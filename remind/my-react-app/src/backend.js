@@ -34,8 +34,8 @@ function getAssignments() {
 }
 
 function countdownAssignments(assignments) {
-    const today = new Date().getTime(); // Current time in milliseconds
-    const msInDay = 24 * 60 * 60 * 1000; // Milliseconds in a day
+    const today = new Date().getTime();
+    const msInDay = 24 * 60 * 60 * 1000; 
 
     assignments.forEach(assignment => {
         const daysUntilDue = Math.floor((assignment.dueDate - today) / msInDay);
