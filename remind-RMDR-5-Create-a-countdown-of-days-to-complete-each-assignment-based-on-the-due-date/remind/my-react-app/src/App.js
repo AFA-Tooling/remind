@@ -66,9 +66,10 @@ function App() {
   //     alert('This feature only sends an automated email to "oindree@berkeley.edu".');
   //   }
   // };
-  
+  // eslint-disable-next-line
   const handleSendEmail = (e) => {
     e.preventDefault();
+    
 
     
 
@@ -116,6 +117,12 @@ function App() {
       }
     } catch (error) {
       console.error('Error saving email:', error);
+    }
+
+     // Check if the email is valid
+     if (email && !emailList.includes(email)) {
+      setEmailList([...emailList, email]);
+      setEmail('');
     }
   }
 
@@ -188,7 +195,7 @@ function App() {
 
         <section>
           <h2>Send Automated Email</h2>
-          <form onSubmit={handleSubmitt}>
+          <form onSubmit={handleSubmit}>
             <label>
               Email Address:
               <input
