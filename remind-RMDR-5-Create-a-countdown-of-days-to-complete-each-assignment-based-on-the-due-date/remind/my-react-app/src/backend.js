@@ -3,6 +3,7 @@ const cors = require('cors');
 require('dotenv').config();
 const sgMail = require('@sendgrid/mail');
 const twilio = require('twilio');
+const fs = require('fs'); // Import the file system module
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -16,6 +17,15 @@ const accountSid = process.env.TWILIO_ACCOUNT_SID;
 const authToken = process.env.TWILIO_AUTH_TOKEN;
 const client = twilio(accountSid, authToken);
 const twilioPhoneNumber = process.env.TWILIO_PHONE_NUMBER;
+
+// Ensure emails.txt exists, create it if not
+const emailsFilePath = 'emails.txt';
+if (!fs.existsSync(emailsFilePath)) {
+  fs.writeFileSync(emailsFilePath, '', (err) => {
+    if (err) console.error('Error creating emails.txt:', err);
+  });
+  console.log('emails.txt created successfully');
+}
 
 // Endpoint to send SMS message
 app.post('/send-sms', (req, res) => {
@@ -42,42 +52,37 @@ app.post('/send-sms', (req, res) => {
       res.status(500).json({ error: 'Failed to send SMS' });
     });
 });
-// checking the logging of emails 
-
-app.get('/list-emails', (req, res) => {
-  console.log("Current email list:", emails);
-  res.status(200).send('Check server console for email list.');
-});
 
 // Endpoint to send email with SendGrid
-app.post('/send-email', (req, res) => {
-  const { email } = req.body;
 
-  const msg = {
-    to: email,
-    from: 'oindree@berkeley.edu',
-    subject: 'Sending with SendGrid is Fun',
-    text: 'and easy to do anywhere, even with Node.js',
-    html: '<strong>and easy to do anywhere, even with Node.js</strong>',
-  };
+  app.post('/send-email', (req, res) => {
+    const { email } = req.body;
+  
+    const msg = {
+      to: email,
+      from: 'oindree@berkeley.edu',
+      subject: 'Sending with SendGrid is Fun',
+      text: 'and easy to do anywhere, even with Node.js',
+      html: '<strong>and easy to do anywhere, even with Node.js</strong>',
+    };
+  
+    sgMail
+      .send(msg)
+      .then(() => {
+        console.log('Email sent');
+        res.status(200).send('Email sent successfully');
+      })
+      .catch((error) => {
+        console.error('Error sending email:', error);
+        res.status(500).send('Error sending email');
+      });
+  });
 
-  sgMail
-    .send(msg)
-    .then(() => {
-      console.log('Email sent');
-      res.status(200).send('Email sent successfully');
-    })
-    .catch((error) => {
-      console.error('Error sending email:', error);
-      res.status(500).send('Error sending email');
-    });
-});
 
-// Saving the user's email to send out automated messages
+// Array to hold emails in memory and save them to a file
+const emails = [];
 
-// Add this new endpoint to your server.js file
-const emails = []; // Or use a database/file storage
-
+// Endpoint to save email and log it to a file
 app.post('/save-email', (req, res) => {
   const { email } = req.body;
   if (!email || !validateEmail(email)) {
@@ -86,16 +91,30 @@ app.post('/save-email', (req, res) => {
 
   emails.push(email);
   console.log('Stored email:', email);
-  res.status(200).json({ message: 'Email saved successfully' });
+
+  // Append the email to emails.txt file
+  fs.appendFile(emailsFilePath, email + '\n', (err) => {
+    if (err) {
+      console.error('Error writing email to file:', err);
+      return res.status(500).json({ error: 'Failed to save email to file' });
+    }
+    res.status(200).json({ message: 'Email saved successfully' });
+  });
 });
 
-// Endpoint to get the list of saved emails
+// Endpoint to log emails to console
+app.get('/list-emails', (req, res) => {
+  console.log("Current email list:", emails);
+  res.status(200).send('Check server console for email list.');
+});
+
+// Endpoint to get emails (if needed in secure context)
 app.get('/get-emails', (req, res) => {
   res.status(200).json(emails);
 });
 
+// Function to validate email format
 function validateEmail(email) {
-  // Add email validation logic here
   return /^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/.test(email);
 }
 
