@@ -5,6 +5,7 @@ function App() {
   const [phoneNumber, setPhoneNumber] = useState('');
   const [email, setEmail] = useState('');
   const [assignments, setAssignments] = useState([]);
+  const [frequency, setFrequency] = useState('');
 
   // Fetch assignments data
   useEffect(() => {
@@ -37,6 +38,30 @@ function App() {
         alert('Failed to send SMS.');
       });
   };
+
+  // Allow the user to customize the notification frequency
+  const handleSetFrequency = (e) => {
+    e.preventDefault();
+    fetch('http://localhost:3000/set-frequency', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ frequency }),
+    })
+     .then((response) => response.json())
+     .then((data) => {
+      if (data.success) {
+        alert('Notification frequency updated successfully!');
+        setFrequency('');
+      } else {
+        alert('Failed to update notification frequency: ' + data.error);
+      }
+     })
+     .catch((error) => {
+       console.error('Error updating frequency:', error);
+       alert('An error occured.');
+     });
+  };
+
 
   // Handle sending Email
 
@@ -257,6 +282,24 @@ function App() {
         <section>
           <h2>Assignment Countdown</h2>
           <ul>{renderAssignments()}</ul>
+        </section>
+
+        <section>
+          <h2>Set Notification Frequency</h2>
+          <form onSubmit={handleSetFrequency}>
+            <label>
+              Frequency (days):
+              <input
+                type="number"
+                min="1"
+                value={frequency}
+                onChange={(e) => setFrequency(e.target.value)}
+                placeholder="Enter frequency in days"
+                required
+              />
+            </label>
+            <button type="submit">Set Frequency</button>
+          </form>
         </section>
       </header>
     </div>
