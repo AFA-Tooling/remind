@@ -4,6 +4,7 @@ require('dotenv').config();
 const sgMail = require('@sendgrid/mail');
 const twilio = require('twilio');
 const fs = require('fs'); // Import the file system module
+const frequencyFilePath = 'frequency.txt';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -134,6 +135,36 @@ app.get('/assignments', (req, res) => {
   });
 
   res.json(assignments);
+});
+
+// Ensure frequency.txt exists, create it if not
+if (!fs.existsSync(frequencyFilePath)) {
+  fs.writeFileSync(frequencyFilePath, '', (err) => {
+    if (err) console.error('Error creating frequency.txt:', err);
+  });
+  console.log('frequency.txt created successfully');
+}
+
+// Endpoint to set notification frequency
+app.post('/set-frequency', (req, res) => {
+  const { frequency } = req.body;
+
+  // Validate frequency input
+  if (!frequency || isNaN(frequency) || frequency <= 0) {
+    return res.status(400).json({ success: false, error: 'Invalid frequency value' });
+  }
+
+  // Append frequency to the file
+  const data = `Frequency: ${frequency} days\n`;
+  fs.appendFile(frequencyFilePath, data, (err) => {
+    if (err) {
+      console.error('Error saving frequency to file:', err);
+      return res.status(500).json({ success: false, error: 'Failed to save frequency to file' });
+    }
+
+    console.log('Frequency saved:', frequency);
+    res.status(200).json({ success: true, message: 'Notification frequency saved successfully.' });
+  });
 });
 
 app.listen(PORT, () => {
