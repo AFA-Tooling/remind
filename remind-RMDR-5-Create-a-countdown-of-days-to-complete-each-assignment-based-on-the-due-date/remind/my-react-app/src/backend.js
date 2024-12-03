@@ -5,6 +5,9 @@ const sgMail = require('@sendgrid/mail');
 const twilio = require('twilio');
 const fs = require('fs'); // Import the file system module
 const frequencyFilePath = 'frequency.txt';
+// webscraping
+const axios = require('axios');
+const cheerio = require('cheerio');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -166,6 +169,51 @@ app.post('/set-frequency', (req, res) => {
     res.status(200).json({ success: true, message: 'Notification frequency saved successfully.' });
   });
 });
+
+// scrape course data (assignments, office hours, etc.)
+async function ScrapeCourseData() {
+  try {
+    const url = "https://example.com/course-page"; // replace with the actual course URL
+    const { data: html } = await axios.get(url); // fetch HTML from the website
+    const $ = cheerio.load(html);
+
+    // extract assignments
+    const assignments = [];
+    $("table.assignments-table tr").each((index, element) => {
+      if (index == 0) return; // skip header row
+      const title = $(element).find("td.title").text().trim();
+      const dueDate = $(element).find("td.due-date").text().trim();
+      assignments.push({ title, dueDate });
+    })
+
+    // extract office hours
+    const officeHours = [];
+    $("div.office-hours p").each((_, element) => {
+      officeHours.push($(element).text().trim());
+    });
+
+    // extract resources
+    const resources = [];
+    $("div.resources a").each((_, element) => {
+      const resourceName = $(element).text().trim();
+      const resourceLink = $(element).attr("href");
+      resources.push({ name: resourceName, url: resourceLink });
+    });
+
+    return { assignments, officeHours, resources };
+  } catch (error) {
+    console.error("Error scraping course data:", error);
+    return { error: "Failed to scrape course data" };
+  }
+}
+
+app.get('/scrape-course', async (req, res) => {
+  const data = await ScrapeCourseData();
+  if (data.error) {
+    return res.status(500).json({ success: false, error: data.error });
+  }
+  res.status(200).json({ success: true, data });
+})
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);

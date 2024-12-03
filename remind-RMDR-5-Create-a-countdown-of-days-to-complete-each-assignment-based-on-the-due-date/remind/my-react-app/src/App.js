@@ -6,6 +6,11 @@ function App() {
   const [email, setEmail] = useState('');
   const [assignments, setAssignments] = useState([]);
   const [frequency, setFrequency] = useState('');
+  const [scrapedData, setScrapedData] = useState({
+    assignments : [],
+    officeHours: [],
+    resources: [],
+  })
 
   // Fetch assignments data
   useEffect(() => {
@@ -13,6 +18,20 @@ function App() {
       .then((response) => response.json())
       .then((data) => setAssignments(data))
       .catch((error) => console.error('Error fetching assignments:', error));
+  }, []);
+
+  // Fetch scraped course data
+  useEffect(() => {
+    fetch('http://localhost:3000/scrape-course')
+      .then((response) => response.json())
+      .then((data) => {
+        if (data.success) {
+          setScrapedData(data.data); // store scraped data in state
+        } else {
+          console.error('Error fetching scraped data:', data.error);
+        }
+      })
+      .catch((error) => console.error('Fetch error:', error));
   }, []);
 
   // Handle sending SMS
@@ -167,7 +186,7 @@ function App() {
 
 
 
-  // Render assignments with countdown
+  /*// Render assignments with countdown
   const renderAssignments = () => {
     const today = new Date().getTime();
     const msInDay = 24 * 60 * 60 * 1000;
@@ -194,6 +213,29 @@ function App() {
         </li>
       );
     });
+  };*/
+
+  // Render scraped assignments
+  const renderScrapedAssignments = () => {
+    return scrapedData.assignments.map((assignment, index) => (
+      <li key={index}>
+        {assignment.title} - Due: {assignment.dueDate}
+      </li>
+    ));
+  };
+
+  const renderOfficeHours = () => {
+    return scrapedData.officeHours.map((oh, index) => <li key={index}>{oh}</li>);
+  };
+
+  const renderResources = () => {
+    return scrapedData.resources.map((resource, index) => (
+      <li key={index}>
+        <a href={resource.url} target="_blank" rel="noopener noreferrer">
+          {resource.name}
+        </a>
+      </li>
+    ));
   };
 
   return (
