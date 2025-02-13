@@ -64,7 +64,7 @@ app.post('/send-sms', (req, res) => {
   
     const msg = {
       to: email,
-      from: 'oindree@berkeley.edu',
+      from: 'autoremindberkeley@gmail.com',
       subject: 'Sending with SendGrid is Fun',
       text: 'and easy to do anywhere, even with Node.js',
       html: '<strong>and easy to do anywhere, even with Node.js</strong>',
