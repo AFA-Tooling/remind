@@ -260,7 +260,7 @@ function App() {
           </form>
         </section>
 
-        <section>
+        {/* <section>
           <h2>Send Automated Email</h2>
           <form onSubmit={handleSubmit}>
             <label>
@@ -283,7 +283,7 @@ function App() {
             ))}
           </ul>
           </div>
-        </section>
+        </section> */}
 
         {/* <section>
           <h2>Submit your email</h2>
@@ -308,6 +308,17 @@ function App() {
         </section> */}
         <section/> 
 
+        <section>
+          <h2>Send Automated Emails</h2>
+          <a
+            href=" https://cdn.forms-content-1.sg-form.com/fe63905c-a2d8-11ef-a2f5-f6bc42c64cc9"
+            rel="noopener noreferrer"
+            target="_blank"
+          >
+            <button type="button">Connect with email</button>
+          </a>
+        </section>
+
 
         <section>
           <h2>Send Automated Discord Messages</h2>
@@ -321,10 +332,10 @@ function App() {
           </a>
         </section>
 
-        <section>
+        {/* <section>
           <h2>Assignment Countdown</h2>
           <ul>{renderAssignments()}</ul>
-        </section>
+        </section> */}
 
         <section>
           <h2>Set Notification Frequency</h2>
