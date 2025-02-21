@@ -4,23 +4,14 @@ import re
 import sqlite3
 
 def scrape_cs10_deadlines(url):
-    """
-    Scrapes the given URL for text blocks containing deadline information.
-
-    Args:
-        url: The URL of the website to scrape.
-
-    Returns:
-        A list of strings, where each string is a text block containing a deadline.
-        Returns an empty list if no deadlines are found or if an error occurs.
-    """
     try:
         response = requests.get(url)
-        response.raise_for_status()  # Raise an exception for HTTP errors
+        response.raise_for_status()
         soup = BeautifulSoup(response.content, "html.parser")
         deadline_texts = []
-        # Regex to match "Due" with dates having optional parentheses.
-        pattern = re.compile(r"Due\s*(?:\(\d+/\d+\)|\d+/\d+)")
+        # Improved regex: looks for "Due" followed by a date OR "Due" followed by "Proj"
+        pattern = re.compile(r"Due\s*(?:\(\d+/\d+\)|\d+/\d+)|Due\s*Proj")
+
         for element in soup.find_all(text=pattern):
             parent = element.parent
             while parent is not None and parent.name not in [
@@ -28,18 +19,28 @@ def scrape_cs10_deadlines(url):
                 'h1', 'h2', 'h3', 'h4', 'h5', 'h6'
             ]:
                 parent = parent.parent
+
             if parent is not None and parent.name in [
                 'p', 'li', 'td', 'span', 'a', 'div',
                 'h1', 'h2', 'h3', 'h4', 'h5', 'h6'
             ]:
                 text = parent.get_text(strip=True)
-                # Normalize the output by ensuring consistent spacing.
+
+                # Normalize and split entries:
                 text = text.replace("Released(Due", "Released Due (")
                 text = text.replace("ReleasedDue", "Released Due")
                 text = text.replace("DueProj", "Due Proj")
-                if "Due" in text:
-                    deadline_texts.append(text)
+
+                # Split on "Due Proj" BUT preserve "Proj" for later entries
+                entries = text.split("Due Proj")
+                for i, entry in enumerate(entries):  # Use enumerate to get the index
+                    if "Due" in entry and re.search(r"\d+/\d+", entry):
+                        if i > 0:  # If it's not the first entry (i.e. after a split)
+                            entry = "Proj" + entry # Add "Proj" back in
+                        deadline_texts.append(entry.strip())
+
         return deadline_texts
+
     except requests.exceptions.RequestException as e:
         print(f"Error fetching URL: {e}")
         return []
