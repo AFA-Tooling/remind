@@ -17,12 +17,20 @@ def get_deadlines(db_name, today_date, days_ahead=5):
         cursor.execute("SELECT * FROM deadlines WHERE due >= ? AND due <= ? AND done = 0", (today_date.isoformat(), future_date.isoformat()))
         upcoming = cursor.fetchall()
 
+        # Completed assignments
+        cursor.execute("SELECT * FROM deadlines WHERE done = 1")
+        completed = cursor.fetchall()
+
+        # All undone assignments (for next deadline calculation)
+        cursor.execute("SELECT * FROM deadlines WHERE done = 0",)
+        all_undone = cursor.fetchall()
+
         conn.close()
-        return overdue, upcoming
+        return overdue, upcoming, completed, all_undone
 
     except sqlite3.Error as e:
         print(f"Database error: {e}")
-        return [], []
+        return [], [], [], []
 
 def update_assignment_done(db_name, assignment_id, submission_time):
     """Updates the 'done' status of an assignment to True and sets submission time."""
@@ -48,15 +56,15 @@ def reset_all_assignments(db_name):
     except sqlite3.Error as e:
         print(f"Database error: {e}")
 
-def display_deadlines(overdue, upcoming, today_date):
-    """Displays overdue and upcoming deadlines."""
+def display_deadlines(overdue, upcoming, completed, all_undone, today_date):
+    """Displays overdue, upcoming, completed deadlines, and next deadline."""
     print("\nOverdue Deadlines:")
     if not overdue:
         print("  None")
     else:
         for row in overdue:
-            due_datetime = datetime.fromisoformat(row[2]) # parse as datetime from iso
-            due_date = due_datetime.date() # extract date portion
+            due_datetime = datetime.fromisoformat(row[2])
+            due_date = due_datetime.date()
             days_overdue = (today_date - due_date).days
             print(f"  ID: {row[0]}, Project: {row[1]}, Due: {row[2]}, Overdue by: {days_overdue} days")
 
@@ -66,6 +74,36 @@ def display_deadlines(overdue, upcoming, today_date):
     else:
         for row in upcoming:
             print(f"  ID: {row[0]}, Project: {row[1]}, Due: {row[2]}")
+
+    print("\nCompleted Assignments:")
+    if not completed:
+        print("  None")
+    else:
+        for row in completed:
+            due_datetime = datetime.fromisoformat(row[2])
+            submission_datetime = datetime.fromisoformat(row[4]) if row[4] else None
+            if submission_datetime:
+                diff = submission_datetime - due_datetime
+                days_diff = diff.days
+                if days_diff > 0:
+                    print(f"  ID: {row[0]}, Project: {row[1]}, Due: {row[2]}, Time Submitted: {row[4]}, Late by: {days_diff} days")
+                else:
+                    print(f"  ID: {row[0]}, Project: {row[1]}, Due: {row[2]}, Time Submitted: {row[4]}, Early by: {-days_diff} days")
+            else:
+                print(f"  ID: {row[0]}, Project: {row[1]}, Due: {row[2]}, Time Submitted: None")
+
+    if all_undone:
+        future_undone = [row for row in all_undone if datetime.fromisoformat(row[2]).date() >= today_date]
+
+        if future_undone:
+            next_deadline_row = min(future_undone, key=lambda row: datetime.fromisoformat(row[2]))
+            next_deadline = datetime.fromisoformat(next_deadline_row[2])
+            days_to_next = (next_deadline.date() - today_date).days
+            print(f"\nNext Upcoming Deadline: {next_deadline_row[1]} due on {next_deadline} (in {days_to_next} days)")
+        else:
+            print("\nNext Upcoming Deadline: None")
+    else:
+        print("\nNext Upcoming Deadline: None")
 
 def main(db_name="deadlines.db", manual_date=None, manual_time=None, update_id=None, reset=False):
     """Main function to check and display deadlines."""
@@ -88,8 +126,8 @@ def main(db_name="deadlines.db", manual_date=None, manual_time=None, update_id=N
         reset_all_assignments(db_name)
         return
 
-    overdue, upcoming = get_deadlines(db_name, today_date)
-    display_deadlines(overdue, upcoming, today_date)
+    overdue, upcoming, completed, all_undone = get_deadlines(db_name, today_date)
+    display_deadlines(overdue, upcoming, completed, all_undone, today_date)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Check and manage CS10 deadlines.")

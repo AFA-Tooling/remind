@@ -48,15 +48,13 @@ def scrape_cs10_deadlines(url):
         return []
 
 def init_db(db_name):
-    """Initializes the SQLite database."""
-    if os.path.exists(db_name):
-        os.remove(db_name)
+    """Initializes the SQLite database if it doesn't exist."""
     conn = sqlite3.connect(db_name)
     cursor = conn.cursor()
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS deadlines (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            project TEXT,
+            project TEXT UNIQUE,
             due TEXT,
             done BOOLEAN DEFAULT 0,
             time_submitted DATETIME
@@ -66,18 +64,29 @@ def init_db(db_name):
     return conn
 
 def store_deadlines(conn, deadlines):
-    """Stores deadlines in the database."""
+    """Stores or updates deadlines in the database, preserving 'done' and 'time_submitted'."""
     cursor = conn.cursor()
     for project_name, due_date in deadlines:
         try:
             due_datetime = datetime.strptime(due_date, "%m/%d").replace(year=2025, hour=23, minute=59, second=59)
-            # Convert datetime object to ISO format string before storing
             due_datetime_iso = due_datetime.isoformat()
-            cursor.execute('INSERT INTO deadlines (project, due, done, time_submitted) VALUES (?, ?, ?, NULL)',
-                           (project_name, due_datetime_iso, False))
+
+            # Check if the project already exists
+            cursor.execute("SELECT done, time_submitted FROM deadlines WHERE project = ?", (project_name,))
+            existing_row = cursor.fetchone()
+
+            if existing_row:
+                # Update existing row, preserving 'done' and 'time_submitted'
+                done_status, time_submitted = existing_row
+                cursor.execute("UPDATE deadlines SET due = ? WHERE project = ?", (due_datetime_iso, project_name))
+            else:
+                # Insert new row
+                cursor.execute('INSERT INTO deadlines (project, due, done, time_submitted) VALUES (?, ?, ?, NULL)',
+                               (project_name, due_datetime_iso, False))
+
         except sqlite3.Error as e:
             print(f"Database error: {e}")
-            print(f"Trying to insert: project='{project_name}', due='{due_date}'")
+            print(f"Trying to insert/update: project='{project_name}', due='{due_date}'")
             conn.rollback()
             raise
         except ValueError as e:
@@ -107,7 +116,7 @@ if __name__ == "__main__":
         db_connection = init_db(db_name)
         store_deadlines(db_connection, deadlines)
         db_connection.close()
-        print(f"Deadlines have been stored in the SQLite database '{db_name}'")
+        print(f"Deadlines have been stored/updated in the SQLite database '{db_name}'")
         print_database_contents(db_name)
     else:
         print("No deadlines found on the page.")
