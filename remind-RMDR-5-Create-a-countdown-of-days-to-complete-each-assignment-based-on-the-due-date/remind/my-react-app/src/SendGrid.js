@@ -32,7 +32,7 @@ async function sendEmail2(studentData) {
     const messageData = {
         to:['autoremindberkeley@gmail.com', 'oindree@berkeley.edu', 'ankitasun@berkeley.edu'],
         from:'autoremindberkeley@gmail.com',
-        subject:'Email template test',
+        subject:'[Action Required] - CS 10 Incomplete Form',
         text:'this is a test',
         html: emailTemplate,
     };
