@@ -1,7 +1,7 @@
 import requests
 from bs4 import BeautifulSoup
 import re
-import sqlite3
+import csv
 import os
 from datetime import datetime, timedelta
 
@@ -47,76 +47,82 @@ def scrape_cs10_deadlines(url):
         print(f"An error occurred: {e}")
         return []
 
-def init_db(db_name):
-    """Initializes the SQLite database if it doesn't exist."""
-    conn = sqlite3.connect(db_name)
-    cursor = conn.cursor()
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS deadlines (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            project TEXT UNIQUE,
-            due TEXT,
-            done BOOLEAN DEFAULT 0,
-            time_submitted DATETIME
-        )
-    ''')
-    conn.commit()
-    return conn
+def read_existing_csv(csv_filename):
+    """Reads existing data from CSV file if it exists."""
+    existing_data = {}
+    if os.path.exists(csv_filename):
+        with open(csv_filename, 'r', newline='') as csvfile:
+            reader = csv.DictReader(csvfile)
+            for row in reader:
+                existing_data[row['project']] = {
+                    'due': row['due'],
+                    'done': row['done'],
+                    'time_submitted': row['time_submitted']
+                }
+    return existing_data
 
-def store_deadlines(conn, deadlines):
-    """Stores or updates deadlines in the database, preserving 'done' and 'time_submitted'."""
-    cursor = conn.cursor()
+def store_deadlines_to_csv(csv_filename, deadlines):
+    """Stores or updates deadlines in CSV file, preserving 'done' and 'time_submitted'."""
+    # Read existing data first (if file exists)
+    existing_data = read_existing_csv(csv_filename)
+    
+    # Prepare data for CSV writing
+    fieldnames = ['project', 'due', 'done', 'time_submitted']
+    rows_to_write = []
+    
     for project_name, due_date in deadlines:
         try:
             due_datetime = datetime.strptime(due_date, "%m/%d").replace(year=2025, hour=23, minute=59, second=59)
             due_datetime_iso = due_datetime.isoformat()
-
-            # Check if the project already exists
-            cursor.execute("SELECT done, time_submitted FROM deadlines WHERE project = ?", (project_name,))
-            existing_row = cursor.fetchone()
-
-            if existing_row:
-                # Update existing row, preserving 'done' and 'time_submitted'
-                done_status, time_submitted = existing_row
-                cursor.execute("UPDATE deadlines SET due = ? WHERE project = ?", (due_datetime_iso, project_name))
+            
+            # Check if project exists in existing data
+            if project_name in existing_data:
+                # Preserve done status and submission time
+                done_status = existing_data[project_name]['done']
+                time_submitted = existing_data[project_name]['time_submitted']
             else:
-                # Insert new row
-                cursor.execute('INSERT INTO deadlines (project, due, done, time_submitted) VALUES (?, ?, ?, NULL)',
-                               (project_name, due_datetime_iso, False))
-
-        except sqlite3.Error as e:
-            print(f"Database error: {e}")
-            print(f"Trying to insert/update: project='{project_name}', due='{due_date}'")
-            conn.rollback()
-            raise
+                # New entry
+                done_status = 'False'
+                time_submitted = ''
+                
+            rows_to_write.append({
+                'project': project_name,
+                'due': due_datetime_iso,
+                'done': done_status,
+                'time_submitted': time_submitted
+            })
+            
         except ValueError as e:
             print(f"Date parsing error: {e}")
             print(f"Problematic date: '{due_date}' for project '{project_name}'")
-    conn.commit()
+    
+    # Write to CSV file
+    with open(csv_filename, 'w', newline='') as csvfile:
+        writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(rows_to_write)
 
-def print_database_contents(db_name):
-    """Prints the contents of the database."""
-    conn = sqlite3.connect(db_name)
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM deadlines")
-    rows = cursor.fetchall()
-    print("\nDatabase contents:")
-    for row in rows:
-        print(f"ID: {row[0]}, Project: {row[1]}, Due: {row[2]}, Done: {row[3]}, Time Submitted: {row[4]}")
-    conn.close()
+def print_csv_contents(csv_filename):
+    """Prints the contents of the CSV file."""
+    if os.path.exists(csv_filename):
+        with open(csv_filename, 'r', newline='') as csvfile:
+            reader = csv.DictReader(csvfile)
+            print("\nCSV contents:")
+            for row in reader:
+                print(f"Project: {row['project']}, Due: {row['due']}, Done: {row['done']}, Time Submitted: {row['time_submitted']}")
+    else:
+        print(f"CSV file '{csv_filename}' does not exist.")
 
 if __name__ == "__main__":
     url = "https://cs10.org/sp25/"
-    db_name = "deadlines.db"
+    csv_filename = "deadlines.csv"
     deadlines = scrape_cs10_deadlines(url)
     if deadlines:
         print("Deadlines found:")
         for project_name, due_date in deadlines:
             print(f"{project_name}; {due_date}")
-        db_connection = init_db(db_name)
-        store_deadlines(db_connection, deadlines)
-        db_connection.close()
-        print(f"Deadlines have been stored/updated in the SQLite database '{db_name}'")
-        print_database_contents(db_name)
+        store_deadlines_to_csv(csv_filename, deadlines)
+        print(f"Deadlines have been stored/updated in the CSV file '{csv_filename}'")
+        print_csv_contents(csv_filename)
     else:
         print("No deadlines found on the page.")
