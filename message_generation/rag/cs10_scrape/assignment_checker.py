@@ -1,70 +1,90 @@
-import sqlite3
 import csv
+import os
 from datetime import datetime, timedelta
 import argparse
 
-def update_csv(db_name, csv_filename="deadlines.csv"):
-    """Updates the CSV file with the latest deadlines from the database."""
-    try:
-        conn = sqlite3.connect(db_name)
-        cursor = conn.cursor()
-        cursor.execute("SELECT * FROM deadlines")
-        rows = cursor.fetchall()
-        conn.close()
+def read_csv(csv_filename):
+    """Reads data from a CSV file."""
+    data = []
+    if os.path.exists(csv_filename):
+        with open(csv_filename, 'r', newline='') as file:
+            reader = csv.reader(file)
+            headers = next(reader)  # Get headers
+            for row in reader:
+                data.append(row)
+    else:
+        print(f"CSV file '{csv_filename}' not found.")
+    return data
 
-        # Write to CSV
-        with open(csv_filename, "w", newline="") as file:
-            writer = csv.writer(file)
-            writer.writerow(["id", "project", "due", "done", "time_submitted"])  # Adjust headers if needed
-            writer.writerows(rows)
-        print(f"CSV file '{csv_filename}' updated.")
-    except sqlite3.Error as e:
-        print(f"Database error: {e}")
+def write_csv(csv_filename, headers, data):
+    """Writes data to a CSV file."""
+    with open(csv_filename, 'w', newline='') as file:
+        writer = csv.writer(file)
+        writer.writerow(headers)
+        writer.writerows(data)
+    print(f"CSV file '{csv_filename}' updated.")
 
-def update_assignment_done(db_name, assignment_id, submission_time):
-    """Updates an assignment's 'done' status and updates CSV."""
+def update_assignment_done(csv_filename, assignment_id, submission_time):
+    """Updates an assignment's 'done' status in the CSV file."""
     try:
-        conn = sqlite3.connect(db_name)
-        cursor = conn.cursor()
-        cursor.execute("UPDATE deadlines SET done = 1, time_submitted = ? WHERE id = ?", (submission_time.isoformat(), assignment_id,))
-        conn.commit()
-        conn.close()
-        print(f"Assignment ID {assignment_id} marked as done at {submission_time}.")
-        update_csv(db_name)  # Update CSV after change
-    except sqlite3.Error as e:
-        print(f"Database error: {e}")
+        data = read_csv(csv_filename)
+        if not data:
+            print(f"No data found in {csv_filename}")
+            return
+            
+        # Assuming CSV structure: id, project, due, done, time_submitted
+        updated = False
+        for row in data:
+            if row[0] == str(assignment_id):  # Convert ID to string for comparison
+                row[3] = '1'  # Mark as done
+                row[4] = submission_time.isoformat()  # Update submission time
+                updated = True
+                break
+                
+        if updated:
+            write_csv(csv_filename, ["id", "project", "due", "done", "time_submitted"], data)
+            print(f"Assignment ID {assignment_id} marked as done at {submission_time}.")
+        else:
+            print(f"Assignment ID {assignment_id} not found in the CSV.")
+    except Exception as e:
+        print(f"Error updating CSV: {e}")
 
-def reset_all_assignments(db_name):
-    """Resets all assignments and updates CSV."""
+def reset_all_assignments(csv_filename):
+    """Resets all assignments to not done in the CSV file."""
     try:
-        conn = sqlite3.connect(db_name)
-        cursor = conn.cursor()
-        cursor.execute("UPDATE deadlines SET done = 0, time_submitted = NULL")
-        conn.commit()
-        conn.close()
+        data = read_csv(csv_filename)
+        if not data:
+            print(f"No data found in {csv_filename}")
+            return
+            
+        # Reset 'done' status and submission time
+        for row in data:
+            row[3] = '0'  # Set done to False
+            row[4] = ''   # Clear submission time
+            
+        write_csv(csv_filename, ["id", "project", "due", "done", "time_submitted"], data)
         print("All assignments reset to not done.")
-        update_csv(db_name)  # Update CSV after reset
-    except sqlite3.Error as e:
-        print(f"Database error: {e}")
+    except Exception as e:
+        print(f"Error resetting CSV: {e}")
 
-def main(db_name="deadlines.db", update_id=None, reset=False):
-    """Main function to update deadlines and sync CSV."""
+def main(csv_filename="deadlines.csv", update_id=None, reset=False):
+    """Main function to update deadlines in CSV."""
     today_datetime = datetime.now().replace(microsecond=0)
 
     if update_id is not None:
-        update_assignment_done(db_name, update_id, today_datetime)
+        update_assignment_done(csv_filename, update_id, today_datetime)
         return
 
     if reset:
-        reset_all_assignments(db_name)
+        reset_all_assignments(csv_filename)
         return
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Manage deadlines and sync CSV.")
-    parser.add_argument("db_name", nargs='?', default="deadlines.db", help="Path to the SQLite database file.")
+    parser = argparse.ArgumentParser(description="Manage deadlines in CSV format.")
+    parser.add_argument("csv_filename", nargs='?', default="deadlines.csv", help="Path to the CSV file.")
     parser.add_argument("--update", type=int, help="Update assignment with given ID.")
     parser.add_argument("--reset", action="store_true", help="Reset all assignments to not done.")
 
     args = parser.parse_args()
 
-    main(args.db_name, args.update, args.reset)
+    main(args.csv_filename, args.update, args.reset)
