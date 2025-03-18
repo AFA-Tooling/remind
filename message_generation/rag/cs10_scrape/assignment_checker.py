@@ -1,20 +1,24 @@
 import csv
 import os
-from datetime import datetime, timedelta
+from datetime import datetime
 import argparse
 
 def read_csv(csv_filename):
     """Reads data from a CSV file."""
     data = []
+    headers = []
     if os.path.exists(csv_filename):
         with open(csv_filename, 'r', newline='') as file:
             reader = csv.reader(file)
-            headers = next(reader)  # Get headers
-            for row in reader:
-                data.append(row)
+            try:
+                headers = next(reader)  # Get headers
+                for row in reader:
+                    data.append(row)
+            except StopIteration:
+                print(f"CSV file '{csv_filename}' is empty or improperly formatted.")
     else:
         print(f"CSV file '{csv_filename}' not found.")
-    return data
+    return headers, data
 
 def write_csv(csv_filename, headers, data):
     """Writes data to a CSV file."""
@@ -27,22 +31,32 @@ def write_csv(csv_filename, headers, data):
 def update_assignment_done(csv_filename, assignment_id, submission_time):
     """Updates an assignment's 'done' status in the CSV file."""
     try:
-        data = read_csv(csv_filename)
+        headers, data = read_csv(csv_filename)
         if not data:
             print(f"No data found in {csv_filename}")
             return
-            
-        # Assuming CSV structure: id, project, due, done, time_submitted
+        
+        # Find the correct column indices
+        id_col = headers.index("id") if "id" in headers else 0
+        done_col = headers.index("done") if "done" in headers else 3
+        time_col = headers.index("time_submitted") if "time_submitted" in headers else 4
+        
+        assignment_id_str = str(assignment_id)
         updated = False
+        
         for row in data:
-            if row[0] == str(assignment_id):  # Convert ID to string for comparison
-                row[3] = '1'  # Mark as done
-                row[4] = submission_time.isoformat()  # Update submission time
+            if len(row) > id_col and row[id_col] == assignment_id_str:
+                # Ensure row has enough elements
+                while len(row) <= max(done_col, time_col):
+                    row.append("")
+                    
+                row[done_col] = '1'  # Mark as done
+                row[time_col] = submission_time.isoformat()  # Update submission time
                 updated = True
                 break
                 
         if updated:
-            write_csv(csv_filename, ["id", "project", "due", "done", "time_submitted"], data)
+            write_csv(csv_filename, headers, data)
             print(f"Assignment ID {assignment_id} marked as done at {submission_time}.")
         else:
             print(f"Assignment ID {assignment_id} not found in the CSV.")
@@ -52,17 +66,25 @@ def update_assignment_done(csv_filename, assignment_id, submission_time):
 def reset_all_assignments(csv_filename):
     """Resets all assignments to not done in the CSV file."""
     try:
-        data = read_csv(csv_filename)
+        headers, data = read_csv(csv_filename)
         if not data:
             print(f"No data found in {csv_filename}")
             return
             
+        # Find the correct column indices
+        done_col = headers.index("done") if "done" in headers else 3
+        time_col = headers.index("time_submitted") if "time_submitted" in headers else 4
+            
         # Reset 'done' status and submission time
         for row in data:
-            row[3] = '0'  # Set done to False
-            row[4] = ''   # Clear submission time
+            # Ensure row has enough elements before trying to modify them
+            while len(row) <= max(done_col, time_col):
+                row.append("")
+                
+            row[done_col] = '0'  # Set done to False
+            row[time_col] = ''   # Clear submission time
             
-        write_csv(csv_filename, ["id", "project", "due", "done", "time_submitted"], data)
+        write_csv(csv_filename, headers, data)
         print("All assignments reset to not done.")
     except Exception as e:
         print(f"Error resetting CSV: {e}")
