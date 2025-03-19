@@ -54,53 +54,70 @@ def read_existing_csv(csv_filename):
         with open(csv_filename, 'r', newline='') as csvfile:
             reader = csv.DictReader(csvfile)
             for row in reader:
+                # Use project name as key and store all info including id (if available)
                 existing_data[row['project']] = {
+                    'id': row.get('id', None),
                     'due': row['due'],
                     'done': row['done'],
                     'time_submitted': row['time_submitted']
                 }
     return existing_data
 
+
 def store_deadlines_to_csv(csv_filename, deadlines):
-    """Stores or updates deadlines in CSV file, preserving 'done' and 'time_submitted'."""
-    # Read existing data first (if file exists)
+    """Stores or updates deadlines in CSV file, preserving 'done' and 'time_submitted' and adding an 'id' column."""
+    # Read existing data (if file exists)
     existing_data = read_existing_csv(csv_filename)
     
-    # Prepare data for CSV writing
-    fieldnames = ['project', 'due', 'done', 'time_submitted']
+    # Determine next available ID based on existing entries
+    existing_ids = []
+    for data in existing_data.values():
+        try:
+            if data.get('id'):
+                existing_ids.append(int(data['id']))
+        except ValueError:
+            pass
+    next_id = max(existing_ids) + 1 if existing_ids else 0
+    
+    # Define CSV header with 'id'
+    fieldnames = ['id', 'project', 'due', 'done', 'time_submitted']
     rows_to_write = []
     
     for project_name, due_date in deadlines:
         try:
+            # Parse the due date; adjust year and time as needed
             due_datetime = datetime.strptime(due_date, "%m/%d").replace(year=2025, hour=23, minute=59, second=59)
             due_datetime_iso = due_datetime.isoformat()
             
-            # Check if project exists in existing data
-            if project_name in existing_data:
-                # Preserve done status and submission time
+            if project_name in existing_data and existing_data[project_name].get('id'):
+                # Use the existing ID and preserved fields
+                assignment_id = existing_data[project_name]['id']
                 done_status = existing_data[project_name]['done']
                 time_submitted = existing_data[project_name]['time_submitted']
             else:
-                # New entry
+                # Assign a new ID if it doesn't exist yet
+                assignment_id = str(next_id)
+                next_id += 1
                 done_status = 'False'
                 time_submitted = ''
-                
+            
             rows_to_write.append({
+                'id': assignment_id,
                 'project': project_name,
                 'due': due_datetime_iso,
                 'done': done_status,
                 'time_submitted': time_submitted
             })
-            
         except ValueError as e:
             print(f"Date parsing error: {e}")
             print(f"Problematic date: '{due_date}' for project '{project_name}'")
     
-    # Write to CSV file
+    # Write updated data to the CSV file with the new header
     with open(csv_filename, 'w', newline='') as csvfile:
         writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
         writer.writeheader()
         writer.writerows(rows_to_write)
+
 
 def print_csv_contents(csv_filename):
     """Prints the contents of the CSV file."""
