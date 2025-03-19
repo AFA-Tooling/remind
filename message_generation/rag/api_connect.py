@@ -43,48 +43,52 @@ def human_readable_due_date(iso_date_str):
     except ValueError:
         return iso_date_str, None  # Return as-is if parsing fails
 
-# Format data into a structured string
 def format_project_data(df):
     formatted_text = "Here is a list of projects with their status:\n\n"
     
-    # Track overdue assignments
     overdue_assignments = []
     upcoming_assignments = []
     
     for _, row in df.iterrows():
         due_date_human, days_diff = human_readable_due_date(row['due'])
         
-        # Track overdue and incomplete assignments
-        if days_diff is not None and days_diff < 0 and not row['done']:
+        # Convert the 'done' field to a string, strip whitespace,
+        # then check if it equals '1' or 'True'
+        done_str = str(row['done']).strip()
+        completed = done_str in ['1', 'True']
+        
+        # Overdue: deadline has passed (days_diff < 0) and the assignment is not completed.
+        if days_diff is not None and days_diff < 0 and not completed:
             overdue_assignments.append((row['project'], days_diff))
         
-        # Track upcoming and incomplete assignments
-        if days_diff is not None and days_diff >= 0 and not row['done']:
+        # Upcoming: assignment is pending and deadline is today or in the future.
+        if days_diff is not None and days_diff >= 0 and not completed:
             upcoming_assignments.append((row['project'], days_diff))
         
         formatted_text += (
             f"- **{row['project']}**\n"
             f"  - Due: {due_date_human}\n"
-            f"  - Completed: {'Yes' if row['done'] else 'No'}\n"
+            f"  - Completed: {'Yes' if completed else 'No'}\n"
             f"  - Submission Time: {row['time_submitted'] if pd.notna(row['time_submitted']) else 'Not submitted'}\n\n"
         )
     
-    # Add summary information about overdue and upcoming assignments
     summary_text = ""
     if overdue_assignments:
-        overdue_assignments.sort(key=lambda x: x[1])  # Sort by days (most overdue first)
+        overdue_assignments.sort(key=lambda x: x[1])  # Most overdue first.
         summary_text += "⚠️ OVERDUE ASSIGNMENTS ⚠️\n"
         for name, days in overdue_assignments:
             summary_text += f"- {name}: {abs(days)} days overdue\n"
         summary_text += "\n"
     
     if upcoming_assignments:
-        upcoming_assignments.sort(key=lambda x: x[1])  # Sort by days (closest due date first)
+        upcoming_assignments.sort(key=lambda x: x[1])  # Closest due date first.
         next_assignment = upcoming_assignments[0]
         days_text = "due today" if next_assignment[1] == 0 else f"due in {next_assignment[1]} days"
         summary_text += f"Next assignment: {next_assignment[0]} ({days_text})\n\n"
     
     return summary_text + formatted_text
+
+
 
 formatted_data = format_project_data(df)
 
