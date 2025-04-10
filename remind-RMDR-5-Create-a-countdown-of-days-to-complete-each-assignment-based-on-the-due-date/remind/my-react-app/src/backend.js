@@ -8,6 +8,19 @@ const frequencyFilePath = 'frequency.txt';
 // webscraping
 const axios = require('axios');
 const cheerio = require('cheerio');
+/*const AWS = require('aws-sdk');
+
+// Load AWS credentials and region from environment variables
+AWS.config.update({
+  accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+  secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+  region: process.env.AWS_REGION
+});*/
+
+const { sendSMS } = require('./src/AmazonSNS');
+
+
+const sns = new AWS.SNS();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -81,6 +94,24 @@ app.post('/send-sms', (req, res) => {
         res.status(500).send('Error sending email');
       });
   });
+
+  // Amazon SNS integration
+  app.post('/send-sns', async (req, res) => {
+    const { phoneNumber, message } = req.body;
+  
+    if (!phoneNumber || !message) {
+      return res.status(400).json({ success: false, error: 'Missing phone number or message.' });
+    }
+  
+    const result = await sendSMS(phoneNumber, message);
+  
+    if (result.success) {
+      res.status(200).json({ success: true, messageId: result.messageId });
+    } else {
+      res.status(500).json({ success: false, error: result.error });
+    }
+  });
+  
 
 
 // Array to hold emails in memory and save them to a file
