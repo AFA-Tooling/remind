@@ -1,1 +1,9 @@
 .env
+# Google service account credentials
+config/credentials.json
+
+# Generated output
+output/
+
+# Optional Mac junk files
+.DS_Store
