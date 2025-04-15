@@ -1,0 +1,69 @@
+b'First Name,Last Name,SID,Email,Sections,Total Score,Max Points,Status,Submission ID,Submission Time,Lateness (H:M:S),View Count,Submission Count,1: Autograder (1.0 pts)
+Malachite,McEvoy,3036547996,malachitemcevoy@berkeley.edu,compsci-10-dis-801-in-person,1,1,Graded,301307786,2025-01-22 14:36:02 -0800,0:00:00,0,1,1
+Jiuxi,Wang,3039900360,jiuxi_wang@berkeley.edu,compsci-10-dis-801-in-person,1,1,Graded,303642478,2025-01-30 18:06:41 -0800,0:00:00,0,1,1
+Qiqing,Deng,3040948524,dqq22071011@berkeley.edu,compsci-10-dis-801-in-person,1,1,Graded,303642478,2025-01-30 18:06:41 -0800,0:00:00,0,1,1
+Jialing,Zhou,3040940542,jialingzhou@berkeley.edu,compsci-10-dis-801-in-person,1,1,Graded,304337825,2025-02-02 12:35:45 -0800,0:00:00,0,1,1
+Yutong,Sun,3040864726,sun0226@berkeley.edu,compsci-10-dis-801-in-person,1,1,Graded,304337825,2025-02-02 12:35:45 -0800,0:00:00,0,2,1
+Kelly,Chou,3038568093,kelly0919@berkeley.edu,compsci-10-dis-801-in-person,1,1,Graded,304489886,2025-02-02 21:58:14 -0800,0:00:00,0,1,1
+Yizhou,Yuan,3040942908,yujoo_ivy@berkeley.edu,compsci-10-dis-801-in-person,1,1,Graded,304737934,2025-02-03 15:56:24 -0800,0:00:00,0,1,1
+Liangcheng,Zhang,3040950656,12012616lc@berkeley.edu,compsci-10-dis-801-in-person,1,1,Graded,304737934,2025-02-03 15:56:24 -0800,0:00:00,0,1,1
+Ella,Pockman,3040677760,ella.pockman@berkeley.edu,,1,1,Graded,304741441,2025-02-03 16:07:31 -0800,0:00:00,0,3,1
+Abigail,Johnson,3040928660,abigail.johnson@berkeley.edu,compsci-10-dis-801-in-person,1,1,Graded,304743995,2025-02-03 16:16:19 -0800,0:00:00,0,1,1
+Madeira,Lowe,3036690193,maddielowe@berkeley.edu,compsci-10-dis-801-in-person,1,1,Graded,304744032,2025-02-03 16:16:26 -0800,0:00:00,0,3,1
+Jack,Hulse,3040081294,johnhulse@berkeley.edu,compsci-10-dis-801-in-person,1,1,Graded,304744785,2025-02-03 16:19:06 -0800,0:00:00,0,1,1
+Zhuoyin,Hu,3040935381,huzhuoyin@berkeley.edu,compsci-10-dis-801-in-person,1,1,Graded,304747025,2025-02-03 16:26:37 -0800,0:00:00,0,1,1
+Fangyin,Ge,3040940100,gnononooy@berkeley.edu,,1,1,Graded,304751713,2025-02-03 16:38:49 -0800,0:00:00,0,1,1
+Xiaolei,Jiang,3040943558,xiaoleijiang@berkeley.edu,compsci-10-dis-801-in-person,1,1,Graded,304751713,2025-02-03 16:38:49 -0800,0:00:00,0,1,1
+Devon,Akiyama,3036618589,devon-akiyama@berkeley.edu,compsci-10-dis-801-in-person,1,1,Graded,304807669,2025-02-03 19:00:19 -0800,0:00:00,0,1,1
+Priscilla,Shih,3040151286,prishi@berkeley.edu,compsci-10-dis-801-in-person,1,1,Graded,304807669,2025-02-03 19:00:19 -0800,0:00:00,0,1,1
+Precious,Rios,3039926074,preciousrios613@berkeley.edu,compsci-10-dis-801-in-person,1,1,Graded,305104574,2025-02-04 15:06:46 -0800,0:00:00,0,1,1
+Augus,Lu,3036656276,ninglu@berkeley.edu,compsci-10-dis-801-in-person,1,1,Graded,305104574,2025-02-04 15:06:46 -0800,0:00:00,0,1,1
+Brandon,Yeh,3040617947,brandon_yeh@berkeley.edu,compsci-10-dis-801-in-person,1,1,Graded,305163167,2025-02-04 17:42:18 -0800,0:00:00,0,1,1
+Wanying,Luo,3040952216,luoluobright@berkeley.edu,compsci-10-dis-801-in-person,1,1,Graded,305174938,2025-02-04 18:14:18 -0800,0:00:00,0,2,1
+Zijian,Qiu,3040942973,jasonqiu12@berkeley.edu,compsci-10-dis-801-in-person,1,1,Graded,305174938,2025-02-04 18:14:18 -0800,0:00:00,0,2,1
+Sofia,Gonzalez,3040044257,sofia_gonzalez@berkeley.edu,compsci-10-dis-801-in-person,1,1,Graded,305176289,2025-02-04 18:18:05 -0800,0:00:00,0,1,1
+Adriana,Ho,3039985705,adrianaho@berkeley.edu,compsci-10-dis-801-in-person,1,1,Graded,305176289,2025-02-04 18:18:05 -0800,0:00:00,0,1,1
+Gabriella,Rachal,3040328684,gcrachal14@berkeley.edu,compsci-10-dis-801-in-person,1,1,Graded,305228430,2025-02-04 20:33:00 -0800,0:00:00,0,1,1
+Aidan,Fuentes-Yip,3039887737,acfuentes@berkeley.edu,compsci-10-dis-801-in-person,1,1,Graded,305234883,2025-02-04 20:48:34 -0800,0:00:00,0,1,1
+Emilie,Yajima,3040923954,emilie1217@berkeley.edu,compsci-10-dis-801-in-person,1,1,Graded,305264822,2025-02-04 22:36:19 -0800,0:00:00,0,1,1
+Angel,Mora Argueta,3040111597,angelmoraargueta@berkeley.edu,compsci-10-dis-801-in-person,1,1,Graded,305485867,2025-02-05 14:39:38 -0800,0:00:00,0,1,1
+Xueyuan,Cheng,3040946171,wnyuanyuan@berkeley.edu,,0,1,Graded,305657765,2025-02-05 21:36:22 -0800,0:00:00,0,7,0
+Yanlin,Zhao,3040466419,yanlinzhao@berkeley.edu,compsci-10-dis-801-in-person,1,1,Graded,305690859,2025-02-06 00:05:46 -0800,0:06:46,0,1,1
+Ruisi,Liu,3039890220,ruisi_liu@berkeley.edu,compsci-10-dis-801-in-person,1,1,Graded,305690859,2025-02-06 00:05:46 -0800,0:06:46,0,1,1
+Carolina,Cabezas,3040308547,caroadamary@berkeley.edu,compsci-10-dis-801-in-person,1,1,Graded,305957276,2025-02-06 17:32:29 -0800,17:33:29,0,1,1
+Yuki,Hamachi,3038033130,yuki1010@berkeley.edu,compsci-10-dis-801-in-person,1,1,Graded,306083919,2025-02-07 00:33:57 -0800,24:34:57,0,1,1
+Alex,Chen,3040081632,alexychen@berkeley.edu,compsci-10-dis-801-in-person,1,1,Graded,306088650,2025-02-07 02:12:04 -0800,26:13:04,0,1,1
+Joyce,Kei,3040233706,joyce_kei@berkeley.edu,compsci-10-dis-801-in-person,1,1,Graded,306089246,2025-02-07 02:32:38 -0800,26:33:38,0,1,1
+Curlee,Thomas,3038646132,curleethomas9@berkeley.edu,compsci-10-dis-801-in-person,1,1,Graded,306256669,2025-02-07 12:48:25 -0800,36:49:25,0,2,1
+Simon,Wimmer,3040927802,simon.wimmer@berkeley.edu,compsci-10-dis-801-in-person,1,1,Graded,306738346,2025-02-09 15:35:12 -0800,87:36:12,0,3,1
+Yiqian,Chen,3040759465,chenyiqian1000@berkeley.edu,compsci-10-dis-801-in-person,1,1,Graded,306738346,2025-02-09 15:35:12 -0800,87:36:12,0,3,1
+Anita,Qian,3040005244,anita_qian@berkeley.edu,compsci-10-dis-801-in-person,1,1,Graded,307922233,2025-02-12 18:24:30 -0800,162:25:30,0,5,1
+Khushi,Kethana,3037674837,khushikethana@berkeley.edu,compsci-10-dis-801-in-person,1,1,Graded,308004351,2025-02-12 21:46:07 -0800,165:47:07,0,1,1
+Giovanni,Chavarria Parra,3037923293,gioparra@berkeley.edu,compsci-10-dis-801-in-person,0.96,1,Graded,308773915,2025-02-14 18:23:55 -0800,210:24:55,0,1,0.96
+Riya,Goel,3038772349,riyagoel@berkeley.edu,compsci-10-dis-801-in-person,1,1,Graded,313013884,2025-02-27 19:40:02 -0800,523:41:02,0,3,1
+Zahra,Mokhtari,3040528611,zahra_mokhtari@berkeley.edu,compsci-10-dis-801-in-person,1,1,Graded,317489166,2025-03-15 00:04:02 -0700,887:05:02,0,1,1
+Edwin,Ruiz-Rodriguez,3040223761,edwinruiz@berkeley.edu,compsci-10-dis-801-in-person,1,1,Graded,320844326,2025-03-28 20:25:12 -0700,1219:26:12,0,1,1
+Minseo,Yoon,3040799830,minseo0223@berkeley.edu,compsci-10-dis-801-in-person,1,1,Graded,321045655,2025-03-30 15:22:03 -0700,1262:23:03,0,4,1
+Gennalyn,Torres,3040583471,gennalynmayberkeley@berkeley.edu,compsci-10-dis-801-in-person,1,1,Graded,322637791,2025-04-04 17:34:15 -0700,1384:35:15,0,5,1
+test2,test2,,test2@test.com,,,1,Missing,,,,,,
+test1,test1,,test1@test.com,,,1,Missing,,,,,,
+test3,test3,,test3@test.com,,,1,Missing,,,,,,
+test4,test4,,test4@test.com,,,1,Missing,,,,,,
+Rishi,Kundu,UID:1732360,rkundu@berkeley.edu,Incomplete / Continuing Work,,1,Missing,,,,,,
+Vanessa,Nguyen,3036804730,vanessa.nguyen@berkeley.edu,compsci-10-dis-801-in-person,,1,Missing,,,,,,
+Tilema,Latu,3037338261,tilemalatu@berkeley.edu,compsci-10-dis-801-in-person,,1,Missing,,,,,,
+Leona,Katibah,,leonakatibah@berkeley.edu,,,1,Missing,,,,,,
+Alex,Xiao,3038531186,xyux@berkeley.edu,compsci-10-dis-801-in-person,,1,Missing,,,,,,
+Liz,Martinez,3038326956,lizbeth.martinez@berkeley.edu,Incomplete / Continuing Work,,1,Missing,,,,,,
+Wendi,Lopez,UID:1808816,wlopez26@berkeley.edu,Incomplete / Continuing Work,,1,Missing,,,,,,
+Qurratul,Sanjida,,qurratulain.508@berkeley.edu,,,1,Missing,,,,,,
+Keon,Soltani,,keon@berkeley.edu,Incomplete / Continuing Work,,1,Missing,,,,,,
+Hyun Woo,Song,3038359521,hsong423@berkeley.edu,compsci-10-dis-801-in-person,,1,Missing,,,,,,
+Edward,Hou,3033723307,eddhou@berkeley.edu,compsci-10-dis-801-in-person,,1,Missing,,,,,,
+Will,Roloson,,kobay@berkeley.edu,,,1,Missing,,,,,,
+test5,test5,,test5@test.com,,,1,Missing,,,,,,
+Kaixing,Zhang,3040937812,keson@berkeley.edu,,,1,Missing,,,,,,
+Erin,ZHOU,3040947731,uerinzhou@berkeley.edu,,,1,Missing,,,,,,
+Efe,Atli,23772813,eatli@berkeley.edu,compsci-10-dis-801-in-person,,1,Missing,,,,,,
+Felipe,Ruiz-Tagle,3040705060,felipe.ruiztagle@berkeley.edu,compsci-10-dis-801-in-person,,1,Missing,,,,,,
+Jerome,Martel,,jerome.martel.t@berkeley.edu,,,1,Missing,,,,,,
