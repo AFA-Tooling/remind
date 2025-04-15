@@ -16,27 +16,23 @@ from googleapiclient.discovery import build
 from google.oauth2 import service_account
 from google.auth.transport.requests import Request
 from google.auth.exceptions import RefreshError
+from google.oauth2.service_account import Credentials
+import gspread
 
 # Sheet & credentials config
-google_sheet_id = '1HGd-7No73YLCHGGB29SrxEJnZ_5SO5oMPY4842d4IAY'
-google_sheet_credentials = 'credentials.json'
-config_folder = os.path.join(os.path.dirname(__file__), 'config')
-credentials_path = os.path.join(config_folder, google_sheet_credentials)
+class_json_name = 'cs10_sp25_test.json'
+config_path = os.path.join(os.path.dirname(__file__), 'config/', class_json_name)
+with open(config_path, "r") as config_file:
+    config = json.load(config_file)
 
-if not os.path.exists(credentials_path):
-    logging.error(f"Credentials file not found: {credentials_path}")
-    sys.exit(1)
+# IDs to link files
+SCOPES = config["SCOPES"]
+SPREADSHEET_ID = config["SPREADSHEET_ID"]
 
-def get_credentials():
-    try:
-        creds = service_account.Credentials.from_service_account_file(
-            credentials_path,
-            scopes=['https://www.googleapis.com/auth/spreadsheets.readonly']
-        )
-        return creds
-    except Exception as e:
-        logging.error(f"Error getting credentials: {e}")
-        sys.exit(1)
+credentials_json = os.getenv("SERVICE_ACCOUNT_CREDENTIALS")
+credentials_dict = json.loads(credentials_json)
+credentials = Credentials.from_service_account_info(credentials_dict, scopes=SCOPES)
+client = gspread.authorize(credentials)
 
 def get_all_tab_names(sheet_id, credentials):
     try:
@@ -100,12 +96,12 @@ def sanitize_filename(name):
 
 if __name__ == "__main__":
     creds = get_credentials()
-    tab_names = get_all_tab_names(google_sheet_id, creds)
+    tab_names = get_all_tab_names(SPREADSHEET_ID, creds)
 
     for tab in tab_names:
         print(f"\n📄 Parsing tab: {tab}")
         range_str = f"{tab}!A1:Z1000"
-        raw_data = get_google_sheet_data(google_sheet_id, range_str, creds)
+        raw_data = get_google_sheet_data(SPREADSHEET_ID, range_str, creds)
 
         if not raw_data or len(raw_data) < 2:
             print(f"⚠️ Skipping {tab} (no data)")
