@@ -17,6 +17,8 @@ AWS.config.update({
   region: process.env.AWS_REGION
 });*/
 
+const { sendTextMessage } = require('./src/TextMessage');
+
 const { sendSMS } = require('./src/AmazonSNS');
 
 
@@ -94,6 +96,24 @@ app.post('/send-sms', (req, res) => {
         res.status(500).send('Error sending email');
       });
   });
+
+  // SendGrid Text Messaging Integration
+  app.post('/send-text-via-email', async (req, res) => {
+    const { phoneNumber, carrier, message } = req.body;
+  
+    if (!phoneNumber || !carrier || !message) {
+      return res.status(400).json({ error: 'Phone number, carrier, and message are required.' });
+    }
+  
+    const result = await sendTextMessage(phoneNumber, carrier, message);
+  
+    if (result.success) {
+      res.status(200).json({ success: true });
+    } else {
+      res.status(500).json({ success: false, error: result.error });
+    }
+  });
+  
 
   // Amazon SNS integration
   app.post('/send-sns', async (req, res) => {
