@@ -58,6 +58,34 @@ function App() {
       });
   };
 
+  // Amazon SNS integration
+  const handleSendSNS = (e) => {
+    e.preventDefault();
+  
+    fetch('http://localhost:3000/send-sns', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        phoneNumber: phoneNumber,
+        message: 'Reminder: You have an assignment due soon!', // or customize
+      }),
+    })
+      .then((response) => response.json())
+      .then((data) => {
+        if (data.success) {
+          alert('SNS message sent successfully!');
+          setPhoneNumber('');
+        } else {
+          alert('Failed to send SNS message: ' + data.error);
+        }
+      })
+      .catch((error) => {
+        console.error('Error sending SNS message:', error);
+        alert('Error occurred while sending SNS message.');
+      });
+  };
+  
+
   // Allow the user to customize the notification frequency
   const handleSetFrequency = (e) => {
     e.preventDefault();
@@ -336,6 +364,25 @@ function App() {
           <h2>Assignment Countdown</h2>
           <ul>{renderAssignments()}</ul>
         </section> */}
+
+        
+        <section>
+          <h2>Send SNS Notification</h2>
+          <form onSubmit={handleSendSNS}>
+            <label>
+              Phone Number:
+              <input
+                type="tel"
+                value={phoneNumber}
+                onChange={(e) => setPhoneNumber(e.target.value)}
+                placeholder="e.g., +1234567890"
+                required
+              />
+            </label>
+            <button type="submit">Send via SNS</button>
+          </form>
+        </section>
+
 
         <section>
           <h2>Set Notification Frequency</h2>
