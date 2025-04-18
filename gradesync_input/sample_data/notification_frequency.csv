@@ -1,37 +1,68 @@
-sid,notification_frequency
-3040005244,3 days
-3036547996,7 days
-3040928660,3 days
-3040081294,3 days
-3038568093,3 days
-3036690193,7 days
-3040927802,3 days
-3040151286,3 days
-3036618589,3 days
-3040943558,7 days
-3040864726,3 days
-3040940542,3 days
-3039900360,3 days
-3040948524,7 days
-3040759465,3 days
-3040935381,3 days
-3040942973,3 days
-3040799830,7 days
-3040950656,3 days
-3040942908,3 days
-3038531186,3 days
-3040328684,7 days
-3039985705,3 days
-3040044257,3 days
-3036656276,3 days
-3040308547,7 days
-3039926074,3 days
-3038772349,3 days
-3039887737,3 days
-3040952216,7 days
-3040081632,3 days
-3040233706,3 days
-3040923954,3 days
-3039890220,7 days
-3040466419,3 days
-3040617947,3 days
+first name,last name,sid,notification_frequency
+Samir,Robinson,3039081502,
+Joyce,Kei,3040233706,
+Qiqing,Deng,3040948524,
+Precious,Rios,3039926074,
+Curlee,Thomas,3038646132,
+Kelly,Chou,3038568093,
+Zhuoyin,Hu,3040935381,
+Devon,Akiyama,3036618589,
+Yizhou,Yuan,3040942908,
+Adriana,Ho,3039985705,
+Alex,Xiao,3038531186,
+Zahra,Mokhtari,3040528611,
+Augus,Lu,3036656276,
+Khushi,Kethana,3037674837,
+Brandon,Yeh,3040617947,
+Ziqi,Dai,3040839571,
+Anita,Qian,3040005244,
+Simon,Wimmer,3040927802,
+Gennalyn,Torres,3040583471,
+Riya,Goel,3038772349,
+Hyun Woo,Song,3038359521,
+Edwin,Ruiz-Rodriguez,3040223761,
+test2,test2,,
+test1,test1,,
+test3,test3,,
+test4,test4,,
+Rishi,Kundu,UID:1732360,
+Vanessa,Nguyen,3036804730,
+Tilema,Latu,3037338261,
+Madeira,Lowe,3036690193,
+Leona,Katibah,,
+Malachite,McEvoy,3036547996,
+Liz,Martinez,3038326956,
+Wendi,Lopez,UID:1808816,
+Qurratul,Sanjida,,
+Keon,Soltani,,
+Giovanni,Chavarria Parra,3037923293,
+Edward,Hou,3033723307,
+Will,Roloson,,
+Yuki,Hamachi,3038033130,
+Priscilla,Shih,3040151286,
+test5,test5,,
+Aidan,Fuentes-Yip,3039887737,
+Angel,Mora Argueta,3040111597,
+Jiuxi,Wang,3039900360,
+Yanlin,Zhao,3040466419,
+Carolina,Cabezas,3040308547,
+Sofia,Gonzalez,3040044257,
+Gabriella,Rachal,3040328684,
+Ruisi,Liu,3039890220,
+Jack,Hulse,3040081294,
+Yutong,Sun,3040864726,
+Minseo,Yoon,3040799830,
+Yiqian,Chen,3040759465,
+Xiaolei,Jiang,3040943558,
+Wanying,Luo,3040952216,
+Emilie,Yajima,3040923954,
+Kaixing,Zhang,3040937812,
+Erin,ZHOU,3040947731,
+Alex,Chen,3040081632,
+Abigail,Johnson,3040928660,
+Jialing,Zhou,3040940542,
+Liangcheng,Zhang,3040950656,
+Zijian,Qiu,3040942973,
+Efe,Atli,23772813,
+Felipe,Ruiz-Tagle,3040705060,
+Jerome,Martel,,
