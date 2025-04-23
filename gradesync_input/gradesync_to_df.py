@@ -5,6 +5,7 @@ import sys
 import argparse
 import logging
 import json
+import re
 
 # Create an output folder if it doesn't exist
 output_folder = os.path.join(os.path.dirname(__file__), 'output')
@@ -18,7 +19,7 @@ from google.auth.transport.requests import Request
 from google.auth.exceptions import RefreshError
 
 # Sheet & credentials config
-google_sheet_id = '1HGd-7No73YLCHGGB29SrxEJnZ_5SO5oMPY4842d4IAY'
+google_sheet_id = '11H0hRtJOHCy59jaxbdRSp7JhDtkaiOibvexZ4Shj4wE'
 google_sheet_credentials = 'credentials.json'
 config_folder = os.path.join(os.path.dirname(__file__), 'config')
 credentials_path = os.path.join(config_folder, google_sheet_credentials)
@@ -76,26 +77,33 @@ def convert_to_dataframe(data):
         logging.error(f"Error converting data to DataFrame: {e}")
         sys.exit(1)
 
-
-def clean_dataframe(df):
-    if 'SID' in df.columns:
-        df = df[df['SID'].notna()]
-        df = df[~df['SID'].astype(str).str.contains("#N/A|UID", na=False)]
-    df.columns = df.columns.str.strip()
-    for col in df.columns[3:]:
-        df[col] = pd.to_numeric(df[col], errors='coerce')
-    df.dropna(how='all', inplace=True)
-    df.reset_index(drop=True, inplace=True)
-    return df
-
-import re
-def sanitize_filename(name):
+def preprocess_df(df, tab_name):
     """
-    Replace or remove characters that can't be used in filenames
+    Cleans and formats a Google Sheets assignment DataFrame:
+    - Filters relevant columns
+    - Adds an 'assignment' column using the provided tab name
+    - Renames columns, reorders them, and standardizes the formatting
+
+    Args:
+        df (pd.DataFrame): Raw DataFrame from Google Sheets
+        tab_name (str): Name of the Google Sheet tab (used as assignment label)
+
+    Returns:
+        pd.DataFrame: Cleaned and formatted DataFrame
     """
-    # Replace anything not alphanumeric, space, underscore or dash
-    name = re.sub(r'[^\w\s-]', '', name)
-    return name.strip().replace(' ', '_')
+    required_columns = ["b'First Name", 'Last Name', 'SID', 'Email', 'Status', 'Submission Time', 'Lateness (H:M:S)']
+    missing = [col for col in required_columns if col not in df.columns]
+    if missing:
+        raise ValueError(f"Missing columns in input DataFrame: {missing}")
+    
+    # Filter and format
+    filtered_df = df[required_columns].copy()
+    filtered_df['Assignment'] = tab_name
+    filtered_df = filtered_df[['Assignment'] + required_columns]
+    filtered_df.rename(columns={"b'First Name": 'First Name'}, inplace=True)
+    filtered_df.columns = filtered_df.columns.str.lower().str.strip()
+
+    return filtered_df
 
 
 if __name__ == "__main__":
@@ -103,20 +111,36 @@ if __name__ == "__main__":
     tab_names = get_all_tab_names(google_sheet_id, creds)
 
     for tab in tab_names:
+
+        # Skip the summary tabs
+        if tab in ['Roster', 'Labs', 'Discussions', 'Projects', 'Lecture Quizzes', 'Midterms', 'Postterms']:
+            print(f"Skipping {tab} (not relevant)")
+            continue
+
         print(f"\n Parsing tab: {tab}")
-        range_str = f"{tab}!A1:Z1000"
+        range_str = f"{tab}"
         raw_data = get_google_sheet_data(google_sheet_id, range_str, creds)
 
         if not raw_data or len(raw_data) < 2:
             print(f"Skipping {tab} (no data)")
             continue
-
+        
+        # 1. Convert the raw data to a dataframe
         df = convert_to_dataframe(raw_data)
-        df = clean_dataframe(df)
 
+        # 2. Preprocess the dataframe
+        df = preprocess_df(df, tab)
+        print(f"Cleaned {tab} DataFrame:")
         print(df.head())  # Preview the cleaned data
-        output_filename = f"{sanitize_filename(tab)}.csv"
+
+        # 3. Export the cleaned dataframe to CSV
+        output_filename = f"{tab}.csv"
         output_path = os.path.join(output_folder, output_filename)
+
+        # ✅ Ensure the folder exists
+        os.makedirs(os.path.dirname(output_path), exist_ok=True)
+
+        # Save the CSV
         df.to_csv(output_path, index=False)
         print(f"Saved {output_path}")
         print(f"Saved {tab}.csv")
