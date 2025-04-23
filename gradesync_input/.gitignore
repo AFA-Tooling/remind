@@ -7,3 +7,6 @@ output/
 
 # Optional Mac junk files
 .DS_Store
+
+# Pycache folder
+__pycache__/
