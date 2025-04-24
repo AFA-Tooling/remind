@@ -14,6 +14,10 @@ assignment_files = [
 
 # Run the processing for each assignment file
 for file_name in assignment_files:
+    # Only process the file if it starts with the word 'Project'
+    if not file_name.startswith('Project'):
+        continue
+
     print(f"\n📄 Processing: {file_name}")
     try:
         process_assignment_file(file_name, deadlines_df, notification_frequency_df)
