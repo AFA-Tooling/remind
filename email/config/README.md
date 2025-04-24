@@ -1,0 +1,1 @@
+Include the credentials.json file in this folder for now, ideally it should be a .env file that you are referencing.
