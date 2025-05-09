@@ -11,6 +11,7 @@ function App() {
     officeHours: [],
     resources: [],
   })
+  const [carrier, setCarrier] = useState('');
 
   // Fetch assignments data
   useEffect(() => {
@@ -57,6 +58,60 @@ function App() {
         alert('Failed to send SMS.');
       });
   };
+
+  // Amazon SNS integration
+  const handleSendSNS = (e) => {
+    e.preventDefault();
+  
+    fetch('http://localhost:3000/send-sns', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        phoneNumber: phoneNumber,
+        message: 'Reminder: You have an assignment due soon!', // or customize
+      }),
+    })
+      .then((response) => response.json())
+      .then((data) => {
+        if (data.success) {
+          alert('SNS message sent successfully!');
+          setPhoneNumber('');
+        } else {
+          alert('Failed to send SNS message: ' + data.error);
+        }
+      })
+      .catch((error) => {
+        console.error('Error sending SNS message:', error);
+        alert('Error occurred while sending SNS message.');
+      });
+  };
+
+  // SendGrid text messages
+  const handleSendTextMessage = (e) => {
+    e.preventDefault();
+    
+    fetch('http://localhost:3000/send-text-message', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phoneNumber, carrier }),
+    })
+      .then((response) => response.json())
+      .then((data) => {
+        if (data.success) {
+          alert('Text message sent successfully!');
+          setPhoneNumber('');
+          setCarrier('');
+        } else {
+          alert('Failed to send text message: ' + data.error);
+        }
+      })
+      .catch((error) => {
+        console.error('Error sending text message:', error);
+        alert('Failed to send text message.');
+      });
+  };
+  
+  
 
   // Allow the user to customize the notification frequency
   const handleSetFrequency = (e) => {
@@ -243,7 +298,7 @@ function App() {
       <header className="App-header">
         <h1>AutoRemind Student-Facing Portal</h1>
 
-        <section>
+        {/*<section>
           <h2>Send Automated SMS</h2>
           <form onSubmit={handleSendSMS}>
             <label>
@@ -258,7 +313,38 @@ function App() {
             </label>
             <button type="submit">Send SMS</button>
           </form>
-        </section>
+        </section>*/}
+
+        {/*<section>
+          <h2>Send Text Message via SendGrid</h2>
+          <form onSubmit={handleSendTextMessage}>
+            <label>
+              Phone Number:
+              <input
+                type="tel"
+                value={phoneNumber}
+                onChange={(e) => setPhoneNumber(e.target.value)}
+                placeholder="e.g., 5101234567"
+                required
+              />
+            </label>
+            <br />
+            <label>
+              Carrier:
+              <select value={carrier} onChange={(e) => setCarrier(e.target.value)} required>
+                <option value="">Select Carrier</option>
+                <option value="att">AT&T</option>
+                <option value="verizon">Verizon</option>
+                <option value="tmobile">T-Mobile</option>
+                <option value="sprint">Sprint</option>
+                <option value="boost">Boost Mobile</option>
+              </select>
+            </label>
+            <br />
+            <button type="submit">Send Text via Email</button>
+          </form>
+        </section>*/}
+
 
         {/* <section>
           <h2>Send Automated Email</h2>
@@ -320,6 +406,7 @@ function App() {
         </section>
 
 
+
         <section>
           <h2>Send Automated Discord Messages</h2>
           <label>Discord:</label>
@@ -336,6 +423,25 @@ function App() {
           <h2>Assignment Countdown</h2>
           <ul>{renderAssignments()}</ul>
         </section> */}
+
+        
+        <section>
+          <h2>Send Text Message</h2>
+          <form onSubmit={handleSendSNS}>
+            <label>
+              Phone Number:
+              <input
+                type="tel"
+                value={phoneNumber}
+                onChange={(e) => setPhoneNumber(e.target.value)}
+                placeholder="e.g., +1234567890"
+                required
+              />
+            </label>
+            <button type="submit">Send via SNS</button>
+          </form>
+        </section>
+
 
         <section>
           <h2>Set Notification Frequency</h2>
