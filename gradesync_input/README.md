@@ -1,6 +1,6 @@
 # gradesync_input
 
-This folder contains the core input-processing logic for GradeSync's automated notification system. It includes scripts to extract, parse, and transform grade-related data from a Google Sheet into formatted message requests.
+This folder contains the core input-processing logic for AutoRemind's automated notification system. It includes scripts to extract, parse, and transform grade-related data from a Google Sheet into formatted message requests.
 
 ## Files
 
@@ -27,10 +27,11 @@ This folder contains the core input-processing logic for GradeSync's automated n
    ```bash
    cd gradesync_input
 2. Generate the DataFrame from the Google Sheet:
+    ```bash
     python df_processing.py
 3. Run the main pipeline to generate message requests:
+    ```bash
     python main.py
-
 ## Dependencies
 - `pandas`
 - `datetime`
