@@ -165,7 +165,6 @@ def process_assignment_file(file_name, deadlines_df, notification_frequency_df):
     safe_assignment_title = _safe_filename_basic(raw_assignment_title)
 
     # Save the message requests to a CSV file
-    # csv_file_name = "message_requests_" + message_requests_df_condensed['assignment'].iloc[0] + ".csv"
     csv_file_name = f"message_requests_{safe_assignment_title}.csv"
     print(f"Saving message requests to {csv_file_name}")
 
