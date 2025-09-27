@@ -142,7 +142,6 @@ if __name__ == "__main__":
         print(df.head())  # Preview the cleaned data
 
         # 3. Export the cleaned dataframe to CSV
-        # output_filename = f"{tab}.csv"
         output_filename = f"{safe_filename_for_windows(tab)}.csv"
         output_path = os.path.join(output_folder, output_filename)
 
