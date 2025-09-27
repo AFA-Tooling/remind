@@ -1,6 +1,7 @@
 # Get the data from the sample_data folder
 import os
 import pandas as pd
+import re
 
 def process_assignment_file(file_name, deadlines_df, notification_frequency_df):
     # ------------------------------
@@ -154,8 +155,18 @@ def process_assignment_file(file_name, deadlines_df, notification_frequency_df):
     print("Condensed Message Requests DataFrame:")
     print(message_requests_df_condensed.head())
 
+    def _safe_filename_basic(name: str) -> str:
+        cleaned = name.replace(":", " - ")
+        cleaned = re.sub(r'\*+', ' - ', cleaned)
+        cleaned = re.sub(r'\s+', ' ', cleaned).strip().rstrip(' .')
+        return cleaned
+    
+    raw_assignment_title = message_requests_df_condensed['assignment'].iloc[0]
+    safe_assignment_title = _safe_filename_basic(raw_assignment_title)
+
     # Save the message requests to a CSV file
-    csv_file_name = "message_requests_" + message_requests_df_condensed['assignment'].iloc[0] + ".csv"
+    # csv_file_name = "message_requests_" + message_requests_df_condensed['assignment'].iloc[0] + ".csv"
+    csv_file_name = f"message_requests_{safe_assignment_title}.csv"
     print(f"Saving message requests to {csv_file_name}")
 
     # Save the dataframe to the message_requests/ folder

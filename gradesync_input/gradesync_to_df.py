@@ -28,6 +28,14 @@ if not os.path.exists(credentials_path):
     logging.error(f"Credentials file not found: {credentials_path}")
     sys.exit(1)
 
+def safe_filename_for_windows(name: str) -> str:
+    # Replace ':' with ' - ' and any run of '*' with ' - '
+    cleaned = name.replace(":", " - ")
+    cleaned = re.sub(r'\*+', ' - ', cleaned)
+    # Tidy up spaces and trim trailing spaces/dots
+    cleaned = re.sub(r'\s+', ' ', cleaned).strip().rstrip(' .')
+    return cleaned
+
 def get_credentials():
     try:
         creds = service_account.Credentials.from_service_account_file(
@@ -134,7 +142,8 @@ if __name__ == "__main__":
         print(df.head())  # Preview the cleaned data
 
         # 3. Export the cleaned dataframe to CSV
-        output_filename = f"{tab}.csv"
+        # output_filename = f"{tab}.csv"
+        output_filename = f"{safe_filename_for_windows(tab)}.csv"
         output_path = os.path.join(output_folder, output_filename)
 
         # ✅ Ensure the folder exists
