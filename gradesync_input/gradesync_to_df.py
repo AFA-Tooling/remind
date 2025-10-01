@@ -29,6 +29,9 @@ if not os.path.exists(credentials_path):
     sys.exit(1)
 
 def safe_filename_for_windows(name: str) -> str:
+    """
+    Return a Windows-safe filename by replacing ':' and runs of '*' with ' - ', etc
+    """
     # Replace ':' with ' - ' and any run of '*' with ' - '
     cleaned = name.replace(":", " - ")
     cleaned = re.sub(r'\*+', ' - ', cleaned)

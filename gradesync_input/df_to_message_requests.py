@@ -156,10 +156,13 @@ def process_assignment_file(file_name, deadlines_df, notification_frequency_df):
     print(message_requests_df_condensed.head())
 
     def _safe_filename_basic(name: str) -> str:
-        cleaned = name.replace(":", " - ")
-        cleaned = re.sub(r'\*+', ' - ', cleaned)
-        cleaned = re.sub(r'\s+', ' ', cleaned).strip().rstrip(' .')
-        return cleaned
+       """
+       Return a Windows-safe filename by replacing ':' and runs of '*' with ' - ', etc
+       """
+       cleaned = name.replace(":", " - ")
+       cleaned = re.sub(r'\*+', ' - ', cleaned)
+       cleaned = re.sub(r'\s+', ' ', cleaned).strip().rstrip(' .')
+       return cleaned
     
     raw_assignment_title = message_requests_df_condensed['assignment'].iloc[0]
     safe_assignment_title = _safe_filename_basic(raw_assignment_title)
