@@ -121,7 +121,7 @@
     <!-- Top Nav -->
     <header class="nav">
       <div class="nav__left">
-        <a class="brand" href="./index.html"><img src="logo.png" alt="AutoRemind Logo">AutoRemind</a>
+        <a class="brand" href="./list.html"><img src="logo.png" alt="AutoRemind Logo">AutoRemind</a>
       </div>
       <nav class="nav__right">
         <a href="./list.html" class="nav__link">How-to</a>
@@ -147,30 +147,30 @@
           <ul class="channels">
             <li>
               <label for="ch-discord">
-                <input id="ch-discord" type="checkbox" />
+                <input id="ch-discord" type="checkbox" name="channel_discord" />
                 <span class="dot" aria-hidden="true"></span>
                 <span>Discord</span>
               </label>
               <!-- revealed on check -->
-              <input id="discord-field" class="channel-field" type="text" placeholder="Enter Discord username" inputmode="text" />
+              <input id="discord-field" class="channel-field" type="text" name="discord_username" placeholder="Enter Discord username" inputmode="text" />
             </li>
             <li>
               <label for="ch-sms">
-                <input id="ch-sms" type="checkbox" />
+                <input id="ch-sms" type="checkbox" name="channel_sms" />
                 <span class="dot" aria-hidden="true"></span>
                 <span>SMS</span>
               </label>
               <!-- revealed on check -->
-              <input id="sms-field" class="channel-field" type="tel" placeholder="Enter phone number" inputmode="tel" />
+              <input id="sms-field" class="channel-field" type="tel" name="sms_number" placeholder="Enter phone number" inputmode="tel" />
             </li>
             <li>
               <label for="ch-email">
-                <input id="ch-email" type="checkbox" />
+                <input id="ch-email" type="checkbox" name="channel_email" />
                 <span class="dot" aria-hidden="true"></span>
                 <span>Email</span>
               </label>
               <!-- revealed on check -->
-              <input id="email-field" class="channel-field" type="email" placeholder="Enter email address" inputmode="email" />
+              <input id="email-field" class="channel-field" type="email" name="email_address" placeholder="Enter email address" inputmode="email" />
             </li>
           </ul>
 
@@ -178,7 +178,7 @@
             <ul class="channels">
               <li>
                 <label for="ch-incomplete">
-                  <input id="ch-incomplete" type="checkbox" />
+                  <input id="ch-incomplete" type="checkbox" name="include_incomplete" />
                   <span class="dot" aria-hidden="true"></span>
                   <span>Include Incomplete Assignments</span>
                 </label>
@@ -188,96 +188,32 @@
 
         <!-- Right column -->
         <div>
-          <div class="divider"><span class="pill">Reminder Schedule</span></div>
+          <div class="divider"><span class="pill">Frequency &amp; Timing</span></div>
 
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 32px; margin-top: 24px;">
-            <!-- Deadline-based reminders -->
-            <div>
-              <h3 style="font-size: 16px; margin: 0 0 16px;">Deadline-based reminders</h3>
-              <p style="font-size: 13px; color: #666; margin: -12px 0 16px;">(like your current list)</p>
-              
-              <div class="reminder-options" style="display: grid; gap: 12px;">
-                <label class="reminder-option" style="display: flex; align-items: center; gap: 8px;">
-                  <input type="checkbox" name="deadline-reminder" value="at-due">
-                  <span>At due time</span>
-                </label>
-                <label class="reminder-option" style="display: flex; align-items: center; gap: 8px;">
-                  <input type="checkbox" name="deadline-reminder" value="1h-before">
-                  <span>1 hour before</span>
-                </label>
-                <label class="reminder-option" style="display: flex; align-items: center; gap: 8px;">
-                  <input type="checkbox" name="deadline-reminder" value="1d-before">
-                  <span>1 day before</span>
-                </label>
-                <label class="reminder-option" style="display: flex; align-items: center; gap: 8px;">
-                  <input type="checkbox" name="deadline-reminder" value="3d-before">
-                  <span>3 days before</span>
-                </label>
-                <label class="reminder-option" style="display: flex; align-items: center; gap: 8px;">
-                  <input type="checkbox" name="deadline-reminder" value="1w-before">
-                  <span>1 week before</span>
-                </label>
-                <label class="reminder-option" style="display: flex; align-items: center; gap: 8px;">
-                  <input type="checkbox" name="deadline-reminder" value="custom">
-                  <span>Custom…</span>
-                </label>
-              </div>
-            </div>
-
-            <!-- Recurring reminders -->
-            <div>
-              <h3 style="font-size: 16px; margin: 0 0 16px;">Routine or recurring reminders</h3>
-              <p style="font-size: 13px; color: #666; margin: -12px 0 16px;">(based on day-of-week or interval)</p>
-
-              <div class="reminder-options" style="display: grid; gap: 12px;">
-                <label class="reminder-option" style="display: flex; align-items: center; gap: 8px;">
-                  <input type="checkbox" name="recurring-reminder" value="weekdays">
-                  <span>Every weekday (Mon–Fri)</span>
-                </label>
-                <label class="reminder-option" style="display: flex; align-items: center; gap: 8px;">
-                  <input type="checkbox" name="recurring-reminder" value="selected-days">
-                  <span>Every 
-                    <select style="margin: 0 4px; padding: 2px 4px;">
-                      <option>Monday</option>
-                      <option>Tuesday</option>
-                      <option>Wednesday</option>
-                      <option>Thursday</option>
-                      <option>Friday</option>
-                      <option>Saturday</option>
-                      <option>Sunday</option>
-                    </select>
-                  </span>
-                </label>
-                <label class="reminder-option" style="display: flex; align-items: center; gap: 8px;">
-                  <input type="checkbox" name="recurring-reminder" value="interval">
-                  <span>Every 
-                    <input type="number" min="1" max="99" value="1" style="width: 50px; padding: 2px 4px; margin: 0 4px;">
-                    <select style="margin: 0 4px; padding: 2px 4px;">
-                      <option>days</option>
-                      <option>weeks</option>
-                    </select>
-                  </span>
-                </label>
-
-                <div style="margin: 8px 0 0 24px;">
-                  <label style="display: flex; align-items: center; gap: 8px;">
-                    At what time:
-                    <input type="time" style="padding: 4px 8px;" value="09:00">
-                  </label>
-                </div>
-
-                <div style="margin: 8px 0 0 24px;">
-                  <label style="display: flex; align-items: center; gap: 8px;">
-                    Until: 
-                    <select style="padding: 4px 8px;">
-                      <option>Assignment completed</option>
-                      <option>Specific date...</option>
-                    </select>
-                  </label>
-                </div>
-              </div>
-            </div>
+          <div class="days-input-row">
+            <label for="days" class="label" style="margin:0;">Send reminder</label>
+            <input id="days" class="num-input" type="number" name="days_before" min="0" max="7" value="5" />
+            <span>days before deadline.</span>
           </div>
+
+          <div class="slider-row" style="margin-top:14px;">
+            <span class="minmax">0</span>
+            <input
+              id="days-range"
+              type="range" min="0" max="7" value="5"
+              oninput="document.getElementById('days').value=this.value"
+            />
+            <span class="minmax">7</span>
+          </div>
+          <script>
+            // keep number input and slider in sync both ways
+            const num = document.getElementById('days');
+            const rng = document.getElementById('days-range');
+            num.addEventListener('input', () => {
+              const v = Math.min(7, Math.max(0, Number(num.value||0)));
+              num.value = v; rng.value = v;
+            });
+          </script>
         </div>
       </div>
 
@@ -290,8 +226,8 @@
       <div id="agreement-modal" style="display:none; position:fixed; z-index:1000; left:0; top:0; width:100vw; height:100vh; background:rgba(0,0,0,0.32); justify-content:center; align-items:center;">
         <div style="background:#fff; border-radius:16px; max-width:90vw; width:400px; padding:32px 24px; box-shadow:0 8px 32px rgba(0,0,0,0.18); text-align:center;">
           <h2 style="margin-top:0;">Agreement Required</h2>
-          <p style="font-size:16px;">I consent to receive informational messages & alerts from AutoRemind.</p>
-          <p style="font-size:13px; color:#555; margin-bottom:24px;">Note: Message frequency varies. Message & data rates may apply. You can cancel any time by clicking Unsubscribe at the bottom of this page.</p>
+          <p style="font-size:16px;">Do you consent to receive informational messages & alerts from AutoRemind?</p>
+          <p style="font-size:13px; color:#555; margin-bottom:24px;">Message frequency varies. <br> Message & data rates may apply. <br> <br> Note: You can cancel any time by clicking "Unsubscribe" at the bottom of this page.</p>
           <button id="agree-btn" style="background:var(--olive); color:#fff; border:none; border-radius:8px; padding:10px 22px; font-size:15px; margin-right:10px; cursor:pointer;">I Agree</button>
           <button id="cancel-btn" style="background:#eee; color:#222; border:none; border-radius:8px; padding:10px 22px; font-size:15px; cursor:pointer;">Cancel</button>
         </div>
@@ -318,7 +254,7 @@
         <label style="display:block; margin:8px 0; text-align:left;"><input type="checkbox" name="platform" value="email"> Email</label>
         <label style="display:block; margin:12px 0 8px; text-align:left; font-weight:600;"><input type="checkbox" name="platform" value="all"> Turn off all notifications</label>
       </form>
-      <p style="font-size:13px; color:#555; margin-bottom:24px;">Note: You are free to re-register for notifications through AutoRemind at any time.</p>
+      <p style="font-size:13px; color:#555; margin-bottom:24px;">You are free to re-register for notifications through AutoRemind at any time.</p>
       <button id="unsubscribe-confirm" style="background:var(--olive); color:#fff; border:none; border-radius:8px; padding:10px 22px; font-size:15px; margin-right:10px; cursor:pointer;">Unsubscribe</button>
       <button id="unsubscribe-cancel" style="background:#eee; color:#222; border:none; border-radius:8px; padding:10px 22px; font-size:15px; cursor:pointer;">Cancel</button>
     </div>
@@ -330,36 +266,128 @@
         const cb = document.getElementById(checkboxId);
         const field = document.getElementById(fieldId);
         const update = () => {
-          field.style.display = cb.checked ? 'block' : 'none';
-          if(cb.checked) field.focus();
+          const enabled = cb.checked;
+          field.style.display = enabled ? 'block' : 'none';
+          field.disabled = !enabled;
+          if(enabled) field.focus();
         };
         cb.addEventListener('change', update);
         // initialize on load in case boxes are pre-checked
         update();
       }
-      bindToggle('ch-discord', 'discord-field');
-      bindToggle('ch-sms', 'sms-field');
-      bindToggle('ch-email', 'email-field');
+      const channelConfigs = [
+        {
+          checkboxId: 'ch-discord',
+          fieldId: 'discord-field',
+          key: 'discord',
+          validate: value => value.trim().length > 0,
+          errorMessage: 'Please enter a Discord username.'
+        },
+        {
+          checkboxId: 'ch-sms',
+          fieldId: 'sms-field',
+          key: 'sms',
+          validate: value => /^\+?[0-9\s().-]{7,}$/.test(value.trim()),
+          errorMessage: 'Please enter a valid phone number for SMS.'
+        },
+        {
+          checkboxId: 'ch-email',
+          fieldId: 'email-field',
+          key: 'email',
+          validate: value => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim()),
+          errorMessage: 'Please enter a valid email address.'
+        }
+      ];
+      channelConfigs.forEach(({ checkboxId, fieldId }) => bindToggle(checkboxId, fieldId));
+
+      const includeIncompleteToggle = document.getElementById('ch-incomplete');
+      const agreementModal = document.getElementById('agreement-modal');
 
         // Agreement popup logic for AutoRemind Me button
-        var autoRemindBtn = document.querySelector('.btn--cta');
+        const autoRemindBtn = document.querySelector('.btn--cta');
         autoRemindBtn.addEventListener('click', function(e) {
           e.preventDefault();
-          document.getElementById('agreement-modal').style.display = 'flex';
+          agreementModal.style.display = 'flex';
         });
-        document.getElementById('agree-btn').addEventListener('click', function() {
-          document.getElementById('agreement-modal').style.display = 'none';
-          // Optionally, submit the form or trigger the reminder action here
+        function collectSettingsPayload(){
+          // Re-query locally so we don't depend on another <script> block's scope
+          const numEl = document.getElementById('days');
+          const rngEl = document.getElementById('days-range');
+          const includeIncompleteToggle = document.getElementById('ch-incomplete');
+
+          const clamp = v => Math.min(7, Math.max(0, Number(v || 0)));
+
+          const payload = {
+            channels: {},                                      // will hold only enabled channels
+            days_before: clamp(numEl.value),
+            include_incomplete: includeIncompleteToggle.checked
+          };
+
+          if (Number.isNaN(payload.days_before)) payload.days_before = 0;
+          payload.days_before = Math.round(payload.days_before);
+          numEl.value = payload.days_before;                   // keep UI in sync
+          rngEl.value = payload.days_before;
+
+          // Validate enabled channels and collect their values
+          let anyChannel = false;
+          for (const { checkboxId, fieldId, key, validate, errorMessage } of channelConfigs) {
+            const checkbox = document.getElementById(checkboxId);
+            const field = document.getElementById(fieldId);
+            if (checkbox.checked) {
+              anyChannel = true;
+              const value = (field.value || '').trim();
+              if (!validate(value)) {
+                alert(errorMessage);
+                field.focus();
+                throw new Error('validation');
+              }
+              payload.channels[key] = value;                   // e.g., { discord: "Lance#1234" }
+            }
+          }
+
+          if (!anyChannel) {
+            alert('Select at least one reminder channel.');
+            throw new Error('validation');
+          }
+
+          return payload;
+        }
+
+        document.getElementById('agree-btn').addEventListener('click', async function() {
+          let payload;
+          try{
+            payload = collectSettingsPayload();
+          } catch (err){
+            if(err.message === 'validation'){
+              return;
+            }
+            console.error(err);
+            alert('There was a problem preparing your reminder settings. Please try again.');
+            return;
+          }
+          try{
+            const response = await fetch('/api/reminders/settings', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(payload)
+            });
+            if(!response.ok){
+              throw new Error('request failed');
+            }
+            agreementModal.style.display = 'none';
+          } catch (err){
+            alert('There was a problem saving your reminder settings. Please try again.');
+          }
         });
         document.getElementById('cancel-btn').addEventListener('click', function() {
-          document.getElementById('agreement-modal').style.display = 'none';
+          agreementModal.style.display = 'none';
         });
 
           // Unsubscribe popup logic
-          var unsubscribeLink = document.getElementById('unsubscribe-link');
-          var unsubscribeModal = document.getElementById('unsubscribe-modal');
-          var unsubscribeCancel = document.getElementById('unsubscribe-cancel');
-          var unsubscribeConfirm = document.getElementById('unsubscribe-confirm');
+          const unsubscribeLink = document.getElementById('unsubscribe-link');
+          const unsubscribeModal = document.getElementById('unsubscribe-modal');
+          const unsubscribeCancel = document.getElementById('unsubscribe-cancel');
+          const unsubscribeConfirm = document.getElementById('unsubscribe-confirm');
           unsubscribeLink.addEventListener('click', function(e) {
             e.preventDefault();
             unsubscribeModal.style.display = 'flex';
@@ -367,10 +395,26 @@
           unsubscribeCancel.addEventListener('click', function() {
             unsubscribeModal.style.display = 'none';
           });
-          unsubscribeConfirm.addEventListener('click', function() {
-            // Here you would handle the actual unsubscribe logic
-            unsubscribeModal.style.display = 'none';
-            alert('Your unsubscribe preferences have been saved.');
+          unsubscribeConfirm.addEventListener('click', async function() {
+            const selectedPlatforms = Array.from(document.querySelectorAll('#unsubscribe-form input[type="checkbox"]:checked')).map(input => input.value);
+            if(selectedPlatforms.length === 0){
+              alert('Please select at least one platform to unsubscribe from.');
+              return;
+            }
+            try{
+              const response = await fetch('/api/reminders/unsubscribe', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ platforms: selectedPlatforms })
+              });
+              if(!response.ok){
+                throw new Error('request failed');
+              }
+              unsubscribeModal.style.display = 'none';
+              alert('Your unsubscribe preferences have been saved.');
+            } catch (err){
+              alert('There was a problem updating your unsubscribe preferences. Please try again.');
+            }
           });
     </script>
   </body>
