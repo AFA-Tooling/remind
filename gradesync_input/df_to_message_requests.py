@@ -2,6 +2,7 @@
 import os
 import pandas as pd
 import re
+from datetime import datetime
 
 def process_assignment_file(file_name, deadlines_df, notification_frequency_df):
     # ------------------------------
@@ -35,10 +36,12 @@ def process_assignment_file(file_name, deadlines_df, notification_frequency_df):
     def get_due_date(row):
         # Get the project name from the row
         project_name = row['assignment']
-        
+    
         # Get the due date from the deadlines_df
-        due_date = deadlines_df.loc[deadlines_df['assignment'] == project_name, 'due'].values[0]
-        
+        if project_name not in deadlines_df['assignment'].values:
+            due_date = pd.NaT
+        else:
+            due_date = deadlines_df.loc[deadlines_df['assignment'] == project_name, 'due'].values[0]
         return due_date
 
     assignment_df['due date'] = assignment_df.apply(get_due_date, axis=1)
@@ -56,14 +59,12 @@ def process_assignment_file(file_name, deadlines_df, notification_frequency_df):
 
     # Match the first and last name column from the assignment_filtered_df with the first name and last name column from the notification_frequency_df 
     def get_notification_frequency(row):
-        first_name = row['first name']
-        last_name = row['last name']
+        first_name = row['name']
 
-        # Check if the first and last name match in the notification_frequency_df
+        # Correct structure: [ROW CONDITION, COLUMN NAME]
         match = notification_frequency_df.loc[
-            (notification_frequency_df['first name'] == first_name) &
-            (notification_frequency_df['last name'] == last_name),
-            'notification_frequency'
+            (notification_frequency_df['name'] == first_name), 
+            'notification_frequency' 
         ]
 
         # If there is a match, return the notification frequency
@@ -71,7 +72,7 @@ def process_assignment_file(file_name, deadlines_df, notification_frequency_df):
             return match.values[0]
         else:
             # Make the default reminder frequency = 3 days before the due date
-            return 3  # or "weekly", or np.nan depending on your use case
+            return 3
 
     assignment_df['notification_frequency'] = assignment_df.apply(get_notification_frequency, axis=1)
     print("Merged DataFrame with Notification Frequency:")
@@ -88,26 +89,17 @@ def process_assignment_file(file_name, deadlines_df, notification_frequency_df):
     # ------------------------------
 
     # Get the difference between the due date and the current date
-    def get_date_difference(row):
-        # Get the due date from the row
-        due_date = row['due date']
-
-        # Make today's date as the due_date minus 5 days 
-        fake_today_date = row['due date'] - pd.Timedelta(days=5)
-
-        # Get the difference between the due date and the current date
-        date_difference = due_date - fake_today_date
-
-        return date_difference
-
-    # Applying the date difference function between today's date and the due date
-    assignment_df['date_diff'] = assignment_df.apply(get_date_difference, axis=1)
+    TODAY_DATE = pd.to_datetime(datetime.now()).normalize()
+    assignment_df['date_diff'] = assignment_df['due date'] - TODAY_DATE
+    
     assignment_df.head()
 
-    assignment_df['is_equal'] = assignment_df['notification_frequency'].dt.days == assignment_df['date_diff'].dt.days
+    notification_days = pd.to_timedelta(assignment_df['notification_frequency']).dt.days
+    date_diff_days = pd.to_timedelta(assignment_df['date_diff']).dt.days
+    
+    assignment_df['is_equal'] = notification_days == date_diff_days
     print("Successfully compared the notification frequency and the difference with today's date:")
     print(assignment_df.head())
-
 
     # ------------------------------
     # Step 5: Create Missing Students DataFrame
@@ -131,8 +123,7 @@ def process_assignment_file(file_name, deadlines_df, notification_frequency_df):
 
         notification_frequency = row['notification_frequency']
 
-        first_name = row["first name"]
-        last_name = row['last name']
+        first_name = row["name"]
 
         # Create the message
         message = f"Dear {first_name}, your {assignment_name} assignment is missing and it is due in {notification_frequency}. Please submit it as soon as possible."
@@ -151,9 +142,13 @@ def process_assignment_file(file_name, deadlines_df, notification_frequency_df):
     # ------------------------------
 
     # Simplify this down to the information that is necessary
-    message_requests_df_condensed = message_requests_df[['first name', 'last name', 'sid', 'email', 'assignment', 'message_requests']]
+    message_requests_df_condensed = message_requests_df[['name', 'sid', 'email', 'assignment', 'message_requests']]
     print("Condensed Message Requests DataFrame:")
     print(message_requests_df_condensed.head())
+
+    if message_requests_df_condensed.empty:
+        print("No students matched the notification criteria. Skipping CSV generation.")
+        return 
 
     def _safe_filename_basic(name: str) -> str:
        """
