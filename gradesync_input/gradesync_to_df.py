@@ -19,7 +19,10 @@ from google.auth.transport.requests import Request
 from google.auth.exceptions import RefreshError
 
 # Sheet & credentials config
-google_sheet_id = '11H0hRtJOHCy59jaxbdRSp7JhDtkaiOibvexZ4Shj4wE'
+# OLD test sheet:
+#google_sheet_id = '11H0hRtJOHCy59jaxbdRSp7JhDtkaiOibvexZ4Shj4wE'
+# Replacing with CS10 Autoreminder ID:
+google_sheet_id = '1jQLrBjhSDbzARCHCQCVinnFqJxmT0OmenjdhcnxIm2s'
 google_sheet_credentials = 'credentials.json'
 config_folder = os.path.join(os.path.dirname(__file__), 'config')
 credentials_path = os.path.join(config_folder, google_sheet_credentials)
@@ -102,7 +105,8 @@ def preprocess_df(df, tab_name):
     Returns:
         pd.DataFrame: Cleaned and formatted DataFrame
     """
-    required_columns = ["b'First Name", 'Last Name', 'SID', 'Email', 'Status', 'Submission Time', 'Lateness (H:M:S)']
+    #required_columns = ["b'First Name", 'Last Name', 'SID', 'Email', 'Status', 'Submission Time', 'Lateness (H:M:S)']
+    required_columns = ["b'Name", 'SID', 'Email', 'Status', 'Submission Time', 'Lateness (H:M:S)']
     missing = [col for col in required_columns if col not in df.columns]
     if missing:
         raise ValueError(f"Missing columns in input DataFrame: {missing}")
@@ -111,7 +115,8 @@ def preprocess_df(df, tab_name):
     filtered_df = df[required_columns].copy()
     filtered_df['Assignment'] = tab_name
     filtered_df = filtered_df[['Assignment'] + required_columns]
-    filtered_df.rename(columns={"b'First Name": 'First Name'}, inplace=True)
+    #filtered_df.rename(columns={"b'First Name": 'First Name'}, inplace=True)
+    filtered_df.rename(columns={"b'Name": 'Name'}, inplace=True)
     filtered_df.columns = filtered_df.columns.str.lower().str.strip()
 
     return filtered_df
