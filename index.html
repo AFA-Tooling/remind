@@ -372,11 +372,16 @@
               body: JSON.stringify(payload)
             });
             if(!response.ok){
-              throw new Error('request failed');
+              const errorData = await response.json().catch(() => ({}));
+              console.error('API Error:', response.status, errorData);
+              throw new Error(errorData.error || 'request failed');
             }
+            const result = await response.json();
+            console.log('Success:', result);
             agreementModal.style.display = 'none';
           } catch (err){
-            alert('There was a problem saving your reminder settings. Please try again.');
+            console.error('Error:', err);
+            alert('There was a problem saving your reminder settings: ' + err.message);
           }
         });
         document.getElementById('cancel-btn').addEventListener('click', function() {
