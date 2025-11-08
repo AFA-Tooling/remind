@@ -22,3 +22,4 @@ Place your Google Cloud service account credentials file here.
 - The service account must have domain-wide delegation enabled
 - The service account must be authorized to send emails from the sender email address
 - See the main README.md for detailed setup instructions
+
