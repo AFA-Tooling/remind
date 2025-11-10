@@ -18,3 +18,14 @@ Integration with LMS (GradeView)
 
 AutoRemind will use the GradeView API to fetch and push course-related updates. The system ensures that students receive reminders tailored to their enrolled courses (CS 10 for now). Future updates will include expanded integration with other LMS platforms and courses.
 
+RUN SITE LOCALLY:
+- create a .env.local file at root populate with:
+    - SUPABASE_URL = https://<project-id>.supabase.co
+    - SUPABASE_SERVICE_ROLE_KEY = <service-role-key>
+*
+<project-id> can be found at Project Settings -> General -> Prject ID
+<service-role-key> can be found at Project Settings -> API Keys -> service_role (secret) -> click Reveal then copy paste it
+
+DO NOT TO COMMIT/PUSH THIS - IF YOU PUSH IT GENERATE A NEW JWT SECRET
+
+- use `npm run test-server` to run server.js
