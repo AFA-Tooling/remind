@@ -1,0 +1,280 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>About AutoRemind</title>
+
+    <style>
+      :root {
+        --olive:#3e5f3a; --olive-dark:#2f472c; --pale:#e7efd9;
+        --text:#0e0e0e; --muted:#6b6b6b; --line:#e6e6e6;
+      }
+
+      * { box-sizing: border-box; }
+      html, body { margin: 0; padding: 0; }
+      body {
+        font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+        color: var(--text);
+        background: #fff;
+      }
+
+      .container { width: min(1100px, 92vw); margin: 0 auto; }
+
+      /* Top nav */
+      .nav {
+        position: sticky; top: 0; z-index: 10;
+        display: flex; align-items: center; justify-content: space-between;
+        padding: 18px clamp(16px, 4vw, 28px);
+        background: #fff;
+      }
+
+      .brand {
+        font-size: 28px; font-weight: 700;
+        text-decoration: none; color: var(--text);
+        letter-spacing: 0.2px;
+        display: flex; align-items: center; gap: 8px;
+      }
+
+      .brand img { height: 70px; width: auto; }
+
+      .nav__right {
+        display: flex; gap: 22px; align-items: center;
+      }
+
+      .nav__link {
+        text-decoration: none; color: #111; font-size: 15px;
+      }
+
+      .nav__link:hover { text-decoration: underline; }
+
+      .nav__link.active {
+        font-weight: 600;
+        color: var(--olive);
+        text-decoration: underline;
+      }
+
+      .btn {
+        border: 0; cursor: pointer; font-weight: 600;
+        border-radius: 999px; padding: 10px 16px;
+      }
+
+      .btn--primary {
+        background: var(--olive); color: #fff;
+        padding: 13px 18px; text-decoration: none;
+      }
+
+      .btn--primary:hover {
+        background: var(--olive-dark);
+      }
+
+      /* Hero section */
+      .hero {
+        display: flex; justify-content: center; align-items: center;
+        text-align: center; margin: 48px 0 24px; width: 100%;
+      }
+
+      .hero h1 {
+        font-size: clamp(28px, 5vw, 42px);
+        margin: 0; font-weight: 500;
+      }
+
+      /* Main content area */
+      main {
+        padding: 40px 0;
+      }
+
+      section {
+        margin: 48px 0;
+      }
+
+      section h2 {
+        font-size: 24px; font-weight: 600;
+        color: var(--olive);
+        margin: 24px 0 16px;
+      }
+
+      section p {
+        font-size: 16px; line-height: 1.6;
+        color: var(--text); margin: 12px 0;
+      }
+
+      section ul {
+        list-style: none; padding: 0; margin: 12px 0;
+      }
+
+      section li {
+        font-size: 16px; line-height: 1.6;
+        color: var(--text); margin: 8px 0 8px 24px;
+        position: relative;
+      }
+
+      section li::before {
+        content: "•"; position: absolute; left: -16px;
+        color: var(--olive); font-weight: bold;
+      }
+
+      .divider {
+        position: relative; height: 32px; margin: 40px 0;
+      }
+
+      .divider::before {
+        content: ""; position: absolute;
+        left: 0; right: 0; top: 50%;
+        height: 1px; background: var(--line);
+        transform: translateY(-50%);
+      }
+
+      .highlight {
+        color: var(--olive); font-weight: 600;
+      }
+
+      .feedback-link {
+        color: var(--olive); text-decoration: none; font-weight: 500;
+      }
+
+      .feedback-link:hover {
+        text-decoration: underline;
+      }
+
+      /* Big green arc background */
+      .arc-bg {
+        position: fixed; left: 50%; transform: translateX(-50%);
+        bottom: -35vh; width: 130vw; height: 60vh;
+        border-radius: 50% 50% 0 0 / 100% 100% 0 0;
+        background: var(--pale); z-index: -1;
+      }
+
+      /* Footer */
+      .site-footer {
+        text-align: center; margin: 48px auto 36px;
+        background: transparent !important;
+      }
+
+      .site-footer small, .site-footer small * {
+        outline: none; border: none;
+        background: transparent; box-shadow: none;
+      }
+
+      .thanks {
+        color: var(--olive-dark); font-weight: 600;
+      }
+
+      .feedback {
+        color: var(--olive);
+      }
+
+      /* Responsive */
+      @media (max-width: 768px) {
+        section h2 {
+          font-size: 20px;
+        }
+
+        section p, section li {
+          font-size: 15px;
+        }
+      }
+    </style>
+  </head>
+
+  <body>
+    <!-- Top Nav -->
+    <header class="nav">
+      <div class="nav__left">
+        <a class="brand" href="./login.html"><img src="logo.png" alt="AutoRemind Logo">AutoRemind</a>
+      </div>
+      <nav class="nav__right">
+        <a href="./about.html" class="nav__link active">About Us</a>
+        <a href="mailto:autoremind@berkeley.edu" class="btn btn--primary" style="text-decoration: none;">Contact Us</a>
+      </nav>
+    </header>
+
+    <!-- Hero -->
+    <section class="hero">
+      <h1>About AutoRemind</h1>
+    </section>
+
+    <!-- Main Content -->
+    <main class="container">
+      <!-- Who We Are -->
+      <section>
+        <h2>Who We Are</h2>
+        <p>
+          AutoRemind is being developed by <span class="highlight">students and researchers in Dan Garcia's R&D group at UC Berkeley</span>, 
+          as part of the <span class="highlight">AFA-Tooling ecosystem</span>. We're committed to creating practical tools that 
+          solve real problems for students and educators.
+        </p>
+        <p>
+          Our work is grounded in the belief that better tools can help students stay organized, reduce stress, and focus on what matters: learning.
+        </p>
+      </section>
+
+      <div class="divider"></div>
+
+      <!-- Berkeley Affiliation -->
+      <section>
+        <h2>Our Berkeley Affiliation</h2>
+        <p>
+          AutoRemind is developed within the <span class="highlight">UC Berkeley EECS department</span> as a research and teaching tool. 
+          While we benefit from UC Berkeley's resources and expertise, AutoRemind is <span class="highlight">not an official 
+          communication channel of the university</span>.
+        </p>
+        <p>
+          For official university communications, please refer to your course syllabus and the official UC Berkeley communication channels provided by your instructor or department.
+        </p>
+      </section>
+
+      <div class="divider"></div>
+
+      <!-- Purpose -->
+      <section>
+        <h2>What AutoRemind Does</h2>
+        <p>
+          AutoRemind connects to your course platform (LMS) to send <span class="highlight">timely reminders about upcoming and overdue assignments</span>. 
+          We understand that students juggle many responsibilities, work, extracurriculars, health, personal challenges, and an extra layer of structure 
+          can make a real difference.
+        </p>
+        <p>
+          AutoRemind is designed to support:
+        </p>
+        <ul>
+          <li>Students managing multiple courses and deadlines</li>
+          <li>Neurodivergent learners who benefit from external reminders and structure</li>
+          <li>First-generation students navigating new academic environments</li>
+          <li>Anyone who wants a little extra help staying on top of their coursework</li>
+        </ul>
+        <p>
+          You choose your reminder channels (email, SMS, or Discord), how far in advance you want to be notified, 
+          and which assignment statuses you want to hear about. It's entirely in your control.
+        </p>
+      </section>
+
+      <div class="divider"></div>
+
+      <!-- Feedback -->
+      <section>
+        <h2>Share Your Feedback</h2>
+        <p>
+          We're constantly working to improve AutoRemind. Whether you're an instructor looking to support your students or 
+          a student with ideas for new features, we'd love to hear from you.
+        </p>
+        <p>
+          Have suggestions? Found a bug? Or just want to share how AutoRemind has helped you? 
+          <a href="mailto:autoremind@berkeley.edu" class="feedback-link">Reach out to us →</a>
+        </p>
+      </section>
+    </main>
+
+    <!-- Arc + Footer -->
+    <div class="arc-bg"></div>
+    <footer class="site-footer container">
+      <small>
+        <span class="thanks">Thanks for using AutoRemind.</span>
+        <span class="feedback"> Part of the AFA-Tooling ecosystem.</span><br>
+        <span style="font-size: 13px; color: #999; margin-top: 8px; display: inline-block;">
+          © 2025 AutoRemind. Developed at UC Berkeley.
+        </span>
+      </small>
+    </footer>
+  </body>
+</html>
