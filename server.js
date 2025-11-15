@@ -8,8 +8,9 @@ import dotenv from 'dotenv';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-// Load environment variables
-dotenv.config({ path: '.env.local' });
+// Load environment variables - use absolute path
+const envPath = path.join(__dirname, '.env.local');
+dotenv.config({ path: envPath });
 
 // Import the serverless function logic
 import settingsHandler from './api/reminders/settings.js';
@@ -34,18 +35,18 @@ const server = http.createServer(async (req, res) => {
     req.on('data', chunk => {
       body += chunk.toString();
     });
-    
+
     req.on('end', async () => {
       try {
         // Parse JSON body
         const parsedBody = body ? JSON.parse(body) : {};
-        
+
         // Create mock req/res objects for the handler - 
         const mockReq = {
           method: req.method,
           body: parsedBody
         };
-        
+
         const mockRes = {
           status: (code) => {
             res.statusCode = code;
@@ -56,7 +57,7 @@ const server = http.createServer(async (req, res) => {
             res.end(JSON.stringify(data));
           }
         };
-        
+
         // Call the handler
         await settingsHandler(mockReq, mockRes);
       } catch (error) {
@@ -95,6 +96,32 @@ const server = http.createServer(async (req, res) => {
         res.end(`Server Error: ${error.code}`, 'utf-8');
       }
     } else {
+      // Inject Supabase credentials into HTML files
+      if (extname === '.html') {
+        const supabaseUrl = process.env.SUPABASE_URL || '';
+        const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || '';
+
+        let htmlContent = content.toString();
+
+        // Inject credentials as the FIRST script in <head> to ensure it runs first
+        const credentialsScript = `
+    <script>
+      // Supabase credentials injected by server - MUST RUN FIRST
+      (function() {
+        window.SUPABASE_URL = '${supabaseUrl}';
+        window.SUPABASE_ANON_KEY = '${supabaseAnonKey}';
+      })();
+    </script>`;
+
+        // Insert at the very beginning of <head>, before any other scripts
+        if (htmlContent.includes('<head>')) {
+          htmlContent = htmlContent.replace('<head>', '<head>' + credentialsScript);
+        } else {
+          htmlContent = htmlContent.replace('</head>', credentialsScript + '\n  </head>');
+        }
+        content = Buffer.from(htmlContent, 'utf-8');
+      }
+
       res.writeHead(200, { 'Content-Type': contentType });
       res.end(content, 'utf-8');
     }

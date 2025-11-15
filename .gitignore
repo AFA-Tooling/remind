@@ -1,3 +1,42 @@
+# Dependencies
 node_modules/
 
+# Environment variables and secrets
+.env
 .env.local
+.env.*.local
+*.env
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Credentials and tokens
+**/config/credentials.json
+**/config/token.json
+**/config/*credentials*.json
+**/config/*.json
+!**/config/README.md
+
+# Log files (may contain sensitive information)
+*.log
+*.log.*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Build outputs
+dist/
+build/
+*.egg-info/
