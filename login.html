@@ -178,45 +178,55 @@
     <small>© 2025 AutoRemind. All rights reserved.</small>
   </footer>
 
-  <!-- Supabase -->
-  <script type="module">
-    import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+  <!-- Supabase JS Library -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <!-- Load auth.js after credentials are injected -->
+  <script src="./auth.js" defer></script>
 
-    document.addEventListener('DOMContentLoaded', async () => {
-      // Get credentials from window (injected by server)
-      const SUPABASE_URL = window.SUPABASE_URL || '';
-      const SUPABASE_ANON_KEY = window.SUPABASE_ANON_KEY || '';
+  <script>
+    // Wait for auth to be available
+    function waitForAuth(callback, maxAttempts = 10) {
+      let attempts = 0;
+      const checkAuth = () => {
+        attempts++;
+        const authInstance = window.auth || (typeof auth !== 'undefined' ? auth : null);
+        if (authInstance && authInstance.supabase) {
+          callback(authInstance);
+        } else if (attempts < maxAttempts) {
+          setTimeout(checkAuth, 200);
+        } else {
+          console.error('Auth not available, but continuing with login page');
+          // Continue anyway - user can still click login button
+          callback(null);
+        }
+      };
+      checkAuth();
+    }
 
-      if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-        console.error('Supabase credentials missing. Make sure SUPABASE_URL and SUPABASE_ANON_KEY are in your .env.local file.');
-        alert('Configuration error: Supabase credentials not found.');
-        return;
-      }
+    document.addEventListener('DOMContentLoaded', () => {
+      waitForAuth((auth) => {
+        // If user is already logged in, redirect to index
+        if (auth) {
+          auth.onAuthStateChange((user, session, loading) => {
+            if (!loading && user) {
+              // User is authenticated, redirect to main page
+              window.location.href = './index.html';
+            }
+          });
+        }
 
-      const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
-      // Check if already logged in
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session) {
-          window.location.href = './index.html';
+        // Handle login button click
+        const loginButton = document.querySelector('.btn--login');
+        if (!loginButton) {
+          console.error('Login button not found!');
           return;
         }
-      } catch (error) {
-        console.error('Error checking session:', error);
-      }
 
-      // Handle login button click
-      const loginButton = document.querySelector('.btn--login');
-      if (!loginButton) {
-        console.error('Login button not found!');
-        return;
-      }
-
-      loginButton.addEventListener('click', (e) => {
-        e.preventDefault();
-        // Redirect to auth page
-        window.location.href = './auth.html';
+        loginButton.addEventListener('click', (e) => {
+          e.preventDefault();
+          // Redirect to auth page
+          window.location.href = './auth.html';
+        });
       });
     });
   </script>

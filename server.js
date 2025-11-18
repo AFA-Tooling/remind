@@ -72,7 +72,7 @@ const server = http.createServer(async (req, res) => {
   // Serve static files
   let filePath = '.' + req.url;
   if (filePath === './') {
-    filePath = './index.html';
+    filePath = './login.html';
   }
 
   const extname = String(path.extname(filePath)).toLowerCase();
