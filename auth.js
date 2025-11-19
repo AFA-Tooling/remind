@@ -188,42 +188,32 @@ class SupabaseAuth {
     }
 }
 
-// Create global auth instance - wait for credentials to be available
-function createAuthInstance() {
-    if (window.SUPABASE_URL && window.SUPABASE_ANON_KEY) {
-        if (!window.auth) {
-            window.auth = new SupabaseAuth();
-        }
-        return window.auth;
+// --- START OF EDITED SECTION ---
+
+// Create the global auth instance directly
+let auth;
+
+// The key check: ensure the variables injected by the server are present
+if (typeof window !== 'undefined' && window.SUPABASE_URL && window.SUPABASE_ANON_KEY) {
+    try {
+        // Create the working instance
+        auth = new SupabaseAuth();
+    } catch (error) {
+        console.error('Error creating SupabaseAuth instance:', error);
+        // Fallback: create a non-functional instance to prevent runtime errors
+        auth = new SupabaseAuth(); 
     }
-    return null;
+} else {
+    // If credentials are NOT available during script load, log a warning
+    console.warn('Supabase credentials not available when auth.js loaded. Check server injection timing.');
+    // Create an instance anyway. The constructor will set this.supabase = null
+    // and log the 'Missing Supabase credentials' error, preventing client-side crashes.
+    auth = new SupabaseAuth(); 
 }
 
-// Try to create immediately
-let auth = createAuthInstance();
-
-// If credentials not available, wait and retry
-if (!auth) {
-    let attempts = 0;
-    const maxAttempts = 20;
-
-    const retryAuth = setInterval(() => {
-        attempts++;
-        auth = createAuthInstance();
-
-        if (auth) {
-            clearInterval(retryAuth);
-        } else if (attempts >= maxAttempts) {
-            console.error('Credentials not available. Make sure server is injecting credentials into HTML.');
-            clearInterval(retryAuth);
-            // Create a dummy auth instance to prevent errors
-            window.auth = new SupabaseAuth();
-            auth = window.auth;
-        }
-    }, 100);
-}
-
-// Export auth
+// Export auth globally (if running in a browser environment)
 if (typeof window !== 'undefined') {
-    window.auth = auth || window.auth;
+    window.auth = auth;
 }
+
+// --- END OF EDITED SECTION ---
