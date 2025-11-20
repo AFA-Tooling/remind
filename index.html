@@ -665,6 +665,20 @@
         const result = await response.json();
         console.log('Success:', result);
         agreementModal.style.display = 'none';
+        
+        // Clear form inputs
+        channelConfigs.forEach(({ checkboxId, fieldId }) => {
+          const checkbox = document.getElementById(checkboxId);
+          const field = document.getElementById(fieldId);
+          checkbox.checked = false;
+          field.value = '';
+          field.style.display = 'none';
+        });
+        document.getElementById('ch-incomplete').checked = false;
+        document.getElementById('days').value = 5;
+        document.getElementById('days-range').value = 5;
+        
+        alert('Your reminder settings have been saved successfully!');
       } catch (err) {
         console.error('Error:', err);
         alert('There was a problem saving your reminder settings: ' + err.message);
