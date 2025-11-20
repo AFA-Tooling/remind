@@ -29,6 +29,27 @@ This folder contains the core input-processing logic for AutoRemind's automated 
 ### `notification_frequency.csv`
 - **Purpose**: List of student names, relavent information (such as SID/email), and their notification frequency. This file was handwritten for now, but actual information will be stored in a DB to be accessed.
 
+### `db_fetch.py`
+- **Purpose**: Connects to Supabase using `.env` credentials, loads student/course data, and drafts reminder messages for each opt-in student based on personalized deadlines and notification frequencies.
+- **Usage**:
+  ```bash
+  # Run the reminder pipeline (default mode)
+  python db_fetch.py --mode reminders
+
+  # Inspect raw Supabase tables
+  python db_fetch.py --mode raw --table assignment_resources --limit 5
+
+  # Enable verbose debugging to trace deadline decisions
+  python db_fetch.py --mode reminders --debug --limit 2
+  ```
+- **Inputs**:
+  - `.env` with `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`.
+  - `shared_data/deadlines.csv` containing `course_code`, `assignment_code`, and `assignment_name` with due timestamps.
+  - Supabase tables:
+    - `students` – opt-in flags, `notif_freq_days`, contact preferences, and assignment offset columns (`PROJ01`, `PROJ02`, ...).
+    - `assignment_resources` – per-course assignment metadata plus helpful resource links.
+- **Output**: Prints each student ready for reminders, their delivery channels, the assignments that triggered (with personalized deadlines/resources), and the draft message text ready for downstream services.
+
 
 ## How to Run
 1. Open a terminal and navigate to this folder:
