@@ -19,21 +19,38 @@ export default async function handler(req, res) {
 
     const { channels, days_before } = body;
     const email = channels?.email;
+    const phoneNumber = channels?.sms;
+    const discordId = channels?.discord;
 
     if (!email || typeof days_before !== 'number') {
       return res.status(400).json({ error: 'Invalid request data' });
     }
 
-    const notificationData = {
-      sid: email.trim(),
-      notification_frequency: Math.max(0, Math.min(7, Math.round(days_before))),
-      name: 'First Last',
-      last_name: null
+    // Map frontend data to new table structure
+    const studentData = {
+      email: email.trim(),
+      phone_number: phoneNumber ? phoneNumber.trim() : null,
+      discord_id: discordId ? discordId.trim() : null,
+      notif_freq_days: Math.max(0, Math.min(7, Math.round(days_before))),
+      phone_pref: !!phoneNumber,
+      email_pref: !!email,
+      discord_pref: !!discordId,
+      opt_in: true, // User agreed to receive notifications
+      course_code: 'CS10',
+      first_name: 'first',
+      last_name: 'last',
+      preferred_first_name: null,
+      sid: email.trim(), // Using email as SID for now (adjust if your table uses numeric SID)
+      PROJ01: 0,
+      PROJ02: 0,
+      PROJ03: 0,
+      PROJ04: 0,
+      PROJ05: 0
     };
 
     const { data, error } = await supabase
-      .from('notification_preferences')
-      .insert(notificationData)
+      .from('students')
+      .insert(studentData)
       .select();
 
     if (error) {

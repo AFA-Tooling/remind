@@ -72,7 +72,8 @@ const server = http.createServer(async (req, res) => {
   // Serve static files
   let filePath = '.' + req.url;
   if (filePath === './') {
-    filePath = './login.html';
+    // TEMPORARILY: Serve index.html for testing (change back to login.html when done)
+    filePath = './index.html';
   }
 
   const extname = String(path.extname(filePath)).toLowerCase();
