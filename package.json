@@ -8,7 +8,9 @@
     "test-server": "node server.js"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.0.0",
+    "@supabase/auth-ui-react": "^0.4.7",
+    "@supabase/auth-ui-shared": "^0.1.8",
+    "@supabase/supabase-js": "^2.81.1",
     "dotenv": "^16.0.0"
   },
   "devDependencies": {

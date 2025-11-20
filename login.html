@@ -1,79 +1,235 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>AutoRemind – Login</title>
 
-    <style>
-      :root {
-        --olive:#3e5f3a; --olive-dark:#2f472c; --pale:#e7efd9;
-        --text:#0e0e0e; --line:#e6e6e6;
-      }
-      * { box-sizing:border-box; }
-      body {
-        margin:0; padding:0; font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
-        color:var(--text); background:#fff; display:flex; flex-direction:column; min-height:100vh;
-      }
-      .container { width:min(1100px,92vw); margin:0 auto; }
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AutoRemind – Login</title>
 
-      /* Nav */
-      .nav{ position:sticky; top:0; z-index:10; display:flex; align-items:center; justify-content:space-between; padding:18px clamp(16px,4vw,28px); background:#fff; }
-      .brand{ font-size:28px; font-weight:700; text-decoration:none; color:var(--text); letter-spacing:.2px; display:flex; align-items:center; gap:8px; }
-      .brand img { height:70px; width:auto; }
-      .nav__right{ display:flex; gap:22px; align-items:center; }
-      .nav__link{ text-decoration:none; color:#111; font-size:15px; }
-      .nav__link:hover{ text-decoration:underline; }
-      .btn{ border:0; cursor:pointer; font-weight:600; border-radius:999px; padding:13px 16px; }
-      .btn--primary{ background:var(--olive); color:#fff; padding:13px 18px; text-decoration:none; }
-      .btn--primary:hover{ background:var(--olive-dark); text-decoration:none; }
+  <style>
+    :root {
+      --olive: #3e5f3a;
+      --olive-dark: #2f472c;
+      --pale: #e7efd9;
+      --text: #0e0e0e;
+      --line: #e6e6e6;
+    }
 
-      /* Hero section */
-      .hero {
-        display:flex; justify-content:center; align-items:center; flex-direction:column;
-        flex-grow:1; text-align:center; height:100%; flex:1; margin-top:-20vh;
-      }
-      .hero h1 { font-size:clamp(28px,5vw,42px); margin-bottom:24px; font-weight:500; }
+    * {
+      box-sizing: border-box;
+    }
 
-      /* Login button */
-      .btn--login {
-        background:var(--olive); color:#fff; padding:14px 28px; font-size:18px; border:none; border-radius:999px; cursor:pointer;
-      }
-      .btn--login:hover { background:var(--olive-dark); }
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      color: var(--text);
+      background: #fff;
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+    }
 
-      /* Green arc background */
-      .arc-bg {
-        position:fixed; left:50%; transform:translateX(-50%); bottom:-35vh; width:130vw; height:60vh;
-        border-radius:50% 50% 0 0 / 100% 100% 0 0; background:var(--pale); z-index:-1;
-      }
+    .container {
+      width: min(1100px, 92vw);
+      margin: 0 auto;
+    }
 
-      footer { text-align:center; margin:16px 0 32px; font-size:14px; color:#444; }
-    </style>
-  </head>
+    /* Nav */
+    .nav {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 18px clamp(16px, 4vw, 28px);
+      background: #fff;
+    }
 
-  <body>
-    <!-- Navigation -->
-    <header class="nav">
-      <div class="nav__left">
-        <a class="brand" href="./login.html"><img src="logo.png" alt="AutoRemind Logo">AutoRemind</a>
-      </div>
-      <nav class="nav__right">
-        <a href="./login.html" class="nav__link">How-to</a>
-        <a href="#" class="nav__link">Accessibility</a>
-        <a href="#" class="nav__link">About Us</a>
-        <a href="#" class="btn btn--primary" style="text-decoration:none;">Contact Us</a>
-      </nav>
-    </header>
+    .brand {
+      font-size: 28px;
+      font-weight: 700;
+      text-decoration: none;
+      color: var(--text);
+      letter-spacing: .2px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
 
-    <!-- Login Hero -->
-    <section class="hero">
-      <h1>Welcome!</h1>
-      <a href="./index.html" class="btn--login" style="display: inline-block; text-decoration: none;">Log In</a>
-    </section>
+    .brand img {
+      height: 70px;
+      width: auto;
+    }
 
-    <div class="arc-bg"></div>
-    <footer>
-      <small>© 2025 AutoRemind. All rights reserved.</small>
-    </footer>
-  </body>
+    .nav__right {
+      display: flex;
+      gap: 22px;
+      align-items: center;
+    }
+
+    .nav__link {
+      text-decoration: none;
+      color: #111;
+      font-size: 15px;
+    }
+
+    .nav__link:hover {
+      text-decoration: underline;
+    }
+
+    .btn {
+      border: 0;
+      cursor: pointer;
+      font-weight: 600;
+      border-radius: 999px;
+      padding: 13px 16px;
+    }
+
+    .btn--primary {
+      background: var(--olive);
+      color: #fff;
+      padding: 13px 18px;
+      text-decoration: none;
+    }
+
+    .btn--primary:hover {
+      background: var(--olive-dark);
+      text-decoration: none;
+    }
+
+    /* Hero section */
+    .hero {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      flex-direction: column;
+      flex-grow: 1;
+      text-align: center;
+      height: 100%;
+      flex: 1;
+      margin-top: -20vh;
+    }
+
+    .hero h1 {
+      font-size: clamp(28px, 5vw, 42px);
+      margin-bottom: 24px;
+      font-weight: 500;
+    }
+
+    /* Login button */
+    .btn--login {
+      background: var(--olive);
+      color: #fff;
+      padding: 14px 28px;
+      font-size: 18px;
+      border: none;
+      border-radius: 999px;
+      cursor: pointer;
+    }
+
+    .btn--login:hover {
+      background: var(--olive-dark);
+    }
+
+    /* Green arc background */
+    .arc-bg {
+      position: fixed;
+      left: 50%;
+      transform: translateX(-50%);
+      bottom: -35vh;
+      width: 130vw;
+      height: 60vh;
+      border-radius: 50% 50% 0 0 / 100% 100% 0 0;
+      background: var(--pale);
+      z-index: -1;
+    }
+
+    footer {
+      text-align: center;
+      margin: 16px 0 32px;
+      font-size: 14px;
+      color: #444;
+    }
+  </style>
+</head>
+
+<body>
+  <!-- Navigation -->
+  <header class="nav">
+    <div class="nav__left">
+      <a class="brand" href="./login.html"><img src="logo.png" alt="AutoRemind Logo">AutoRemind</a>
+    </div>
+    <nav class="nav__right">
+      <a href="./about.html" class="nav__link">About Us</a>
+      <a href="mailto:autoremind@berkeley.edu" class="btn btn--primary" style="text-decoration:none;">Contact Us</a>
+    </nav>
+  </header>
+
+  <!-- Login Hero -->
+  <section class="hero">
+    <h1>Welcome!</h1>
+    <button class="btn--login">Log In</button>
+  </section>
+
+  <div class="arc-bg"></div>
+  <footer>
+    <small>© 2025 AutoRemind. All rights reserved.</small>
+  </footer>
+
+  <!-- Supabase JS Library -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <!-- Load auth.js after credentials are injected -->
+  <script src="./auth.js" defer></script>
+
+  <script>
+    // Wait for auth to be available
+    function waitForAuth(callback, maxAttempts = 10) {
+      let attempts = 0;
+      const checkAuth = () => {
+        attempts++;
+        const authInstance = window.auth || (typeof auth !== 'undefined' ? auth : null);
+        if (authInstance && authInstance.supabase) {
+          callback(authInstance);
+        } else if (attempts < maxAttempts) {
+          setTimeout(checkAuth, 200);
+        } else {
+          console.error('Auth not available, but continuing with login page');
+          // Continue anyway - user can still click login button
+          callback(null);
+        }
+      };
+      checkAuth();
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      waitForAuth((auth) => {
+        // If user is already logged in, redirect to index
+        if (auth) {
+          auth.onAuthStateChange((user, session, loading) => {
+            if (!loading && user) {
+              // User is authenticated, redirect to main page
+              window.location.href = './index.html';
+            }
+          });
+        }
+
+        // Handle login button click
+        const loginButton = document.querySelector('.btn--login');
+        if (!loginButton) {
+          console.error('Login button not found!');
+          return;
+        }
+
+        loginButton.addEventListener('click', (e) => {
+          e.preventDefault();
+          // Redirect to auth page
+          window.location.href = './auth.html';
+        });
+      });
+    });
+  </script>
+</body>
+
 </html>
