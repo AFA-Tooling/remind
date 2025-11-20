@@ -1,7 +1,7 @@
-assignment,due
-Project 1: Wordle™-lite, 2025-11-09 23:59:59
-Project 2: Spelling Bee,2025-11-04 23:59:59
-Project 3: 2048,2025-11-14 23:59:59
-Project 4: Artifact + Documentation, 2025-11-19 23:59:59
-Project 5: Final Project Proposal, 2050-10-09 23:59:59
-Project 5 RESUBMISSION: Final Project Submission, 2050-11-06 23:59:59
+course_code, assignment_code, assignment_name, due
+CS10, PROJ01, Project 1: Wordle™-lite, 2025-11-21 23:59:59
+CS10, PROJ02, Project 2: Spelling Bee,2025-11-21 23:59:59
+CS10, PROJ03, Project 3: 2048,2025-11-21 23:59:59
+CS10, PROJ04, Project 4: Artifact + Documentation, 2025-11-22 23:59:59
+CS10, PROJ05, Project 5: Final Project Proposal, 2025-11-22 23:59:59
+CS10, PROJ0, Project 5 RESUBMISSION: Final Project Submission, 2025-11-22 23:59:59
