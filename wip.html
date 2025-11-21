@@ -1,219 +1,242 @@
 <!doctype html>
 <html lang="en">
+
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>AutoRemind - Work in Progress</title>
+
+  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="table_style.css" />
+
   <style>
+    :root {
+      --olive: #3e5f3a;
+      --olive-dark: #2f472c;
+      --pale: #e7efd9;
+      --text: #0e0e0e;
+      --muted: #6b6b6b;
+      --line: #e6e6e6;
+    }
+
     * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
       margin: 0;
       padding: 0;
-      box-sizing: border-box;
     }
 
     body {
       font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      padding: 20px;
-      color: #fff;
-      overflow: hidden;
+      color: var(--text);
+      background: #fff;
     }
 
     .container {
-      text-align: center;
+      width: min(1100px, 92vw);
+      margin: 0 auto;
+    }
+
+    /* Top nav */
+    .nav {
+      position: sticky;
+      top: 0;
       z-index: 10;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 18px clamp(16px, 4vw, 28px);
+      background: #fff;
     }
 
-    h1 {
-      font-size: clamp(32px, 6vw, 64px);
-      margin-bottom: 20px;
+    .brand {
+      font-size: 28px;
       font-weight: 700;
-      text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+      text-decoration: none;
+      color: var(--text);
+      letter-spacing: .2px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
     }
 
-    .subtitle {
-      font-size: clamp(18px, 3vw, 28px);
-      margin-bottom: 40px;
-      opacity: 0.9;
+    .brand img {
+      height: 70px;
+      width: auto;
     }
 
-    .fun-box {
-      background: rgba(255, 255, 255, 0.2);
-      backdrop-filter: blur(10px);
-      border-radius: 20px;
-      padding: 40px;
+    .nav__right {
+      display: flex;
+      gap: 22px;
+      align-items: center;
+    }
+
+    .nav__link {
+      text-decoration: none;
+      color: #111;
+      font-size: 15px;
+    }
+
+    .nav__link:hover {
+      text-decoration: underline;
+    }
+
+    .btn {
+      border: 0;
+      cursor: pointer;
+      font-weight: 600;
+      border-radius: 999px;
+      padding: 10px 16px;
+    }
+
+    .btn--primary {
+      background: var(--olive);
+      color: #fff;
+      padding: 13px 18px;
+      text-decoration: none;
+    }
+
+    .btn--primary:hover {
+      background: var(--olive-dark);
+    }
+
+    /* Hero — centered horizontally */
+    .hero {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+      margin: 48px 0 24px;
+      width: 100%;
+    }
+
+    .hero h1 {
+      font-size: clamp(28px, 5vw, 42px);
+      margin: 0;
+      font-weight: 500;
+    }
+
+    /* WIP Message Box */
+    .wip-box {
+      background: #fff;
+      border-radius: 16px;
+      padding: 60px 40px;
       margin: 40px auto;
       max-width: 600px;
-      box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+      text-align: center;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
     }
 
-    .emoji-display {
-      font-size: 80px;
-      margin: 20px 0;
-      cursor: pointer;
-      transition: transform 0.2s;
-      user-select: none;
+    .wip-icon {
+      font-size: 64px;
+      margin-bottom: 24px;
     }
 
-    .emoji-display:hover {
-      transform: scale(1.2) rotate(10deg);
+    .wip-title {
+      font-size: clamp(24px, 4vw, 32px);
+      font-weight: 600;
+      color: var(--olive);
+      margin-bottom: 16px;
     }
 
-    .emoji-display:active {
-      transform: scale(0.9) rotate(-10deg);
-    }
-
-    .button {
-      background: rgba(255, 255, 255, 0.3);
-      border: 2px solid rgba(255, 255, 255, 0.5);
-      color: #fff;
-      padding: 15px 30px;
+    .wip-message {
       font-size: 18px;
-      border-radius: 50px;
-      cursor: pointer;
-      margin: 10px;
-      transition: all 0.3s;
+      color: var(--muted);
+      line-height: 1.6;
+      margin-bottom: 8px;
+    }
+
+    .wip-submessage {
+      font-size: 15px;
+      color: var(--muted);
+      font-style: italic;
+      margin-top: 24px;
+    }
+
+    /* Big green arc */
+    .arc-bg {
+      position: fixed;
+      left: 50%;
+      transform: translateX(-50%);
+      bottom: -35vh;
+      width: 130vw;
+      height: 60vh;
+      border-radius: 50% 50% 0 0 / 100% 100% 0 0;
+      background: var(--pale);
+      z-index: -1;
+    }
+
+    /* Footer */
+    .site-footer {
+      text-align: center;
+      margin: 8px auto 36px;
+      background: transparent !important;
+    }
+
+    .site-footer small,
+    .site-footer small * {
+      outline: none;
+      border: none;
+      background: transparent;
+      box-shadow: none;
+    }
+
+    .thanks {
+      color: var(--olive-dark);
       font-weight: 600;
     }
 
-    .button:hover {
-      background: rgba(255, 255, 255, 0.4);
-      transform: translateY(-2px);
-      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
-    }
-
-    .button:active {
-      transform: translateY(0);
-    }
-
-    .counter {
-      font-size: 48px;
-      font-weight: bold;
-      margin: 20px 0;
-      color: #ffd700;
-      text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
-    }
-
-    .floating-shapes {
-      position: fixed;
-      width: 100%;
-      height: 100%;
-      top: 0;
-      left: 0;
-      pointer-events: none;
-      z-index: 1;
-    }
-
-    .shape {
-      position: absolute;
-      border-radius: 50%;
-      opacity: 0.1;
-      animation: float 20s infinite ease-in-out;
-    }
-
-    @keyframes float {
-      0%, 100% {
-        transform: translateY(0) rotate(0deg);
-      }
-      50% {
-        transform: translateY(-100px) rotate(180deg);
-      }
-    }
-
-    .message {
-      margin-top: 30px;
-      font-size: 16px;
-      opacity: 0.8;
-      font-style: italic;
+    .feedback {
+      color: var(--olive);
     }
   </style>
 </head>
+
 <body>
-  <div class="floating-shapes" id="shapes"></div>
-  
-  <div class="container">
-    <h1>🚧 Work in Progress 🚧</h1>
-    <p class="subtitle">We're putting the finishing touches on AutoRemind!</p>
-    
-    <div class="fun-box">
-      <p style="font-size: 20px; margin-bottom: 20px;">Enjoy this little distraction while you wait:</p>
-      
-      <div class="emoji-display" id="emoji">🎯</div>
-      
-      <div class="counter" id="counter">0</div>
-      <p style="margin-bottom: 20px;">Clicks</p>
-      
-      <button class="button" onclick="changeEmoji()">Change Emoji 🎲</button>
-      <button class="button" onclick="resetCounter()">Reset 🔄</button>
+  <!-- Top Nav -->
+  <header class="nav">
+    <div class="nav__left">
+      <a class="brand" href="./wip.html"><img src="logo.png" alt="AutoRemind Logo">AutoRemind</a>
     </div>
-    
-    <p class="message">Check back soon! We're working hard to make AutoRemind awesome. 💪</p>
-  </div>
+    <nav class="nav__right">
+      <a href="./about.html" class="nav__link">About Us</a>
+      <a href="mailto:autoremind@berkeley.edu" class="btn btn--primary" style="text-decoration:none;">Contact Us</a>
+    </nav>
+  </header>
 
-  <script>
-    let clickCount = 0;
-    const emojis = ['🎯', '🎨', '🚀', '🌟', '💫', '🎪', '🎭', '🎸', '🎮', '🎲', '🎊', '🎉', '🔥', '⚡', '💎', '🌈', '🦄', '🐉', '🎈', '🎁'];
-    
-    const emojiEl = document.getElementById('emoji');
-    const counterEl = document.getElementById('counter');
-    
-    emojiEl.addEventListener('click', function() {
-      clickCount++;
-      counterEl.textContent = clickCount;
-      
-      // Add some fun effects
-      this.style.transform = 'scale(1.3) rotate(360deg)';
-      setTimeout(() => {
-        this.style.transform = '';
-      }, 300);
-      
-      // Random color flash
-      document.body.style.background = `linear-gradient(135deg, 
-        hsl(${Math.random() * 360}, 70%, 60%) 0%, 
-        hsl(${Math.random() * 360}, 70%, 50%) 100%)`;
-    });
-    
-    function changeEmoji() {
-      const randomEmoji = emojis[Math.floor(Math.random() * emojis.length)];
-      emojiEl.textContent = randomEmoji;
-      emojiEl.style.transform = 'scale(1.2)';
-      setTimeout(() => {
-        emojiEl.style.transform = '';
-      }, 200);
-    }
-    
-    function resetCounter() {
-      clickCount = 0;
-      counterEl.textContent = '0';
-      emojiEl.textContent = '🎯';
-      document.body.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
-    }
-    
-    // Create floating shapes
-    function createShapes() {
-      const shapesContainer = document.getElementById('shapes');
-      for (let i = 0; i < 20; i++) {
-        const shape = document.createElement('div');
-        shape.className = 'shape';
-        const size = Math.random() * 100 + 50;
-        shape.style.width = size + 'px';
-        shape.style.height = size + 'px';
-        shape.style.left = Math.random() * 100 + '%';
-        shape.style.top = Math.random() * 100 + '%';
-        shape.style.background = `hsl(${Math.random() * 360}, 70%, 70%)`;
-        shape.style.animationDelay = Math.random() * 20 + 's';
-        shape.style.animationDuration = (Math.random() * 10 + 15) + 's';
-        shapesContainer.appendChild(shape);
-      }
-    }
-    
-    createShapes();
-  </script>
+  <!-- Hero -->
+  <section class="hero">
+    <h1>Never miss an assignment.</h1>
+  </section>
+
+  <!-- WIP Message -->
+  <section class="container">
+    <div class="wip-box">
+      <div class="wip-icon">🚧</div>
+      <h2 class="wip-title">Work in Progress</h2>
+      <p class="wip-message">
+        We're putting the finishing touches on AutoRemind!
+      </p>
+      <p class="wip-message">
+        Please check back soon. We're working hard to make AutoRemind awesome.
+      </p>
+      <p class="wip-submessage">
+        💪 Thanks for your patience!
+      </p>
+    </div>
+  </section>
+
+  <!-- Arc + footer -->
+  <div class="arc-bg"></div>
+  <footer class="site-footer container">
+    <small>
+      <span class="thanks">Thanks for trying our tool.</span>
+      <span class="feedback"> Share your feedback to help us improve.</span>
+    </small>
+  </footer>
 </body>
-</html>
 
+</html>
