@@ -555,6 +555,19 @@
     </div>
   </div>
 
+  <!-- Success Popup Modal -->
+  <div id="success-modal"
+    style="display:none; position:fixed; z-index:1000; left:0; top:0; width:100vw; height:100vh; background:rgba(0,0,0,0.32); justify-content:center; align-items:center;">
+    <div
+      style="background:#fff; border-radius:16px; max-width:90vw; width:400px; padding:32px 24px; box-shadow:0 8px 32px rgba(0,0,0,0.18); text-align:center;">
+      <h2 style="margin-top:0; color:var(--olive);">Success!</h2>
+      <p style="font-size:16px;">Your reminder settings have been saved successfully.</p>
+      <p style="font-size:13px; color:#555; margin-bottom:24px;">You will now receive reminders based on your preferences.</p>
+      <button id="success-ok-btn"
+        style="background:var(--olive); color:#fff; border:none; border-radius:8px; padding:10px 22px; font-size:15px; cursor:pointer;">OK</button>
+    </div>
+  </div>
+
   <!-- Arc + footer -->
   <div class="arc-bg"></div>
   <footer class="site-footer container">
@@ -711,7 +724,7 @@
         const result = await response.json();
         console.log('Success:', result);
         agreementModal.style.display = 'none';
-
+        
         // Clear form inputs
         channelConfigs.forEach(({ checkboxId, fieldId }) => {
           const checkbox = document.getElementById(checkboxId);
@@ -724,7 +737,9 @@
         document.getElementById('days').value = 5;
         document.getElementById('days-range').value = 5;
 
-        alert('Your reminder settings have been saved successfully!');
+        // Show success modal
+        const successModal = document.getElementById('success-modal');
+        successModal.style.display = 'flex';
       } catch (err) {
         console.error('Error:', err);
         alert('There was a problem saving your reminder settings: ' + err.message);
@@ -732,6 +747,12 @@
     });
     document.getElementById('cancel-btn').addEventListener('click', function () {
       agreementModal.style.display = 'none';
+    });
+
+    // Success modal close handler
+    document.getElementById('success-ok-btn').addEventListener('click', function () {
+      const successModal = document.getElementById('success-modal');
+      successModal.style.display = 'none';
     });
 
     // Unsubscribe popup logic

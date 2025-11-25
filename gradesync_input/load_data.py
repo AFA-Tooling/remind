@@ -1,8 +1,21 @@
+import os
 import pandas as pd
 import psycopg2
+from dotenv import load_dotenv
+from pathlib import Path
+
+# Load environment variables from .env file in the same directory
+env_path = Path(__file__).resolve().parent / ".env"
+load_dotenv(env_path)
 
 # --- connection settings ---
-DB_URI = "postgresql://postgres:LWOj2GLk72BAsoH5@db.dvtmavnxogjaezfuqnqo.supabase.co:5432/postgres"
+# Get database URI from environment variable
+DB_URI = os.getenv("DATABASE_URL") or os.getenv("SUPABASE_DB_URI")
+
+if not DB_URI:
+    print("❌ Error: DATABASE_URL or SUPABASE_DB_URI environment variable not set")
+    print("Please set the database connection string in your .env file")
+    exit(1)
 
 # --- connect to database ---
 try:
