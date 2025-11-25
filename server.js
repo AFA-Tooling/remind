@@ -72,7 +72,12 @@ const server = http.createServer(async (req, res) => {
   // Serve static files
   let filePath = '.' + req.url;
   if (filePath === './') {
-    filePath = './login.html';
+    filePath = './wip.html'; // Show work in progress page
+  }
+
+  // Redirect index.html to wip.html (hide main app)
+  if (filePath === './index.html') {
+    filePath = './wip.html';
   }
 
   const extname = String(path.extname(filePath)).toLowerCase();
@@ -96,8 +101,8 @@ const server = http.createServer(async (req, res) => {
         res.end(`Server Error: ${error.code}`, 'utf-8');
       }
     } else {
-      // Inject Supabase credentials into HTML files
-      if (extname === '.html') {
+      // Inject Supabase credentials into HTML files (skip wip.html)
+      if (extname === '.html' && !filePath.includes('wip.html')) {
         const supabaseUrl = process.env.SUPABASE_URL || '';
         const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || '';
 
