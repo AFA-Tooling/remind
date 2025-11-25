@@ -8,8 +8,54 @@
 
   <!-- Supabase JS Library -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <!-- Load auth.js after credentials are injected -->
-  <script src="./auth.js" defer></script>
+  <!-- Load credentials - works with both local (server.js injection) and Vercel (API endpoint) -->
+  <script>
+    // Check if credentials are already injected by server.js (local development)
+    // If not, fetch from /api/config endpoint (Vercel deployment)
+    (async function () {
+      // Wait a moment for server injection (local dev)
+      await new Promise(resolve => setTimeout(resolve, 50));
+
+      // If credentials already injected by server.js, use them
+      if (window.SUPABASE_URL && window.SUPABASE_ANON_KEY) {
+        console.log('✅ Using server-injected credentials (local dev)');
+        const script = document.createElement('script');
+        script.src = './auth.js';
+        script.defer = true;
+        document.head.appendChild(script);
+        return;
+      }
+
+      // Otherwise, fetch from API endpoint (Vercel)
+      try {
+        const response = await fetch('/api/config');
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: Failed to fetch config`);
+        }
+        const config = await response.json();
+
+        if (!config.SUPABASE_URL || !config.SUPABASE_ANON_KEY) {
+          throw new Error('Config missing required values');
+        }
+
+        window.SUPABASE_URL = config.SUPABASE_URL;
+        window.SUPABASE_ANON_KEY = config.SUPABASE_ANON_KEY;
+        console.log('✅ Using API-fetched credentials (Vercel)');
+
+        const script = document.createElement('script');
+        script.src = './auth.js';
+        script.defer = true;
+        document.head.appendChild(script);
+      } catch (error) {
+        console.error('❌ Error loading credentials from API:', error);
+        // Still try to load auth.js - it has retry logic
+        const script = document.createElement('script');
+        script.src = './auth.js';
+        script.defer = true;
+        document.head.appendChild(script);
+      }
+    })();
+  </script>
 
   <link rel="stylesheet" href="style.css" />
   <link rel="stylesheet" href="table_style.css" />
@@ -678,6 +724,19 @@
         const result = await response.json();
         console.log('Success:', result);
         agreementModal.style.display = 'none';
+        
+        // Clear form inputs
+        channelConfigs.forEach(({ checkboxId, fieldId }) => {
+          const checkbox = document.getElementById(checkboxId);
+          const field = document.getElementById(fieldId);
+          checkbox.checked = false;
+          field.value = '';
+          field.style.display = 'none';
+        });
+        document.getElementById('ch-incomplete').checked = false;
+        document.getElementById('days').value = 5;
+        document.getElementById('days-range').value = 5;
+
         // Show success modal
         const successModal = document.getElementById('success-modal');
         successModal.style.display = 'flex';

@@ -1,0 +1,15 @@
+{
+  "redirects": [
+    {
+      "source": "/",
+      "destination": "/wip.html",
+      "permanent": false
+    },
+    {
+      "source": "/index.html",
+      "destination": "/wip.html",
+      "permanent": false
+    }
+  ]
+}
+

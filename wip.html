@@ -1,0 +1,242 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AutoRemind - Work in Progress</title>
+
+  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="table_style.css" />
+
+  <style>
+    :root {
+      --olive: #3e5f3a;
+      --olive-dark: #2f472c;
+      --pale: #e7efd9;
+      --text: #0e0e0e;
+      --muted: #6b6b6b;
+      --line: #e6e6e6;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      color: var(--text);
+      background: #fff;
+    }
+
+    .container {
+      width: min(1100px, 92vw);
+      margin: 0 auto;
+    }
+
+    /* Top nav */
+    .nav {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 18px clamp(16px, 4vw, 28px);
+      background: #fff;
+    }
+
+    .brand {
+      font-size: 28px;
+      font-weight: 700;
+      text-decoration: none;
+      color: var(--text);
+      letter-spacing: .2px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .brand img {
+      height: 70px;
+      width: auto;
+    }
+
+    .nav__right {
+      display: flex;
+      gap: 22px;
+      align-items: center;
+    }
+
+    .nav__link {
+      text-decoration: none;
+      color: #111;
+      font-size: 15px;
+    }
+
+    .nav__link:hover {
+      text-decoration: underline;
+    }
+
+    .btn {
+      border: 0;
+      cursor: pointer;
+      font-weight: 600;
+      border-radius: 999px;
+      padding: 10px 16px;
+    }
+
+    .btn--primary {
+      background: var(--olive);
+      color: #fff;
+      padding: 13px 18px;
+      text-decoration: none;
+    }
+
+    .btn--primary:hover {
+      background: var(--olive-dark);
+    }
+
+    /* Hero — centered horizontally */
+    .hero {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+      margin: 48px 0 24px;
+      width: 100%;
+    }
+
+    .hero h1 {
+      font-size: clamp(28px, 5vw, 42px);
+      margin: 0;
+      font-weight: 500;
+    }
+
+    /* WIP Message Box */
+    .wip-box {
+      background: #fff;
+      border-radius: 16px;
+      padding: 60px 40px;
+      margin: 40px auto;
+      max-width: 600px;
+      text-align: center;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+    }
+
+    .wip-icon {
+      font-size: 64px;
+      margin-bottom: 24px;
+    }
+
+    .wip-title {
+      font-size: clamp(24px, 4vw, 32px);
+      font-weight: 600;
+      color: var(--olive);
+      margin-bottom: 16px;
+    }
+
+    .wip-message {
+      font-size: 18px;
+      color: var(--muted);
+      line-height: 1.6;
+      margin-bottom: 8px;
+    }
+
+    .wip-submessage {
+      font-size: 15px;
+      color: var(--muted);
+      font-style: italic;
+      margin-top: 24px;
+    }
+
+    /* Big green arc */
+    .arc-bg {
+      position: fixed;
+      left: 50%;
+      transform: translateX(-50%);
+      bottom: -35vh;
+      width: 130vw;
+      height: 60vh;
+      border-radius: 50% 50% 0 0 / 100% 100% 0 0;
+      background: var(--pale);
+      z-index: -1;
+    }
+
+    /* Footer */
+    .site-footer {
+      text-align: center;
+      margin: 8px auto 36px;
+      background: transparent !important;
+    }
+
+    .site-footer small,
+    .site-footer small * {
+      outline: none;
+      border: none;
+      background: transparent;
+      box-shadow: none;
+    }
+
+    .thanks {
+      color: var(--olive-dark);
+      font-weight: 600;
+    }
+
+    .feedback {
+      color: var(--olive);
+    }
+  </style>
+</head>
+
+<body>
+  <!-- Top Nav -->
+  <header class="nav">
+    <div class="nav__left">
+      <a class="brand" href="./wip.html"><img src="logo.png" alt="AutoRemind Logo">AutoRemind</a>
+    </div>
+    <nav class="nav__right">
+      <a href="./about.html" class="nav__link">About Us</a>
+      <a href="mailto:autoremind@berkeley.edu" class="btn btn--primary" style="text-decoration:none;">Contact Us</a>
+    </nav>
+  </header>
+
+  <!-- Hero -->
+  <section class="hero">
+    <h1>Never miss an assignment.</h1>
+  </section>
+
+  <!-- WIP Message -->
+  <section class="container">
+    <div class="wip-box">
+      <div class="wip-icon">🚧</div>
+      <h2 class="wip-title">Work in Progress</h2>
+      <p class="wip-message">
+        We're putting the finishing touches on AutoRemind!
+      </p>
+      <p class="wip-message">
+        Please check back soon. We're working hard to make AutoRemind awesome.
+      </p>
+      <p class="wip-submessage">
+        💪 Thanks for your patience!
+      </p>
+    </div>
+  </section>
+
+  <!-- Arc + footer -->
+  <div class="arc-bg"></div>
+  <footer class="site-footer container">
+    <small>
+      <span class="thanks">Thanks for trying our tool.</span>
+      <span class="feedback"> Share your feedback to help us improve.</span>
+    </small>
+  </footer>
+</body>
+
+</html>

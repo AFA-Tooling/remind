@@ -6,10 +6,48 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>AutoRemind – Sign In</title>
 
-    <!-- Credentials are injected by server before </head> -->
+    <!-- Supabase JS Library -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <!-- Load auth.js after credentials are available -->
-    <script src="./auth.js" defer></script>
+    <!-- Load credentials - works with both local (server.js injection) and Vercel (API endpoint) -->
+    <script>
+        (async function () {
+            await new Promise(resolve => setTimeout(resolve, 50));
+
+            if (window.SUPABASE_URL && window.SUPABASE_ANON_KEY) {
+                console.log('✅ Using server-injected credentials (local dev)');
+                const script = document.createElement('script');
+                script.src = './auth.js';
+                script.defer = true;
+                document.head.appendChild(script);
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/config');
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                const config = await response.json();
+
+                if (!config.SUPABASE_URL || !config.SUPABASE_ANON_KEY) {
+                    throw new Error('Config missing required values');
+                }
+
+                window.SUPABASE_URL = config.SUPABASE_URL;
+                window.SUPABASE_ANON_KEY = config.SUPABASE_ANON_KEY;
+                console.log('✅ Using API-fetched credentials (Vercel)');
+
+                const script = document.createElement('script');
+                script.src = './auth.js';
+                script.defer = true;
+                document.head.appendChild(script);
+            } catch (error) {
+                console.error('❌ Error loading credentials:', error);
+                const script = document.createElement('script');
+                script.src = './auth.js';
+                script.defer = true;
+                document.head.appendChild(script);
+            }
+        })();
+    </script>
 
     <style>
         :root {
