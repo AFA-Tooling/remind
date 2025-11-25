@@ -9,6 +9,16 @@
       "source": "/index.html",
       "destination": "/wip.html",
       "permanent": false
+    },
+    {
+      "source": "/login.html",
+      "destination": "/wip.html",
+      "permanent": false
+    },
+    {
+      "source": "/auth.html",
+      "destination": "/wip.html",
+      "permanent": false
     }
   ]
 }

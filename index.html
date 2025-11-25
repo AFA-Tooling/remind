@@ -436,7 +436,7 @@
   <!-- Top Nav -->
   <header class="nav">
     <div class="nav__left">
-      <a class="brand" href="./login.html"><img src="logo.png" alt="AutoRemind Logo">AutoRemind</a>
+      <a class="brand" href="./wip.html"><img src="logo.png" alt="AutoRemind Logo">AutoRemind</a>
     </div>
     <nav class="nav__right">
       <a href="./about.html" class="nav__link">About Us</a>
@@ -803,8 +803,8 @@
         } else if (attempts < maxAttempts) {
           setTimeout(checkAuth, 200);
         } else {
-          console.error('❌ Auth not available, redirecting to login');
-          window.location.href = './login.html';
+          console.error('❌ Auth not available, redirecting to WIP page');
+          window.location.href = './wip.html';
         }
       };
       checkAuth();
@@ -834,8 +834,8 @@
             logoutBtn.onclick = handleLogout;
           }
         } else {
-          // User is not authenticated, redirect to login
-          window.location.href = './login.html';
+          // User is not authenticated, redirect to WIP page
+          window.location.href = './wip.html';
         }
       });
 

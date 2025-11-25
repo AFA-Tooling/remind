@@ -75,8 +75,9 @@ const server = http.createServer(async (req, res) => {
     filePath = './wip.html'; // Show work in progress page
   }
 
-  // Redirect index.html to wip.html (hide main app)
-  if (filePath === './index.html') {
+  // Redirect sensitive routes to wip.html (hide main app)
+  const blockedPages = new Set(['./index.html', './login.html', './auth.html']);
+  if (blockedPages.has(filePath)) {
     filePath = './wip.html';
   }
 
