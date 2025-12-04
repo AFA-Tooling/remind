@@ -1,25 +1,61 @@
-import os
-import pandas as pd
-from df_to_message_requests import process_assignment_file 
+"""
+Main orchestration script.
+1. Runs db_fetch.py to generate the Discord CSV.
+2. Runs send_discord_reminders.py to send the messages.
+"""
 
-# Load shared data
-deadlines_df = pd.read_csv('shared_data/deadlines.csv')
-notification_frequency_df = pd.read_csv('shared_data/notification_frequency.csv')
+import sys
+import subprocess
+from pathlib import Path
 
-# List all assignment files in output/
-assignment_files = [
-    f for f in os.listdir('output')
-    if f.endswith('.csv') and f not in ['deadlines.csv', 'notification_frequency.csv']
-]
+def main():
+    # 1. Setup Paths
+    current_dir = Path(__file__).resolve().parent
+    project_root = current_dir.parent
+    
+    script_fetch = current_dir / "db_fetch.py"
+    script_send = project_root / "discord_service" / "send_discord_reminders.py"
 
-# Run the processing for each assignment file
-for file_name in assignment_files:
-    # Only process the file if it starts with the word 'Project'
-    if not file_name.startswith('Project'):
-        continue
+    # 2. Verify scripts exist
+    if not script_fetch.exists():
+        print(f"❌ Error: Could not find {script_fetch}")
+        return
+    if not script_send.exists():
+        print(f"❌ Error: Could not find {script_send}")
+        return
 
-    print(f"\n📄 Processing: {file_name}")
+    # 3. Run Step 1: db_fetch.py
+    print("--------------------------------------------------")
+    print("STEP 1: Fetching Data & Generating Reminders CSV")
+    print("--------------------------------------------------")
+    
+    # We must pass --discord-csv so db_fetch generates the file 
+    # required by the sender script.
+    fetch_cmd = [sys.executable, str(script_fetch), "--discord-csv"]
+    
     try:
-        process_assignment_file(file_name, deadlines_df, notification_frequency_df)
-    except Exception as e:
-        print(f"❌ Error processing {file_name}: {e}")
+        # check=True raises an exception if the script fails (returns non-zero)
+        subprocess.run(fetch_cmd, check=True)
+    except subprocess.CalledProcessError as e:
+        print(f"\n❌ Step 1 Failed. Aborting. (Exit code: {e.returncode})")
+        return
+
+    # 4. Run Step 2: send_discord_reminders.py
+    print("\n--------------------------------------------------")
+    print("STEP 2: Sending Discord Messages")
+    print("--------------------------------------------------")
+
+    send_cmd = [sys.executable, str(script_send)]
+
+    try:
+        subprocess.run(send_cmd, check=True)
+    except subprocess.CalledProcessError as e:
+        print(f"\n❌ Step 2 Failed. (Exit code: {e.returncode})")
+        return
+
+    print("\n--------------------------------------------------")
+    print("✅ AUTOMATION COMPLETE")
+    print("--------------------------------------------------")
+
+if __name__ == "__main__":
+    main()
