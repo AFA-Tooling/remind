@@ -72,6 +72,19 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Print verbose diagnostics about fetched data and filtering decisions",
     )
+    parser.add_argument(
+        "--discord-csv",
+        action="store_true",
+        help=(
+            "If set, also write a CSV of (discord_id,message) for students who "
+            "have Discord enabled as a channel."
+        ),
+    )
+    parser.add_argument(
+        "--discord-output",
+        default="discord_messages.csv",
+        help="Output path for the Discord CSV (default: discord_messages.csv)",
+    )
     return parser.parse_args()
 
 
@@ -530,6 +543,42 @@ def compose_message(student: Dict[str, Any], assignments: List[Dict[str, Any]]) 
     return "\n".join(lines)
 
 
+def write_discord_csv(reminders: List[Dict[str, Any]], output_path: Path) -> None:
+    """Write a CSV with columns discord_id,message for entries with Discord channel."""
+    rows: List[Dict[str, str]] = []
+
+    for entry in reminders:
+        # Find the Discord channel for this student, if any
+        discord_channel = next(
+            (ch for ch in entry.get("channels", []) if ch.get("type") == "discord"),
+            None,
+        )
+        if not discord_channel:
+            continue
+
+        discord_id = str(discord_channel.get("target", "")).strip()
+        if not discord_id:
+            continue
+
+        rows.append(
+            {
+                "discord_id": discord_id,
+                "message": entry.get("message", ""),
+            }
+        )
+
+    # Always overwrite the file, even if there are no rows
+    with output_path.open("w", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=["discord_id", "message"])
+        writer.writeheader()
+        writer.writerows(rows)
+
+    if rows:
+        print(f"✅ Wrote {len(rows)} Discord messages to {output_path}")
+    else:
+        print(f"✅ No students with Discord reminders. Wrote empty CSV to {output_path}")
+
+
 def gather_reminders(
     supabase: Client,
     args: argparse.Namespace,
@@ -615,28 +664,36 @@ def run_reminder_mode(supabase: Client, args: argparse.Namespace) -> None:
 
     if not reminders:
         print("✅ No students currently fall within their notification windows.")
-        return
+    else: 
+        for entry in reminders:
+            student_name = entry["student"]["name"] or f"Student #{entry['student']['id']}"
+            print("\n" + "=" * 60)
+            print(f"Reminder for: {student_name}")
+            print("Channels:")
+            for channel in entry["channels"]:
+                print(f"  - {channel['type']}: {channel['target']}")
+            print("Assignments:")
+            for assignment in entry["assignments"]:
+                due_text = format_due_datetime(assignment["personal_deadline"])
+                offset_note = (
+                    f" (offset +{assignment['offset_days']}d)" if assignment["offset_days"] else ""
+                )
+                print(
+                    f"  • {assignment['assignment_name']} [{assignment['assignment_code']}] → {due_text}{offset_note}"
+                )
+            print("\nDraft message:\n")
+            print(entry["message"])
+        print(f"\nSummary: {len(reminders)} students ready for reminders.")
 
-    for entry in reminders:
-        student_name = entry["student"]["name"] or f"Student #{entry['student']['id']}"
-        print("\n" + "=" * 60)
-        print(f"Reminder for: {student_name}")
-        print("Channels:")
-        for channel in entry["channels"]:
-            print(f"  - {channel['type']}: {channel['target']}")
-        print("Assignments:")
-        for assignment in entry["assignments"]:
-            due_text = format_due_datetime(assignment["personal_deadline"])
-            offset_note = (
-                f" (offset +{assignment['offset_days']}d)" if assignment["offset_days"] else ""
-            )
-            print(
-                f"  • {assignment['assignment_name']} [{assignment['assignment_code']}] → {due_text}{offset_note}"
-            )
-        print("\nDraft message:\n")
-        print(entry["message"])
+    #write Discord CSV into remind/discord_service if requested
+    if args.discord_csv:
+        script_dir = Path(__file__).resolve().parent
+        project_root = script_dir.parent
+        base_dir = project_root / "discord_service" / "message_requests"
+        base_dir.mkdir(parents=True, exist_ok=True)
 
-    print(f"\nSummary: {len(reminders)} students ready for reminders.")
+        output_path = base_dir / args.discord_output
+        write_discord_csv(reminders, output_path)
 
 
 def main() -> None:
