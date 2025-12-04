@@ -10,7 +10,13 @@ GUILD_ID  = os.getenv("DISCORD_GUILD_ID")
 BASE = "https://discord.com/api/v10"
 HEADERS = {"Authorization": f"Bot {TOKEN}", "Content-Type": "application/json"}
 
-CSV_FOLDER = Path(os.getenv("DISCORD_CSV_FOLDER", r"discord_service\message_requests"))
+BASE_DIR = Path(__file__).resolve().parent
+env_csv = os.getenv("DISCORD_CSV_FOLDER")
+if env_csv:
+    CSV_FOLDER = Path(env_csv)
+else:
+    CSV_FOLDER = BASE_DIR / "message_requests"
+# CSV_FOLDER = Path(os.getenv("DISCORD_CSV_FOLDER", r"discord_service\message_requests"))
 
 def get(url, params=None):
     r = requests.get(url, headers=HEADERS, params=params, timeout=30)
@@ -81,21 +87,21 @@ def dm_by_username(guild_id: str, username: str, message: str):
 def parse_csv_to_dict(file_path):
     """
     input: a Path to a CSV in the message_requests folder
-    return: a dictionary {phone_number: message}
+    return: a dictionary {discord_id: message}
     """
     dict = {}
     with file_path.open(newline="", encoding="utf-8") as f:
         reader = csv.DictReader(f)
         if not reader.fieldnames:
             return dict
-        
-        discord_username_col = reader.fieldnames[3]
-        message_col = reader.fieldnames[-1]
 
+        # New: use the named columns directly
         for row in reader:
-            discord_username = (row.get(discord_username_col) or "").strip()
-            message = (row.get(message_col) or "").strip()
-            dict[discord_username] = message
+            discord_id = (row.get("discord_id") or "").strip()
+            message = (row.get("message") or "").strip()
+            if not discord_id or not message:
+                continue
+            dict[discord_id] = message
     return dict
 
 def dm_to_all():
