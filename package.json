@@ -3,8 +3,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vercel dev",
-    "start": "vercel dev",
+    "start": "node server.js",
+    "dev": "node server.js",
     "test-server": "node server.js"
   },
   "dependencies": {
@@ -12,8 +12,5 @@
     "@supabase/auth-ui-shared": "^0.1.8",
     "@supabase/supabase-js": "^2.81.1",
     "dotenv": "^16.0.0"
-  },
-  "devDependencies": {
-    "vercel": "^34.0.0"
   }
 }

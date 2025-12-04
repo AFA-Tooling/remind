@@ -1,0 +1,45 @@
+steps:
+  # Build the container image
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['build', '-t', 'gcr.io/$PROJECT_ID/autoremind:$SHORT_SHA', '-t', 'gcr.io/$PROJECT_ID/autoremind:latest', '.']
+    id: 'build-image'
+
+  # Push the container image to Container Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'gcr.io/$PROJECT_ID/autoremind:$SHORT_SHA']
+    id: 'push-image-versioned'
+
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'gcr.io/$PROJECT_ID/autoremind:latest']
+    id: 'push-image-latest'
+
+  # Deploy container image to Cloud Run
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - 'autoremind'
+      - '--image'
+      - 'gcr.io/$PROJECT_ID/autoremind:$SHORT_SHA'
+      - '--region'
+      - 'us-central1'
+      - '--platform'
+      - 'managed'
+      - '--allow-unauthenticated'
+      - '--port'
+      - '8080'
+      - '--set-env-vars'
+      - 'PORT=8080'
+    id: 'deploy-cloud-run'
+
+images:
+  - 'gcr.io/$PROJECT_ID/autoremind:$SHORT_SHA'
+  - 'gcr.io/$PROJECT_ID/autoremind:latest'
+
+options:
+  logging: CLOUD_LOGGING_ONLY
+  machineType: 'E2_HIGHCPU_8'
+
+timeout: '1200s'
+

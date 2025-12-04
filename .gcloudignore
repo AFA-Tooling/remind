@@ -1,0 +1,55 @@
+# This file specifies files that are *not* uploaded to Google Cloud
+# using gcloud. It follows the same syntax as .gitignore
+
+.gcloudignore
+.git/
+.gitignore
+.gitattributes
+
+# Dependencies
+node_modules/
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+
+# Jupyter Notebooks
+*.ipynb_checkpoints
+
+# Vercel
+.vercel/
+
+# Test files
+test/
+tests/
+*.test.js
+*.spec.js
+
+# Logs
+*.log
+logs/
+
+# Remind subdirectory (if it's a duplicate)
+remind/
+

@@ -15,7 +15,8 @@ dotenv.config({ path: envPath });
 // Import the serverless function logic
 import settingsHandler from './api/reminders/settings.js';
 
-const PORT = 3000;
+// Use PORT from environment variable (GCP Cloud Run sets this) or default to 3000 for local dev
+const PORT = process.env.PORT || 3000;
 
 const server = http.createServer(async (req, res) => {
   // Enable CORS
