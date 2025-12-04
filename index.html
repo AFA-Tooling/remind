@@ -57,8 +57,7 @@
     })();
   </script>
 
-  <link rel="stylesheet" href="style.css" />
-  <link rel="stylesheet" href="table_style.css" />
+  <!-- Styles are inline, no external CSS files needed -->
 
   <style>
     :root {
@@ -562,7 +561,8 @@
       style="background:#fff; border-radius:16px; max-width:90vw; width:400px; padding:32px 24px; box-shadow:0 8px 32px rgba(0,0,0,0.18); text-align:center;">
       <h2 style="margin-top:0; color:var(--olive);">Success!</h2>
       <p style="font-size:16px;">Your reminder settings have been saved successfully.</p>
-      <p style="font-size:13px; color:#555; margin-bottom:24px;">You will now receive reminders based on your preferences.</p>
+      <p style="font-size:13px; color:#555; margin-bottom:24px;">You will now receive reminders based on your
+        preferences.</p>
       <button id="success-ok-btn"
         style="background:var(--olive); color:#fff; border:none; border-radius:8px; padding:10px 22px; font-size:15px; cursor:pointer;">OK</button>
     </div>
@@ -724,7 +724,7 @@
         const result = await response.json();
         console.log('Success:', result);
         agreementModal.style.display = 'none';
-        
+
         // Clear form inputs
         channelConfigs.forEach(({ checkboxId, fieldId }) => {
           const checkbox = document.getElementById(checkboxId);
@@ -792,58 +792,87 @@
 
   <!-- Auth Protection & User Management -->
   <script>
-    // Wait for auth to be available
-    function waitForAuth(callback, maxAttempts = 10) {
-      let attempts = 0;
-      const checkAuth = () => {
-        attempts++;
-        const authInstance = window.auth || (typeof auth !== 'undefined' ? auth : null);
-        if (authInstance && authInstance.supabase) {
-          callback(authInstance);
-        } else if (attempts < maxAttempts) {
-          setTimeout(checkAuth, 200);
-        } else {
-          console.error('❌ Auth not available, redirecting to WIP page');
-          window.location.href = './wip.html';
-        }
-      };
-      checkAuth();
-    }
+    // Wrap in IIFE to allow return statements
+    (function () {
+      // Check for password authentication cookie first - MUST RUN IMMEDIATELY
+      function hasPasswordAuth() {
+        const cookies = document.cookie.split(';');
+        const hasCookie = cookies.some(cookie => cookie.trim().startsWith('autoremind_session='));
+        console.log('🔍 Checking password auth cookie:', document.cookie, 'Result:', hasCookie);
+        return hasCookie;
+      }
 
-    waitForAuth((auth) => {
-      // Main page logic
-      const userEmail = document.getElementById('user-email');
-      const logoutBtn = document.getElementById('logout-btn');
+      // Check immediately on page load
+      const passwordAuthExists = hasPasswordAuth();
 
-      // Update UI based on auth state
-      auth.onAuthStateChange((user, session, loading) => {
-        if (loading) {
-          // Show loading state if needed
-          return;
-        }
+      // If no password auth, redirect to wip page
+      if (!passwordAuthExists) {
+        console.log('❌ No password authentication, redirecting to WIP page');
+        window.location.href = './wip.html';
+        return; // Stop execution
+      }
 
-        if (user) {
-          // User is authenticated
-          if (userEmail && user.email) {
-            userEmail.textContent = user.email;
-            userEmail.style.display = 'inline-block';
+      console.log('✅ Password authentication found, proceeding with Supabase auth');
+
+      // Wait for auth to be available
+      function waitForAuth(callback, maxAttempts = 10) {
+        let attempts = 0;
+        const checkAuth = () => {
+          attempts++;
+          const authInstance = window.auth || (typeof auth !== 'undefined' ? auth : null);
+          if (authInstance && authInstance.supabase) {
+            callback(authInstance);
+          } else if (attempts < maxAttempts) {
+            setTimeout(checkAuth, 200);
+          } else {
+            console.error('❌ Auth not available, redirecting to WIP page');
+            window.location.href = './wip.html';
+          }
+        };
+        checkAuth();
+      }
+
+      waitForAuth((auth) => {
+        // Main page logic
+        const userEmail = document.getElementById('user-email');
+        const logoutBtn = document.getElementById('logout-btn');
+
+        // Update UI based on auth state
+        auth.onAuthStateChange((user, session, loading) => {
+          if (loading) {
+            // Show loading state if needed
+            return;
           }
 
-          if (logoutBtn) {
-            logoutBtn.style.display = 'block';
-            logoutBtn.onclick = handleLogout;
+          if (user) {
+            // User is authenticated with Supabase
+            console.log('✅ Supabase authentication successful');
+            if (userEmail && user.email) {
+              userEmail.textContent = user.email;
+              userEmail.style.display = 'inline-block';
+            }
+
+            if (logoutBtn) {
+              logoutBtn.style.display = 'block';
+              logoutBtn.onclick = handleLogout;
+            }
+          } else {
+            // User is not authenticated with Supabase, but has password auth
+            // They need to sign in with Supabase - redirect to auth page
+            console.log('⚠️ Password auth exists but Supabase sign-in required - redirecting to auth page');
+            window.location.href = './auth.html';
           }
-        } else {
-          // User is not authenticated, redirect to WIP page
+        });
+
+        async function handleLogout() {
+          await auth.signOut();
+          // Clear both Supabase session and password cookie
+          document.cookie = 'autoremind_session=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+          // Redirect will happen via auth state change or manually
           window.location.href = './wip.html';
         }
       });
-
-      async function handleLogout() {
-        await auth.signOut();
-        // Redirect will happen via auth state change
-      }
-    });
+    })(); // End IIFE
   </script>
 </body>
 
