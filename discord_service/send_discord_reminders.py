@@ -27,10 +27,20 @@ def get(url, params=None):
     return r.json()
 
 
-def post(url, json):
+def post(url, json, retries=0):
+    MAX_RETRIES = 3
     r = requests.post(url, headers=HEADERS, json=json, timeout=15)
+    
     if r.status_code == 429:
-        raise SystemExit(f"Rate-limited. Retry-After (s): {r.json().get('retry_after')}")
+        if retries >= MAX_RETRIES:
+            print(f"❌ Hit max retries ({MAX_RETRIES}) for rate limiting. Giving up.")
+            r.raise_for_status()
+
+        retry_after = float(r.json().get('retry_after', 1.0))
+        print(f"Rate limited. Sleeping for {retry_after}s... (Attempt {retries+1}/{MAX_RETRIES})")
+        time.sleep(retry_after)
+        return post(url, json, retries=retries + 1)
+    
     if r.status_code >= 400:
         try:
             err = r.json()
@@ -78,7 +88,7 @@ def send_dm(channel_id: str, content: str):
 def dm_by_username(guild_id: str, username: str, message: str):
     member = find_member_by_username(guild_id, username)
     if not member:
-        raise SystemExit(f"User '{username}' not found in guild {guild_id}.")
+        raise ValueError(f"User '{username}' not found in guild {guild_id}.")
     user_id = member["user"]["id"]
     ch_id = open_dm(user_id)
     send_dm(ch_id, message)
@@ -116,7 +126,12 @@ def dm_to_all():
         for username, message in dict_of_message.items():
             if not message:
                 continue
-            dm_by_username(GUILD_ID, username, message)
+            try:
+                dm_by_username(GUILD_ID, username, message)
+            except Exception as e:
+                # This catches ValueErrors (User not found) 
+                # AND requests.exceptions.HTTPError (Cannot send to user/Blocked bot)
+                print(f"⚠️ Failed to send to '{username}'. Reason: {e}")
             time.sleep(0.5)
 
 
