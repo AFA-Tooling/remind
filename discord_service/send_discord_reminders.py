@@ -10,7 +10,13 @@ GUILD_ID  = os.getenv("DISCORD_GUILD_ID")
 BASE = "https://discord.com/api/v10"
 HEADERS = {"Authorization": f"Bot {TOKEN}", "Content-Type": "application/json"}
 
-CSV_FOLDER = Path(os.getenv("DISCORD_CSV_FOLDER", r"discord_service\message_requests"))
+BASE_DIR = Path(__file__).resolve().parent
+env_csv = os.getenv("DISCORD_CSV_FOLDER")
+if env_csv:
+    CSV_FOLDER = Path(env_csv)
+else:
+    CSV_FOLDER = BASE_DIR / "message_requests"
+# CSV_FOLDER = Path(os.getenv("DISCORD_CSV_FOLDER", r"discord_service\message_requests"))
 
 def get(url, params=None):
     r = requests.get(url, headers=HEADERS, params=params, timeout=30)
@@ -21,10 +27,20 @@ def get(url, params=None):
     return r.json()
 
 
-def post(url, json):
+def post(url, json, retries=0):
+    MAX_RETRIES = 3
     r = requests.post(url, headers=HEADERS, json=json, timeout=15)
+    
     if r.status_code == 429:
-        raise SystemExit(f"Rate-limited. Retry-After (s): {r.json().get('retry_after')}")
+        if retries >= MAX_RETRIES:
+            print(f"❌ Hit max retries ({MAX_RETRIES}) for rate limiting. Giving up.")
+            r.raise_for_status()
+
+        retry_after = float(r.json().get('retry_after', 1.0))
+        print(f"Rate limited. Sleeping for {retry_after}s... (Attempt {retries+1}/{MAX_RETRIES})")
+        time.sleep(retry_after)
+        return post(url, json, retries=retries + 1)
+    
     if r.status_code >= 400:
         try:
             err = r.json()
@@ -72,7 +88,7 @@ def send_dm(channel_id: str, content: str):
 def dm_by_username(guild_id: str, username: str, message: str):
     member = find_member_by_username(guild_id, username)
     if not member:
-        raise SystemExit(f"User '{username}' not found in guild {guild_id}.")
+        raise ValueError(f"User '{username}' not found in guild {guild_id}.")
     user_id = member["user"]["id"]
     ch_id = open_dm(user_id)
     send_dm(ch_id, message)
@@ -81,21 +97,21 @@ def dm_by_username(guild_id: str, username: str, message: str):
 def parse_csv_to_dict(file_path):
     """
     input: a Path to a CSV in the message_requests folder
-    return: a dictionary {phone_number: message}
+    return: a dictionary {discord_id: message}
     """
     dict = {}
     with file_path.open(newline="", encoding="utf-8") as f:
         reader = csv.DictReader(f)
         if not reader.fieldnames:
             return dict
-        
-        discord_username_col = reader.fieldnames[3]
-        message_col = reader.fieldnames[-1]
 
+        # New: use the named columns directly
         for row in reader:
-            discord_username = (row.get(discord_username_col) or "").strip()
-            message = (row.get(message_col) or "").strip()
-            dict[discord_username] = message
+            discord_id = (row.get("discord_id") or "").strip()
+            message = (row.get("message") or "").strip()
+            if not discord_id or not message:
+                continue
+            dict[discord_id] = message
     return dict
 
 def dm_to_all():
@@ -110,7 +126,12 @@ def dm_to_all():
         for username, message in dict_of_message.items():
             if not message:
                 continue
-            dm_by_username(GUILD_ID, username, message)
+            try:
+                dm_by_username(GUILD_ID, username, message)
+            except Exception as e:
+                # This catches ValueErrors (User not found) 
+                # AND requests.exceptions.HTTPError (Cannot send to user/Blocked bot)
+                print(f"⚠️ Failed to send to '{username}'. Reason: {e}")
             time.sleep(0.5)
 
 
