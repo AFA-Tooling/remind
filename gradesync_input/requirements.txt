@@ -5,3 +5,5 @@ google-auth-httplib2
 python-dotenv
 psycopg2-binary
 supabase
+pandas
+numpy

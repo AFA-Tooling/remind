@@ -6,6 +6,9 @@ import argparse
 import logging
 import json
 import re
+from datetime import datetime
+from pathlib import Path
+from typing import Optional, Dict, Any, List
 
 # Create an output folder if it doesn't exist
 output_folder = os.path.join(os.path.dirname(__file__), 'output')
@@ -17,6 +20,10 @@ from googleapiclient.discovery import build
 from google.oauth2 import service_account
 from google.auth.transport.requests import Request
 from google.auth.exceptions import RefreshError
+
+# Supabase
+from dotenv import load_dotenv
+from supabase import Client, create_client
 
 # Sheet & credentials config
 # OLD test sheet:
@@ -30,6 +37,9 @@ credentials_path = os.path.join(config_folder, google_sheet_credentials)
 if not os.path.exists(credentials_path):
     logging.error(f"Credentials file not found: {credentials_path}")
     sys.exit(1)
+
+# Supabase configuration
+DEFAULT_SUPABASE_TABLE = "assignment_submissions"
 
 def safe_filename_for_windows(name: str) -> str:
     """
@@ -122,15 +132,185 @@ def preprocess_df(df, tab_name):
     return filtered_df
 
 
+def load_supabase_env() -> Dict[str, str]:
+    """
+    Load Supabase environment variables from .env file.
+    Returns a dictionary with 'url' and 'service_role_key'.
+    """
+    env_path = Path(__file__).resolve().parent / ".env"
+    load_dotenv(env_path)
+
+    required_vars = ["SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY"]
+    missing = [var for var in required_vars if not os.getenv(var)]
+
+    if missing:
+        raise ValueError(
+            "Missing required environment variables: " + ", ".join(missing)
+        )
+
+    return {
+        "url": os.environ["SUPABASE_URL"],
+        "service_role_key": os.environ["SUPABASE_SERVICE_ROLE_KEY"],
+    }
+
+
+
+
+
+
+def upsert_submissions_to_supabase(
+    df: pd.DataFrame,
+    supabase: Client,
+    table_name: str
+) -> None:
+    """
+    Upsert assignment submission data to Supabase table.
+    
+    Args:
+        df: DataFrame with columns: assignment, name, sid, email, status
+        supabase: Supabase client instance
+        table_name: Name of the Supabase table
+    
+    Note:
+        Primary key is (assignment_name, name). Records with missing names
+        will be skipped with a warning. Uses upsert to update existing records
+        or insert new ones.
+    """
+    if df.empty:
+        logging.warning("DataFrame is empty, nothing to upsert")
+        return
+    
+    # Prepare records for upsert
+    records: List[Dict[str, Any]] = []
+    
+    for _, row in df.iterrows():
+        # Build record
+        # Note: name is required (part of primary key), so ensure it's not None
+        name_value = str(row.get('name', '')).strip() if pd.notna(row.get('name')) else ''
+        if not name_value:
+            logging.warning(f"Skipping record with missing name for assignment {row.get('assignment', '')}")
+            continue
+        
+        # Handle SID - convert empty strings to None
+        sid_value = row.get('sid', '')
+        if pd.isna(sid_value) or (isinstance(sid_value, str) and sid_value.strip() == ''):
+            sid_value = None
+        else:
+            sid_value = str(sid_value).strip()
+        
+        # Handle email - convert empty strings to None
+        email_value = row.get('email', '')
+        if pd.isna(email_value) or (isinstance(email_value, str) and email_value.strip() == ''):
+            email_value = None
+        else:
+            email_value = str(email_value).strip()
+        
+        # Handle status - convert empty strings to None
+        status_value = row.get('status', '')
+        if pd.isna(status_value) or (isinstance(status_value, str) and status_value.strip() == ''):
+            status_value = None
+        else:
+            status_value = str(status_value).strip()
+        
+        record = {
+            'assignment_name': str(row.get('assignment', '')),
+            'sid': sid_value,
+            'name': name_value,
+            'email': email_value,
+            'status': status_value,
+            'updated_at': datetime.now().isoformat()
+        }
+        
+        records.append(record)
+    
+    if not records:
+        logging.warning("No valid records to upsert")
+        return
+    
+    try:
+        # Upsert with conflict resolution on (assignment_name, name)
+        # The upsert method will update existing records or insert new ones
+        # based on the primary key constraint (assignment_name, name)
+        response = supabase.table(table_name).upsert(records).execute()
+        
+        if hasattr(response, 'error') and response.error:
+            raise RuntimeError(f"Supabase error: {response.error}")
+        
+        print(f"✅ Successfully upserted {len(records)} records to {table_name}")
+        
+    except Exception as e:
+        logging.error(f"Error upserting to Supabase: {e}")
+        raise
+
+
 if __name__ == "__main__":
+    # Parse command-line arguments
+    parser = argparse.ArgumentParser(
+        description="Fetch assignment data from Google Sheets and upload to Supabase"
+    )
+    parser.add_argument(
+        "--supabase",
+        action="store_true",
+        default=True,
+        help="Enable Supabase upload (default: True)"
+    )
+    parser.add_argument(
+        "--no-supabase",
+        dest="supabase",
+        action="store_false",
+        help="Disable Supabase upload"
+    )
+    parser.add_argument(
+        "--csv-fallback",
+        action="store_true",
+        help="Also write CSV files for debugging"
+    )
+    parser.add_argument(
+        "--table",
+        default=DEFAULT_SUPABASE_TABLE,
+        help=f"Supabase table name (default: {DEFAULT_SUPABASE_TABLE})"
+    )
+    parser.add_argument(
+        "--test",
+        action="store_true",
+        help="Test mode: process only the first valid assignment tab"
+    )
+    args = parser.parse_args()
+    
+    # Initialize Google Sheets credentials
     creds = get_credentials()
     tab_names = get_all_tab_names(google_sheet_id, creds)
+    
+    # Initialize Supabase client if enabled
+    supabase_client = None
+    if args.supabase:
+        try:
+            supabase_config = load_supabase_env()
+            supabase_client = create_client(
+                supabase_config["url"],
+                supabase_config["service_role_key"]
+            )
+            print("✅ Connected to Supabase")
+        except ValueError as e:
+            logging.error(f"Failed to load Supabase credentials: {e}")
+            if not args.csv_fallback:
+                print("❌ Supabase upload required but credentials not available. Exiting.")
+                sys.exit(1)
+            else:
+                print("⚠️  Supabase upload disabled, falling back to CSV only")
+                args.supabase = False
 
+    processed_count = 0
+    
     for tab in tab_names:
-
         # Skip the summary tabs
         if tab in ['Roster', 'Labs', 'Discussions', 'Projects', 'Lecture Quizzes', 'Midterms', 'Postterms']:
-            print(f"Skipping {tab} (not relevant)")
+            print(f"Skipping {tab} (summary tab)")
+            continue
+        
+        # Only process tabs that start with "Project" (case-insensitive)
+        if not tab.lower().startswith('project'):
+            print(f"Skipping {tab} (not a Project)")
             continue
 
         print(f"\n Parsing tab: {tab}")
@@ -141,22 +321,51 @@ if __name__ == "__main__":
             print(f"Skipping {tab} (no data)")
             continue
         
-        # 1. Convert the raw data to a dataframe
-        df = convert_to_dataframe(raw_data)
+        try:
+            # 1. Convert the raw data to a dataframe
+            df = convert_to_dataframe(raw_data)
 
-        # 2. Preprocess the dataframe
-        df = preprocess_df(df, tab)
-        print(f"Cleaned {tab} DataFrame:")
-        print(df.head())  # Preview the cleaned data
+            # 2. Preprocess the dataframe
+            df = preprocess_df(df, tab)
+            print(f"Cleaned {tab} DataFrame:")
+            print(df.head())  # Preview the cleaned data
 
-        # 3. Export the cleaned dataframe to CSV
-        output_filename = f"{safe_filename_for_windows(tab)}.csv"
-        output_path = os.path.join(output_folder, output_filename)
+            # 3. Upload to Supabase (if enabled)
+            if args.supabase and supabase_client:
+                try:
+                    upsert_submissions_to_supabase(
+                        df,
+                        supabase_client,
+                        args.table
+                    )
+                    processed_count += 1
+                    print(f"✅ Successfully processed {tab}")
+                except Exception as e:
+                    logging.error(f"Error uploading {tab} to Supabase: {e}")
+                    if not args.csv_fallback:
+                        print(f"❌ Failed to upload {tab} to Supabase. Continuing with next tab...")
+                        continue
 
-        # ✅ Ensure the folder exists
-        os.makedirs(os.path.dirname(output_path), exist_ok=True)
+            # 4. Export to CSV (if fallback enabled or Supabase disabled)
+            if args.csv_fallback or not args.supabase:
+                output_filename = f"{safe_filename_for_windows(tab)}.csv"
+                output_path = os.path.join(output_folder, output_filename)
 
-        # Save the CSV
-        df.to_csv(output_path, index=False)
-        print(f"Saved {output_path}")
-        print(f"Saved {tab}.csv")
+                # ✅ Ensure the folder exists
+                os.makedirs(os.path.dirname(output_path), exist_ok=True)
+
+                # Save the CSV
+                df.to_csv(output_path, index=False)
+                print(f"Saved {output_path}")
+                print(f"Saved {tab}.csv")
+                processed_count += 1
+            
+            # If in test mode, break after processing first valid assignment
+            if args.test:
+                print(f"\n🧪 Test mode: Processed 1 assignment ({tab}). Exiting.")
+                break
+                
+        except Exception as e:
+            logging.error(f"Error processing tab {tab}: {e}")
+            print(f"❌ Failed to process {tab}. Continuing with next tab...")
+            continue

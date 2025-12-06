@@ -5,12 +5,31 @@ This folder contains the core input-processing logic for AutoRemind's automated 
 ## Files
 
 ### `gradesync_to_df.py`
-- **Purpose**: Uses Google Sheet API to parse through the given spreadsheet and obain necessary information required for AutoRemind.
+- **Purpose**: Uses Google Sheet API to parse through the given spreadsheet and upload assignment submission data to Supabase database.
 - **Functionality**:
   - Authenticates with the Google Sheets API, fetches all assignment tabs from a specific sheet, and skips summary tabs (e.g., 'Roster', 'Labs') to isolate raw assignment submissions.
   - Extracts essential columns (Name, SID, Email, Status, Submission Time, Lateness), pads shorter rows, adds an Assignment identifier, and standardizes all column headers for downstream processing
-  - Iterates through each processed assignment tab and exports the cleaned data as a separate, Windows-safe CSV file into a local output/ directory
-- **Usage**: Should be run regularly (e.g., daily via cron) to grab updated student information.
+  - Uploads cleaned data to Supabase `assignment_submissions` table using upsert logic (updates existing records, inserts new ones)
+  - Converts lateness from "H:M:S" format to total seconds for database storage
+  - Optionally exports CSV files for debugging with `--csv-fallback` flag
+- **Usage**: 
+  ```bash
+  # Default: Upload to Supabase (requires .env with Supabase credentials)
+  python gradesync_to_df.py
+  
+  # Disable Supabase, write CSV files only
+  python gradesync_to_df.py --no-supabase
+  
+  # Upload to Supabase AND write CSV files for debugging
+  python gradesync_to_df.py --csv-fallback
+  
+  # Custom table name and course code
+  python gradesync_to_df.py --table my_submissions --course-code CS61A
+  ```
+- **Environment Variables** (required for Supabase upload):
+  - `SUPABASE_URL`: Your Supabase project URL
+  - `SUPABASE_SERVICE_ROLE_KEY`: Your Supabase service role key (stored in `.env` file)
+- **Database Schema**: See `assignment_submissions_schema.sql` for the required table structure
 
 ### `df_to_message_requests.py`
 - **Purpose**: Converts the output DataFrame into message request files if necessary.
@@ -52,20 +71,38 @@ This folder contains the core input-processing logic for AutoRemind's automated 
 
 
 ## How to Run
+
+### Setup
+1. Create a `.env` file in the `gradesync_input` directory with:
+   ```
+   SUPABASE_URL=https://your-project.supabase.co
+   SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+   ```
+
+2. Run the SQL schema in your Supabase SQL editor (see `assignment_submissions_schema.sql`)
+
+### Running the Scripts
 1. Open a terminal and navigate to this folder:
    ```bash
    cd gradesync_input
-2. Parse through the google sheet and create the DataFrame:
-    ```bash
-    python gradesync_to_df
+   ```
+
+2. Parse through the google sheet and upload to Supabase:
+   ```bash
+   python gradesync_to_df.py
+   ```
+
 3. Run the main pipeline to generate message requests:
-    ```bash
-    python main.py
+   ```bash
+   python main.py
+   ```
 ## Dependencies
-- `pandas`
-- `datetime`
-- Google Sheets API client libraries
-- Your internal messaging/email services (e.g., Twilio, SendGrid)
+- `pandas` - Data manipulation
+- `numpy` - Numerical operations
+- `python-dotenv` - Environment variable management
+- `supabase` - Supabase Python client
+- Google Sheets API client libraries (`google-api-python-client`, `google-auth`, etc.)
+- `psycopg2-binary` - PostgreSQL adapter (for direct database access if needed)
 
 ## Current Setup
 The script is currently configured to read from a test sheet deployed by GradeSync. Ensure the correct credentials and sheet ID are used before deploying.
