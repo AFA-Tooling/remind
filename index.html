@@ -698,24 +698,41 @@
       return payload;
     }
 
-    document.getElementById('agree-btn').addEventListener('click', async function () {
-      let payload;
-      try {
-        payload = collectSettingsPayload();
-      } catch (err) {
-        if (err.message === 'validation') {
-          return;
-        }
-        console.error(err);
-        alert('There was a problem preparing your reminder settings. Please try again.');
+  document.getElementById('agree-btn').addEventListener('click', async function () {
+    let payload;
+    try {
+      payload = collectSettingsPayload();
+    } catch (err) {
+      if (err.message === 'validation') {
         return;
       }
-      try {
-        const response = await fetch('/api/reminders/settings', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        });
+      console.error(err);
+      alert('There was a problem preparing your reminder settings. Please try again.');
+      return;
+    }
+
+    // 🔑 attach login email from Supabase auth
+    try {
+      const authInstance = window.auth || (typeof auth !== 'undefined' ? auth : null);
+      const loggedInEmail = authInstance?.user?.email || null;
+      if (!loggedInEmail) {
+        alert('You must be signed in to save your reminder settings.');
+        return;
+      }
+      payload.user_email = loggedInEmail;
+    } catch (e) {
+      console.error('Could not read auth user email', e);
+      alert('There was a problem reading your login information. Please sign in again.');
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/reminders/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      
         if (!response.ok) {
           const errorData = await response.json().catch(() => ({}));
           console.error('API Error:', response.status, errorData);
