@@ -17,45 +17,39 @@ export default async function handler(req, res) {
 
     let body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
 
-    const { channels, days_before } = body;
-    const email = channels?.email;
-    const phoneNumber = channels?.sms;
-    const discordId = channels?.discord;
+    const { channels = {}, days_before, user_email } = body;
 
-    if (!email || typeof days_before !== 'number') {
+    // 🔑 canonical email is always the login email
+    const loginEmail = typeof user_email === 'string' ? user_email.trim() : null;
+
+    const phoneNumber = channels.sms || null;
+    const discordId = channels.discord || null;
+    const wantsEmailChannel = !!channels.email; // just to set email_pref
+
+    if (!loginEmail || typeof days_before !== 'number') {
       return res.status(400).json({ error: 'Invalid request data' });
     }
 
-    // Map frontend data to new table structure
+    const clampedDays = Math.max(0, Math.min(7, Math.round(days_before)));
+
     const studentData = {
-      email: email.trim(),
+      email: loginEmail,
       phone_number: phoneNumber ? phoneNumber.trim() : null,
       discord_id: discordId ? discordId.trim() : null,
-      notif_freq_days: Math.max(0, Math.min(7, Math.round(days_before))),
+      notif_freq_days: clampedDays,
       phone_pref: !!phoneNumber,
-      email_pref: !!email,
-      discord_pref: !!discordId,
-      opt_in: true, // User agreed to receive notifications
-      course_code: 'CS10',
-      first_name: 'first',
-      last_name: 'last',
-      preferred_first_name: null,
-      sid: email.trim(), // Using email as SID for now (adjust if your table uses numeric SID)
-      PROJ01: 0,
-      PROJ02: 0,
-      PROJ03: 0,
-      PROJ04: 0,
-      PROJ05: 0
+      email_pref: wantsEmailChannel, 
+      discord_pref: !!discordId
     };
 
     const { data, error } = await supabase
-      .from('students')
+      .from('students_duplicate')
       .insert(studentData)
       .select();
 
     if (error) {
       if (error.code === '23505') {
-        return res.status(400).json({ 
+        return res.status(400).json({
           error: 'This email is already registered.',
           details: 'Duplicate entry'
         });
