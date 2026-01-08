@@ -461,14 +461,11 @@
 
         <ul class="channels">
           <li>
-            <label for="ch-discord">
-              <input id="ch-discord" type="checkbox" name="channel_discord" />
+            <label for="ch-email">
+              <input id="ch-email" type="checkbox" name="channel_email" />
               <span class="dot" aria-hidden="true"></span>
-              <span>Discord</span>
+              <span>Email</span>
             </label>
-            <!-- revealed on check -->
-            <input id="discord-field" class="channel-field" type="text" name="discord_username"
-              placeholder="Enter Discord username" inputmode="text" />
           </li>
           <li>
             <label for="ch-sms">
@@ -481,14 +478,14 @@
               inputmode="tel" />
           </li>
           <li>
-            <label for="ch-email">
-              <input id="ch-email" type="checkbox" name="channel_email" />
+            <label for="ch-discord">
+              <input id="ch-discord" type="checkbox" name="channel_discord" />
               <span class="dot" aria-hidden="true"></span>
-              <span>Email</span>
+              <span>Discord</span>
             </label>
             <!-- revealed on check -->
-            <input id="email-field" class="channel-field" type="email" name="email_address"
-              placeholder="Enter email address" inputmode="email" />
+            <input id="discord-field" class="channel-field" type="text" name="discord_username"
+              placeholder="Enter Discord username" inputmode="text" />
           </li>
         </ul>
 
@@ -622,13 +619,6 @@
     }
     const channelConfigs = [
       {
-        checkboxId: 'ch-discord',
-        fieldId: 'discord-field',
-        key: 'discord',
-        validate: value => value.trim().length > 0,
-        errorMessage: 'Please enter a Discord username.'
-      },
-      {
         checkboxId: 'ch-sms',
         fieldId: 'sms-field',
         key: 'sms',
@@ -636,11 +626,11 @@
         errorMessage: 'Please enter a valid phone number for SMS.'
       },
       {
-        checkboxId: 'ch-email',
-        fieldId: 'email-field',
-        key: 'email',
-        validate: value => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim()),
-        errorMessage: 'Please enter a valid email address.'
+        checkboxId: 'ch-discord',
+        fieldId: 'discord-field',
+        key: 'discord',
+        validate: value => value.trim().length > 0,
+        errorMessage: 'Please enter a Discord username.'
       }
     ];
     channelConfigs.forEach(({ checkboxId, fieldId }) => bindToggle(checkboxId, fieldId));
@@ -675,6 +665,15 @@
 
       // Validate enabled channels and collect their values
       let anyChannel = false;
+      
+      // Handle email checkbox (no input field needed)
+      const emailCheckbox = document.getElementById('ch-email');
+      if (emailCheckbox.checked) {
+        anyChannel = true;
+        payload.channels.email = true; // Email doesn't need additional input
+      }
+      
+      // Handle channels with input fields
       for (const { checkboxId, fieldId, key, validate, errorMessage } of channelConfigs) {
         const checkbox = document.getElementById(checkboxId);
         const field = document.getElementById(fieldId);
@@ -743,6 +742,10 @@
         agreementModal.style.display = 'none';
 
         // Clear form inputs
+        // Clear email checkbox (no input field)
+        document.getElementById('ch-email').checked = false;
+        
+        // Clear channels with input fields
         channelConfigs.forEach(({ checkboxId, fieldId }) => {
           const checkbox = document.getElementById(checkboxId);
           const field = document.getElementById(fieldId);
