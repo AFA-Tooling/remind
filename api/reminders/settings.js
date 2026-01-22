@@ -17,7 +17,7 @@ export default async function handler(req, res) {
 
     let body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
 
-    const { channels = {}, days_before, user_email } = body;
+    const { channels = {}, days_before, user_email, preferred_first_name } = body;
 
     // 🔑 canonical email is always the login email
     const loginEmail = typeof user_email === 'string' ? user_email.trim() : null;
@@ -32,14 +32,17 @@ export default async function handler(req, res) {
 
     const clampedDays = Math.max(0, Math.min(7, Math.round(days_before)));
 
+    const preferredFirstName = preferred_first_name ? preferred_first_name.trim() : null;
+
     const studentData = {
       email: loginEmail,
       phone_number: phoneNumber ? phoneNumber.trim() : null,
       discord_id: discordId ? discordId.trim() : null,
-      notif_freq_days: clampedDays,
+      days_before_deadline: clampedDays,
       phone_pref: !!phoneNumber,
-      email_pref: wantsEmailChannel, 
-      discord_pref: !!discordId
+      email_pref: wantsEmailChannel,
+      discord_pref: !!discordId,
+      preferred_first_name: preferredFirstName || null
     };
 
     const { data, error } = await supabase

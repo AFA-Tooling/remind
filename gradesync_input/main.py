@@ -33,9 +33,9 @@ def main():
     print("STEP 1: Fetching Data & Generating Reminders CSV")
     print("--------------------------------------------------")
     
-    # We must pass --discord-csv so db_fetch generates the file 
-    # required by the sender script.
-    fetch_cmd = [sys.executable, str(script_fetch), "--discord-csv"]
+    # We must pass --discord-csv and --gmail-csv so db_fetch generates the files 
+    # required by the sender scripts.
+    fetch_cmd = [sys.executable, str(script_fetch), "--discord-csv", "--gmail-csv"]
     
     try:
         # check=True raises an exception if the script fails (returns non-zero)

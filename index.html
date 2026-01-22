@@ -456,6 +456,15 @@
     <div class="grid">
       <!-- Left column -->
       <div>
+        <div class="divider"><span class="pill">Preferred Name</span></div>
+        <div style="margin-bottom: 24px;">
+          <label for="preferred-name" class="label" style="margin-bottom: 8px; display: block;">What should we call
+            you?</label>
+          <input id="preferred-name" type="text" name="preferred_first_name"
+            placeholder="Enter your preferred first name" class="channel-field" style="display: block; margin-top: 0;"
+            maxlength="50" />
+        </div>
+
         <div class="divider"><span class="pill">Reminder Channels</span></div>
         <p class="label">Turn reminders on via:</p>
 
@@ -489,6 +498,7 @@
           </li>
         </ul>
 
+        <!-- Commented out: Assignment Status section
         <div class="divider" style="margin-top:32px;"><span class="pill">Assignment Status</span></div>
         <ul class="channels">
           <li>
@@ -499,6 +509,7 @@
             </label>
           </li>
         </ul>
+        -->
       </div>
 
       <!-- Right column -->
@@ -635,7 +646,8 @@
     ];
     channelConfigs.forEach(({ checkboxId, fieldId }) => bindToggle(checkboxId, fieldId));
 
-    const includeIncompleteToggle = document.getElementById('ch-incomplete');
+    // Commented out: Incomplete assignments toggle
+    // const includeIncompleteToggle = document.getElementById('ch-incomplete');
     const agreementModal = document.getElementById('agreement-modal');
 
     // Agreement popup logic for AutoRemind Me button
@@ -648,14 +660,20 @@
       // Re-query locally so we don't depend on another <script> block's scope
       const numEl = document.getElementById('days');
       const rngEl = document.getElementById('days-range');
-      const includeIncompleteToggle = document.getElementById('ch-incomplete');
+      // Commented out: Incomplete assignments toggle
+      // const includeIncompleteToggle = document.getElementById('ch-incomplete');
 
       const clamp = v => Math.min(7, Math.max(0, Number(v || 0)));
+
+      const preferredNameEl = document.getElementById('preferred-name');
+      const preferredFirstName = (preferredNameEl.value || '').trim();
 
       const payload = {
         channels: {},                                      // will hold only enabled channels
         days_before: clamp(numEl.value),
-        include_incomplete: includeIncompleteToggle.checked
+        // Commented out: include_incomplete field
+        // include_incomplete: includeIncompleteToggle.checked,
+        preferred_first_name: preferredFirstName || null
       };
 
       if (Number.isNaN(payload.days_before)) payload.days_before = 0;
@@ -665,14 +683,14 @@
 
       // Validate enabled channels and collect their values
       let anyChannel = false;
-      
+
       // Handle email checkbox (no input field needed)
       const emailCheckbox = document.getElementById('ch-email');
       if (emailCheckbox.checked) {
         anyChannel = true;
         payload.channels.email = true; // Email doesn't need additional input
       }
-      
+
       // Handle channels with input fields
       for (const { checkboxId, fieldId, key, validate, errorMessage } of channelConfigs) {
         const checkbox = document.getElementById(checkboxId);
@@ -697,41 +715,41 @@
       return payload;
     }
 
-  document.getElementById('agree-btn').addEventListener('click', async function () {
-    let payload;
-    try {
-      payload = collectSettingsPayload();
-    } catch (err) {
-      if (err.message === 'validation') {
+    document.getElementById('agree-btn').addEventListener('click', async function () {
+      let payload;
+      try {
+        payload = collectSettingsPayload();
+      } catch (err) {
+        if (err.message === 'validation') {
+          return;
+        }
+        console.error(err);
+        alert('There was a problem preparing your reminder settings. Please try again.');
         return;
       }
-      console.error(err);
-      alert('There was a problem preparing your reminder settings. Please try again.');
-      return;
-    }
 
-    // 🔑 attach login email from Supabase auth
-    try {
-      const authInstance = window.auth || (typeof auth !== 'undefined' ? auth : null);
-      const loggedInEmail = authInstance?.user?.email || null;
-      if (!loggedInEmail) {
-        alert('You must be signed in to save your reminder settings.');
+      // 🔑 attach login email from Supabase auth
+      try {
+        const authInstance = window.auth || (typeof auth !== 'undefined' ? auth : null);
+        const loggedInEmail = authInstance?.user?.email || null;
+        if (!loggedInEmail) {
+          alert('You must be signed in to save your reminder settings.');
+          return;
+        }
+        payload.user_email = loggedInEmail;
+      } catch (e) {
+        console.error('Could not read auth user email', e);
+        alert('There was a problem reading your login information. Please sign in again.');
         return;
       }
-      payload.user_email = loggedInEmail;
-    } catch (e) {
-      console.error('Could not read auth user email', e);
-      alert('There was a problem reading your login information. Please sign in again.');
-      return;
-    }
 
-    try {
-      const response = await fetch('/api/reminders/settings', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-      
+      try {
+        const response = await fetch('/api/reminders/settings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
         if (!response.ok) {
           const errorData = await response.json().catch(() => ({}));
           console.error('API Error:', response.status, errorData);
@@ -742,9 +760,12 @@
         agreementModal.style.display = 'none';
 
         // Clear form inputs
+        // Clear preferred name field
+        document.getElementById('preferred-name').value = '';
+
         // Clear email checkbox (no input field)
         document.getElementById('ch-email').checked = false;
-        
+
         // Clear channels with input fields
         channelConfigs.forEach(({ checkboxId, fieldId }) => {
           const checkbox = document.getElementById(checkboxId);
@@ -753,7 +774,8 @@
           field.value = '';
           field.style.display = 'none';
         });
-        document.getElementById('ch-incomplete').checked = false;
+        // Commented out: Clear incomplete checkbox
+        // document.getElementById('ch-incomplete').checked = false;
         document.getElementById('days').value = 5;
         document.getElementById('days-range').value = 5;
 

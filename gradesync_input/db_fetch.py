@@ -85,6 +85,14 @@ def parse_args() -> argparse.Namespace:
         default="discord_messages.csv",
         help="Output path for the Discord CSV (default: discord_messages.csv)",
     )
+    parser.add_argument(
+        "--gmail-csv",
+        action="store_true",
+        help=(
+            "If set, also write CSV files for Gmail reminders. Creates one CSV per assignment "
+            "in the message_requests directory with columns: name, sid, email, assignment, message_requests"
+        ),
+    )
     return parser.parse_args()
 
 
@@ -579,6 +587,103 @@ def write_discord_csv(reminders: List[Dict[str, Any]], output_path: Path) -> Non
         print(f"✅ No students with Discord reminders. Wrote empty CSV to {output_path}")
 
 
+def _safe_filename_basic(name: str) -> str:
+    """
+    Return a Windows-safe filename by replacing ':' and runs of '*' with ' - ', etc
+    """
+    cleaned = name.replace(":", " - ")
+    cleaned = re.sub(r'\*+', ' - ', cleaned)
+    cleaned = re.sub(r'\s+', ' ', cleaned).strip().rstrip(' .')
+    return cleaned
+
+
+def write_gmail_csv(reminders: List[Dict[str, Any]], output_dir: Path) -> None:
+    """
+    Write Gmail-compatible CSV files grouped by assignment.
+    Creates one CSV file per assignment in the output directory.
+    CSV format: name,sid,email,assignment,message_requests
+    """
+    output_dir.mkdir(parents=True, exist_ok=True)
+    assignment_rows: Dict[str, List[Dict[str, str]]] = {}
+    total_rows = 0
+
+    for entry in reminders:
+        # Find the email channel for this student, if any
+        email_channel = next(
+            (ch for ch in entry.get("channels", []) if ch.get("type") == "email"),
+            None,
+        )
+        if not email_channel:
+            continue
+
+        email = str(email_channel.get("target", "")).strip()
+        if not email:
+            continue
+
+        student_data = entry.get("student", {})
+        student_name = student_data.get("name", "").strip()
+        student_id = student_data.get("id")
+        
+        # Get SID from student data
+        sid = student_data.get("sid", "")
+        if not sid and student_id:
+            sid = str(student_id)
+
+        # Create a row for each assignment
+        assignments = entry.get("assignments", [])
+        for assignment in assignments:
+            assignment_name = assignment.get("assignment_name", "Assignment")
+            assignment_code = assignment.get("assignment_code", "")
+            
+            # Use assignment_name as the key, fallback to assignment_code
+            assignment_key = assignment_name or assignment_code
+            
+            # Create a per-assignment message
+            # Use preferred_first_name if available, otherwise use first name from student_name
+            preferred_first_name = student_data.get("preferred_first_name")
+            if preferred_first_name and str(preferred_first_name).strip():
+                preferred_name = str(preferred_first_name).strip()
+            elif student_name:
+                preferred_name = student_name.split()[0] if student_name else "there"
+            else:
+                preferred_name = "there"
+            
+            due_text = format_due_datetime(assignment["personal_deadline"]) if assignment.get("personal_deadline") else "soon"
+            
+            message = f"Dear {preferred_name}, your {assignment_name} assignment is missing and it is due in {due_text}. Please submit it as soon as possible."
+            
+            if assignment_key not in assignment_rows:
+                assignment_rows[assignment_key] = []
+            
+            assignment_rows[assignment_key].append({
+                "name": student_name,
+                "sid": sid,
+                "email": email,
+                "assignment": assignment_name,
+                "message_requests": message,
+            })
+
+    for assignment_key, rows in assignment_rows.items():
+        safe_assignment_title = _safe_filename_basic(assignment_key)
+        csv_file_name = f"message_requests_{safe_assignment_title}.csv"
+        output_path = output_dir / csv_file_name
+
+        with output_path.open("w", newline="", encoding="utf-8") as f:
+            writer = csv.DictWriter(
+                f, fieldnames=["name", "sid", "email", "assignment", "message_requests"]
+            )
+            writer.writeheader()
+            writer.writerows(rows)
+
+        total_rows += len(rows)
+        print(f"✅ Wrote {len(rows)} Gmail reminders for '{assignment_key}' to {output_path}")
+
+    if total_rows == 0:
+        print(f"✅ No students with email reminders. No Gmail CSV files created.")
+    else:
+        print(f"✅ Total: Wrote {total_rows} Gmail reminder rows across {len(assignment_rows)} assignment file(s)")
+
+
 def gather_reminders(
     supabase: Client,
     args: argparse.Namespace,
@@ -635,6 +740,9 @@ def gather_reminders(
                 "student": {
                     "id": student.get("id"),
                     "name": f"{student.get('first_name', '')} {student.get('last_name', '')}".strip(),
+                    "preferred_first_name": student.get("preferred_first_name"),
+                    "email": student.get("email"),
+                    "sid": student.get("sid"),
                 },
                 "channels": channels,
                 "assignments": assignments_to_notify,
@@ -685,7 +793,7 @@ def run_reminder_mode(supabase: Client, args: argparse.Namespace) -> None:
             print(entry["message"])
         print(f"\nSummary: {len(reminders)} students ready for reminders.")
 
-    #write Discord CSV into remind/discord_service if requested
+    # Write Discord CSV into discord_service/message_requests if requested
     if args.discord_csv:
         script_dir = Path(__file__).resolve().parent
         project_root = script_dir.parent
@@ -694,6 +802,12 @@ def run_reminder_mode(supabase: Client, args: argparse.Namespace) -> None:
 
         output_path = base_dir / args.discord_output
         write_discord_csv(reminders, output_path)
+
+    # Write Gmail CSV into gradesync_input/message_requests if requested
+    if args.gmail_csv:
+        script_dir = Path(__file__).resolve().parent
+        output_dir = script_dir / "message_requests"
+        write_gmail_csv(reminders, output_dir)
 
 
 def main() -> None:
