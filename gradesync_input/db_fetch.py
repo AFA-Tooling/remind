@@ -14,10 +14,10 @@ from dotenv import load_dotenv
 from supabase import Client, create_client
 
 
-DEFAULT_STUDENTS_TABLE = "students"
+DEFAULT_STUDENTS_TABLE = "students_duplicate"
 DEFAULT_RESOURCES_TABLE = "assignment_resources"
 DEFAULT_DEADLINES_CSV = "shared_data/deadlines.csv"
-DEFAULT_FREQ_FIELD = "notif_freq_days"
+DEFAULT_FREQ_FIELD = "days_before_deadline"
 
 
 def mask_secret(secret: str) -> str:
@@ -383,7 +383,7 @@ def build_assignment_lookup(
 def get_notification_frequency(student: Dict[str, Any], assignment_code: str) -> int:
     """Return student's notification window in days for a given assignment."""
 
-    # Prefer a single-column layout if available (notif_freq_days).
+    # Prefer a single-column layout if available (days_before_deadline).
     freq_value = student.get(DEFAULT_FREQ_FIELD)
     if freq_value is not None:
         try:
@@ -445,32 +445,66 @@ def build_assignment_payload(
     *,
     debug: bool = False,
 ) -> Optional[Dict[str, Any]]:
+    student_email = student.get("email", "unknown")
+    student_id = student.get("id", "unknown")
+    
+    # Enhanced debugging for specific email
+    is_target_student = "autoremindberkeley" in str(student_email).lower()
+    
+    if is_target_student or debug:
+        print(f"\n{'='*80}")
+        print(f"🔍 DEBUG: Evaluating assignment {code} for student:")
+        print(f"   Email: {student_email}")
+        print(f"   ID: {student_id}")
+        print(f"   Today: {today.strftime('%Y-%m-%d %H:%M:%S')}")
+        print(f"{'='*80}")
+    
     course_code = (student.get("course_code") or "").strip()
     course_lookup = lookup.get(course_code)
     if course_lookup is None and course_code:
         course_lookup = lookup.get("")
+    
+    if is_target_student or debug:
+        print(f"   Course code: '{course_code}' (empty='{not course_code}')")
+        print(f"   Course lookup found: {course_lookup is not None}")
+        if course_lookup:
+            print(f"   Available assignment codes in lookup: {list(course_lookup.keys())}")
 
     entry = course_lookup.get(code) if course_lookup else None
     if not entry and course_lookup:
         alias_code = base_assignment_code(code)
+        if is_target_student or debug:
+            print(f"   Direct lookup for '{code}' failed, trying alias: '{alias_code}'")
         if alias_code:
             entry = course_lookup.get(alias_code)
 
     if not entry:
-        debug_print(
-            debug,
-            f"No assignment data found for {code} in course '{course_code or 'default'}'",
-        )
+        msg = f"No assignment data found for {code} in course '{course_code or 'default'}'"
+        if is_target_student or debug:
+            print(f"   ❌ {msg}")
+        debug_print(debug, msg)
         return None
+
+    if is_target_student or debug:
+        print(f"   ✅ Found assignment entry: {entry.get('assignment_name', code)}")
+        print(f"   Base deadline from entry: {entry.get('deadline')}")
 
     offset_raw = student.get(code, 0) or 0
     try:
         offset = int(offset_raw)
     except (TypeError, ValueError):
         offset = 0
+    
+    if is_target_student or debug:
+        print(f"   Student offset for {code}: {offset} days")
 
     base_deadline = entry.get("deadline")
     personal_deadline = compute_personal_deadline(base_deadline, offset)
+    
+    if is_target_student or debug:
+        print(f"   Base deadline: {base_deadline}")
+        print(f"   Personal deadline (base + {offset}): {personal_deadline}")
+    
     debug_print(
         debug,
         " | ".join(
@@ -482,25 +516,47 @@ def build_assignment_payload(
             ]
         ),
     )
+    
     if not personal_deadline:
-        debug_print(debug, f"Skipping {code}: no deadline available")
+        msg = f"Skipping {code}: no deadline available"
+        if is_target_student or debug:
+            print(f"   ❌ {msg}")
+        debug_print(debug, msg)
         return None
 
     freq_days = get_notification_frequency(student, code)
     delta_days = (personal_deadline.date() - today.date()).days
+    
+    if is_target_student or debug:
+        print(f"   Notification frequency (days_before_deadline): {freq_days} days")
+        print(f"   Days until deadline (delta_days): {delta_days} days")
+        print(f"   Personal deadline date: {personal_deadline.date()}")
+        print(f"   Today date: {today.date()}")
+    
     debug_print(
         debug,
         f"Student {student.get('id')} {code}: freq={freq_days}d, delta={delta_days}d",
     )
 
     if delta_days < 0:
-        debug_print(debug, f"Skipping {code}: past due")
+        msg = f"Skipping {code}: past due (delta_days={delta_days})"
+        if is_target_student or debug:
+            print(f"   ❌ {msg}")
+        debug_print(debug, msg)
         return None
 
     # New rule: only send when the diff exactly matches the notification frequency.
     if delta_days != freq_days:
-        debug_print(debug, f"Skipping {code}: delta {delta_days} != freq {freq_days}")
+        msg = f"Skipping {code}: delta {delta_days} != freq {freq_days} (EXACT MATCH REQUIRED)"
+        if is_target_student or debug:
+            print(f"   ❌ {msg}")
+            print(f"   💡 To send email, delta_days ({delta_days}) must exactly equal freq_days ({freq_days})")
+        debug_print(debug, msg)
         return None
+
+    if is_target_student or debug:
+        print(f"   ✅ MATCH! delta_days ({delta_days}) == freq_days ({freq_days})")
+        print(f"   ✅ Will send reminder for {code}")
 
     return {
         "assignment_code": code,
@@ -709,29 +765,74 @@ def gather_reminders(
     )
     today = datetime.now()
 
+    # Debug: Check if target student is in the list
+    target_email = "autoremindberkeley@gmail.com"
+    target_found = False
+    for student in students:
+        if target_email.lower() in str(student.get("email", "")).lower():
+            target_found = True
+            print(f"\n{'='*80}")
+            print(f"🎯 FOUND TARGET STUDENT: {student.get('email')}")
+            print(f"   Student ID: {student.get('id')}")
+            print(f"   Name: {student.get('first_name')} {student.get('last_name')}")
+            print(f"   email_pref: {student.get('email_pref')}")
+            print(f"   days_before_deadline: {student.get('days_before_deadline')}")
+            print(f"   course_code: {student.get('course_code')}")
+            print(f"   Assignment codes in student record: {[k for k in student.keys() if k.upper().startswith('PROJ')]}")
+            print(f"   Note: All students in table are considered opted-in")
+            print(f"{'='*80}\n")
+            break
+    
+    if not target_found:
+        print(f"\n⚠️  WARNING: Target student '{target_email}' NOT FOUND in {DEFAULT_STUDENTS_TABLE} table!")
+        print(f"   Total students loaded: {len(students)}")
+        if students:
+            print(f"   Sample emails: {[s.get('email') for s in students[:5]]}")
+
     reminders: List[Dict[str, Any]] = []
     for student in students:
-        if not student.get("opt_in"):
-            continue
+        student_email = student.get("email", "")
+        is_target = target_email.lower() in str(student_email).lower()
+        
+        if is_target or args.debug:
+            print(f"\n{'='*80}")
+            print(f"📋 Processing student: {student_email}")
+            print(f"   email_pref: {student.get('email_pref')}")
+            print(f"   days_before_deadline: {student.get('days_before_deadline')}")
+            print(f"   Note: All students in table are considered opted-in")
 
         assignments_to_notify: List[Dict[str, Any]] = []
-        for code in collect_assignment_codes(student):
+        assignment_codes = collect_assignment_codes(student)
+        
+        if is_target or args.debug:
+            print(f"   Assignment codes found: {assignment_codes}")
+        
+        for code in assignment_codes:
             payload = build_assignment_payload(
                 student,
                 code,
                 assignment_lookup,
                 today,
-                debug=args.debug,
+                debug=args.debug or is_target,  # Always debug for target student
             )
             if payload:
                 assignments_to_notify.append(payload)
+                if is_target or args.debug:
+                    print(f"   ✅ Added assignment to notify: {code}")
 
         if not assignments_to_notify:
+            if is_target or args.debug:
+                print(f"   ❌ No assignments matched notification window criteria")
             continue
 
         channels = determine_channels(student)
+        if is_target or args.debug:
+            print(f"   Channels determined: {channels}")
+        
         if not channels:
             channels = [{"type": "none", "target": "(no opted-in channels)"}]
+            if is_target or args.debug:
+                print(f"   ⚠️  WARNING: No channels found! Student won't receive reminders.")
 
         message = compose_message(student, assignments_to_notify)
 
@@ -749,6 +850,11 @@ def gather_reminders(
                 "message": message,
             }
         )
+        
+        if is_target:
+            print(f"   ✅ REMINDER CREATED for {student_email}")
+            print(f"   Assignments: {[a['assignment_name'] for a in assignments_to_notify]}")
+            print(f"   Channels: {[c['type'] for c in channels]}")
 
     return reminders
 

@@ -114,14 +114,58 @@ def upload_deadlines_to_supabase(
     for deadline in deadlines:
         try:
             if upsert:
-                # Use upsert to insert or update
-                result = supabase.table("deadlines").upsert(deadline).execute()
-                if result.data:
-                    # Check if it was an insert or update by checking if id was generated
-                    if result.data[0].get("id"):
-                        stats["inserted"] += 1
+                # First, check if a record with the same unique key exists
+                course_code = deadline.get("course_code", "")
+                assignment_code = deadline.get("assignment_code")
+                assignment_name = deadline.get("assignment_name", "")
+                
+                # Query for existing record based on unique constraint
+                query = supabase.table("deadlines").select("id, due, updated_at")
+                query = query.eq("course_code", course_code)
+                query = query.eq("assignment_name", assignment_name)
+                
+                # Handle assignment_code (can be None)
+                if assignment_code:
+                    query = query.eq("assignment_code", assignment_code)
+                else:
+                    query = query.is_("assignment_code", "null")
+                
+                existing = query.execute()
+                
+                if existing.data and len(existing.data) > 0:
+                    # Record exists - update it
+                    existing_id = existing.data[0]["id"]
+                    existing_due = existing.data[0].get("due")
+                    new_due = deadline.get("due")
+                    
+                    # Only update if the due date has changed
+                    if existing_due != new_due:
+                        update_data = {
+                            "due": deadline.get("due"),
+                            "updated_at": datetime.now().isoformat()
+                        }
+                        # Also update assignment_code if it changed
+                        if "assignment_code" in deadline:
+                            update_data["assignment_code"] = deadline.get("assignment_code")
+                        
+                        result = supabase.table("deadlines").update(update_data).eq("id", existing_id).execute()
+                        if result.data:
+                            stats["updated"] += 1
+                            print(f"   ✅ Updated: {assignment_name} (course: {course_code}) - Due: {deadline.get('due')}")
+                        else:
+                            stats["errors"] += 1
                     else:
+                        # No change needed
                         stats["updated"] += 1
+                        print(f"   ⏭️  No change: {assignment_name} (course: {course_code})")
+                else:
+                    # Record doesn't exist - insert it
+                    result = supabase.table("deadlines").insert(deadline).execute()
+                    if result.data:
+                        stats["inserted"] += 1
+                        print(f"   ➕ Inserted: {assignment_name} (course: {course_code}) - Due: {deadline.get('due')}")
+                    else:
+                        stats["errors"] += 1
             else:
                 # Try to insert, skip if duplicate
                 try:
@@ -130,6 +174,7 @@ def upload_deadlines_to_supabase(
                         stats["inserted"] += 1
                 except Exception as e:
                     if "duplicate" in str(e).lower() or "unique" in str(e).lower():
+                        print(f"   ⏭️  Skipped duplicate: {deadline.get('assignment_name', 'unknown')}")
                         stats["updated"] += 1  # Count as updated for stats
                     else:
                         raise

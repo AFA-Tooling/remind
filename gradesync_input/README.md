@@ -65,7 +65,7 @@ This folder contains the core input-processing logic for AutoRemind's automated 
   - `.env` with `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`.
   - `shared_data/deadlines.csv` containing `course_code`, `assignment_code`, and `assignment_name` with due timestamps.
   - Supabase tables:
-    - `students` – opt-in flags, `notif_freq_days`, contact preferences, and assignment offset columns (`PROJ01`, `PROJ02`, ...).
+    - `students` – `days_before_deadline`, contact preferences, and assignment offset columns (`PROJ01`, `PROJ02`, ...).
     - `assignment_resources` – per-course assignment metadata plus helpful resource links.
 - **Output**: Prints each student ready for reminders, their delivery channels, the assignments that triggered (with personalized deadlines/resources), and the draft message text ready for downstream services.
 
