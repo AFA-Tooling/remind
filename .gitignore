@@ -5,9 +5,13 @@ npm
 
 # Environment variables and secrets
 .env
+.env
 .env.local
 .env.*.local
 *.env
+.env.*
+!.env.example
+!.env.template
 
 # Python cache
 __pycache__/
@@ -22,10 +26,18 @@ __pycache__/
 **/config/*credentials*.json
 **/config/*.json
 !**/config/README.md
+# Specific credential files
+**/AutoRemindCredentials.json
+**/cs10_*.json
+**/*test*.json
+**/*secret*.json
+**/*key*.json
 
 # Log files (may contain sensitive information)
 *.log
 *.log.*
+**/gmail_reminder.log
+**/*_reminder.log
 
 # OS files
 .DS_Store

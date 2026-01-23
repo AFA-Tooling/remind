@@ -435,7 +435,7 @@
   <!-- Top Nav -->
   <header class="nav">
     <div class="nav__left">
-      <a class="brand" href="./wip.html"><img src="logo.png" alt="AutoRemind Logo">AutoRemind</a>
+      <a class="brand" href="./login.html"><img src="logo.png" alt="AutoRemind Logo">AutoRemind</a>
     </div>
     <nav class="nav__right">
       <a href="./about.html" class="nav__link">About Us</a>
@@ -836,26 +836,6 @@
   <script>
     // Wrap in IIFE to allow return statements
     (function () {
-      // Check for password authentication cookie first - MUST RUN IMMEDIATELY
-      function hasPasswordAuth() {
-        const cookies = document.cookie.split(';');
-        const hasCookie = cookies.some(cookie => cookie.trim().startsWith('autoremind_session='));
-        console.log('🔍 Checking password auth cookie:', document.cookie, 'Result:', hasCookie);
-        return hasCookie;
-      }
-
-      // Check immediately on page load
-      const passwordAuthExists = hasPasswordAuth();
-
-      // If no password auth, redirect to wip page
-      if (!passwordAuthExists) {
-        console.log('❌ No password authentication, redirecting to WIP page');
-        window.location.href = './wip.html';
-        return; // Stop execution
-      }
-
-      console.log('✅ Password authentication found, proceeding with Supabase auth');
-
       // Wait for auth to be available
       function waitForAuth(callback, maxAttempts = 10) {
         let attempts = 0;
@@ -867,8 +847,8 @@
           } else if (attempts < maxAttempts) {
             setTimeout(checkAuth, 200);
           } else {
-            console.error('❌ Auth not available, redirecting to WIP page');
-            window.location.href = './wip.html';
+            console.error('❌ Auth not available, redirecting to login page');
+            window.location.href = './login.html';
           }
         };
         checkAuth();
@@ -880,7 +860,7 @@
         const logoutBtn = document.getElementById('logout-btn');
 
         // Update UI based on auth state
-        auth.onAuthStateChange((user, session, loading) => {
+        auth.onAuthStateChange(async (user, session, loading) => {
           if (loading) {
             // Show loading state if needed
             return;
@@ -898,20 +878,40 @@
               logoutBtn.style.display = 'block';
               logoutBtn.onclick = handleLogout;
             }
+
+            // Check if user already exists in students_duplicate table
+            try {
+              const checkResponse = await fetch(`/api/reminders/get?user_email=${encodeURIComponent(user.email)}`);
+
+              if (checkResponse.ok) {
+                // User exists in database - redirect to profile edit page
+                console.log('✅ User found in database, redirecting to profile page');
+                window.location.href = './profile.html';
+                return;
+              } else if (checkResponse.status === 404) {
+                // User doesn't exist - show registration form (current behavior)
+                console.log('ℹ️ User not found in database, showing registration form');
+                // Continue with normal page display
+              } else {
+                // Error checking user status - log but continue with registration form
+                console.error('⚠️ Error checking user status:', checkResponse.status);
+                // Continue with normal page display
+              }
+            } catch (error) {
+              console.error('⚠️ Error checking if user exists:', error);
+              // Continue with normal page display on error
+            }
           } else {
-            // User is not authenticated with Supabase, but has password auth
-            // They need to sign in with Supabase - redirect to auth page
-            console.log('⚠️ Password auth exists but Supabase sign-in required - redirecting to auth page');
-            window.location.href = './auth.html';
+            // User is not authenticated with Supabase - redirect to login page
+            console.log('⚠️ Not authenticated, redirecting to login page');
+            window.location.href = './login.html';
           }
         });
 
         async function handleLogout() {
           await auth.signOut();
-          // Clear both Supabase session and password cookie
-          document.cookie = 'autoremind_session=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
-          // Redirect will happen via auth state change or manually
-          window.location.href = './wip.html';
+          // Redirect to login page
+          window.location.href = './login.html';
         }
       });
     })(); // End IIFE

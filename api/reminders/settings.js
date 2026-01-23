@@ -19,8 +19,10 @@ export default async function handler(req, res) {
 
     const { channels = {}, days_before, user_email, preferred_first_name } = body;
 
-    // 🔑 canonical email is always the login email
-    const loginEmail = typeof user_email === 'string' ? user_email.trim() : null;
+    // 🔑 canonical email is always the login email from authenticated session
+    // The email cannot be changed - it must match the authenticated user's email
+    // This ensures users can only update their own profile
+    const loginEmail = typeof user_email === 'string' ? user_email.trim().toLowerCase() : null;
 
     const phoneNumber = channels.sms || null;
     const discordId = channels.discord || null;
@@ -35,7 +37,7 @@ export default async function handler(req, res) {
     const preferredFirstName = preferred_first_name ? preferred_first_name.trim() : null;
 
     const studentData = {
-      email: loginEmail,
+      email: loginEmail, // Email is locked to authenticated user - cannot be changed
       phone_number: phoneNumber ? phoneNumber.trim() : null,
       discord_id: discordId ? discordId.trim() : null,
       days_before_deadline: clampedDays,
@@ -45,23 +47,23 @@ export default async function handler(req, res) {
       preferred_first_name: preferredFirstName || null
     };
 
+    // Use upsert to handle both insert and update
+    // This will insert if email doesn't exist, or update if it does
+    // The email field is used as the conflict key, so it cannot be changed
     const { data, error } = await supabase
       .from('students_duplicate')
-      .insert(studentData)
-      .select();
+      .upsert(studentData, {
+        onConflict: 'email',
+        ignoreDuplicates: false
+      })
+      .select()
+      .single();
 
     if (error) {
-      if (error.code === '23505') {
-        return res.status(400).json({
-          error: 'This email is already registered.',
-          details: 'Duplicate entry'
-        });
-      }
-
       return res.status(500).json({ error: error.message });
     }
 
-    return res.status(200).json({ success: true, data: data[0] });
+    return res.status(200).json({ success: true, data: data });
 
   } catch (error) {
     return res.status(500).json({ error: 'Internal server error', details: error.message });

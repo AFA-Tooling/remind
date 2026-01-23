@@ -159,7 +159,7 @@
   <!-- Navigation -->
   <header class="nav">
     <div class="nav__left">
-      <a class="brand" href="./wip.html"><img src="logo.png" alt="AutoRemind Logo">AutoRemind</a>
+      <a class="brand" href="./login.html"><img src="logo.png" alt="AutoRemind Logo">AutoRemind</a>
     </div>
     <nav class="nav__right">
       <a href="./about.html" class="nav__link">About Us</a>
@@ -182,9 +182,9 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <!-- Load credentials - works with both local (server.js injection) and Vercel (API endpoint) -->
   <script>
-    (async function() {
+    (async function () {
       await new Promise(resolve => setTimeout(resolve, 50));
-      
+
       if (window.SUPABASE_URL && window.SUPABASE_ANON_KEY) {
         console.log('✅ Using server-injected credentials (local dev)');
         const script = document.createElement('script');
@@ -198,15 +198,15 @@
         const response = await fetch('/api/config');
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         const config = await response.json();
-        
+
         if (!config.SUPABASE_URL || !config.SUPABASE_ANON_KEY) {
           throw new Error('Config missing required values');
         }
-        
+
         window.SUPABASE_URL = config.SUPABASE_URL;
         window.SUPABASE_ANON_KEY = config.SUPABASE_ANON_KEY;
         console.log('✅ Using API-fetched credentials (Vercel)');
-        
+
         const script = document.createElement('script');
         script.src = './auth.js';
         script.defer = true;
