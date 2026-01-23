@@ -337,8 +337,10 @@ def process_assignment_from_supabase(
         missing_students_df = missing_students_df.drop(columns=['status_lower'])
     
     print(f"\n📋 Found {len(missing_students_df)} student(s) needing reminders")
-    if not missing_students_df.empty:
-        print(missing_students_df.head())
+    if missing_students_df.empty:
+        print("ℹ️  No students matched the notification criteria. Skipping message generation.")
+        return
+    print(missing_students_df.head())
 
     # Now create a message_requests column in the merged_df dataframe with the f_string message
     def create_message(row):
