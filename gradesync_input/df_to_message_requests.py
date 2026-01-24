@@ -208,12 +208,16 @@ def process_assignment_from_supabase(
     
     # Merge preferred_first_name into assignment_df based on email
     if not student_prefs_df.empty and 'email' in assignment_df.columns:
-        # Merge on email, keeping all assignment_submissions rows
+        # Merge on email, keeping only students who exist in students_duplicate table
+        original_count = len(assignment_df)
         assignment_df = assignment_df.merge(
             student_prefs_df[['email', 'preferred_first_name']],
             on='email',
-            how='left'
+            how='inner'
         )
+        filtered_count = len(assignment_df)
+        if filtered_count < original_count:
+            print(f"⚠️  Filtered from {original_count} to {filtered_count} submissions - {original_count - filtered_count} student(s) not in students_duplicate table")
         print(f"✅ Merged student preferences (preferred_first_name) with assignment data")
     else:
         # Add empty preferred_first_name column if merge not possible

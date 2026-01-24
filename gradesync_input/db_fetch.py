@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import argparse
+from codecs import lookup
 import csv
 import os
 import re
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+from unicodedata import lookup
 
 from dotenv import load_dotenv
 from supabase import Client, create_client
@@ -421,8 +423,14 @@ def determine_channels(student: Dict[str, Any]) -> List[Dict[str, str]]:
     return channels
 
 
-def collect_assignment_codes(student: Dict[str, Any]) -> List[str]:
-    return [key for key in student.keys() if key.upper().startswith("PROJ")]
+# def collect_assignment_codes(student: Dict[str, Any]) -> List[str]:
+#     return [key for key in student.keys() if key.upper().startswith("PROJ")]
+
+def collect_assignment_codes(student: Dict[str, Any], assignment_lookup: Dict) -> List[str]:
+    all_codes = []
+    for course_code in assignment_lookup:
+        all_codes.extend(assignment_lookup[course_code].keys())
+    return list(set(all_codes))
 
 
 def compute_personal_deadline(
@@ -460,9 +468,12 @@ def build_assignment_payload(
         print(f"{'='*80}")
     
     course_code = (student.get("course_code") or "").strip()
-    course_lookup = lookup.get(course_code)
-    if course_lookup is None and course_code:
-        course_lookup = lookup.get("")
+    # course_lookup = lookup.get(course_code)
+    # if course_lookup is None and course_code:
+    #     course_lookup = lookup.get("")
+    # This forces the script to look into the CS10 assignments folder
+    course_lookup = lookup.get(course_code) or lookup.get("CS10")
+
     
     if is_target_student or debug:
         print(f"   Course code: '{course_code}' (empty='{not course_code}')")
@@ -802,7 +813,8 @@ def gather_reminders(
             print(f"   Note: All students in table are considered opted-in")
 
         assignments_to_notify: List[Dict[str, Any]] = []
-        assignment_codes = collect_assignment_codes(student)
+        #assignment_codes = collect_assignment_codes(student)
+        assignment_codes = collect_assignment_codes(student, assignment_lookup)
         
         if is_target or args.debug:
             print(f"   Assignment codes found: {assignment_codes}")
