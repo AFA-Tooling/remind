@@ -12,6 +12,7 @@ npm
 .env.*
 !.env.example
 !.env.template
+.venv/
 
 # Python cache
 __pycache__/
