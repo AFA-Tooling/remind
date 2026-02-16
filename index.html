@@ -58,6 +58,21 @@
   </script>
 
   <!-- Styles are inline, no external CSS files needed -->
+  <style id="auth-guard">
+    body>*:not(#auth-loading) {
+      display: none !important;
+    }
+
+    @keyframes spin {
+      0% {
+        transform: rotate(0deg);
+      }
+
+      100% {
+        transform: rotate(360deg);
+      }
+    }
+  </style>
 
   <style>
     :root {
@@ -432,6 +447,14 @@
 </head>
 
 <body>
+  <div id="auth-loading"
+    style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center; background: white; z-index: 9999;">
+    <div
+      style="width: 40px; height: 40px; margin-bottom: 16px; border: 4px solid #f3f3f3; border-top: 4px solid #3e5f3a; border-radius: 50%; animation: spin 1s linear infinite;">
+    </div>
+    <div style="font-family: system-ui; color: #3e5f3a; font-weight: 600;">Loading AutoRemind...</div>
+  </div>
+
   <!-- Top Nav -->
   <header class="nav">
     <div class="nav__left">
@@ -891,14 +914,17 @@
               } else if (checkResponse.status === 404) {
                 // User doesn't exist - show registration form (current behavior)
                 console.log('ℹ️ User not found in database, showing registration form');
+                removeAuthGuard();
                 // Continue with normal page display
               } else {
                 // Error checking user status - log but continue with registration form
                 console.error('⚠️ Error checking user status:', checkResponse.status);
+                removeAuthGuard();
                 // Continue with normal page display
               }
             } catch (error) {
               console.error('⚠️ Error checking if user exists:', error);
+              removeAuthGuard();
               // Continue with normal page display on error
             }
           } else {
@@ -912,6 +938,13 @@
           await auth.signOut();
           // Redirect to login page
           window.location.href = './login.html';
+        }
+
+        function removeAuthGuard() {
+          const guard = document.getElementById('auth-guard');
+          if (guard) guard.remove();
+          const loader = document.getElementById('auth-loading');
+          if (loader) loader.remove();
         }
       });
     })(); // End IIFE

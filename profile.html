@@ -58,6 +58,21 @@
     </script>
 
     <!-- Styles are inline, no external CSS files needed -->
+    <style id="auth-guard">
+        body>*:not(#auth-loading) {
+            display: none !important;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+    </style>
 
     <style>
         :root {
@@ -453,6 +468,11 @@
 </head>
 
 <body>
+    <div id="auth-loading"
+        style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; display: flex; justify-content: center; align-items: center; background: white; z-index: 9999;">
+        <div style="font-family: system-ui; color: #3e5f3a; font-weight: 600;">Loading Profile...</div>
+    </div>
+
     <!-- Top Nav -->
     <header class="nav">
         <div class="nav__left">
@@ -831,10 +851,13 @@
 
                             // Remove loading state
                             if (container) container.classList.remove('loading');
+                            removeAuthGuard();
                         } catch (error) {
                             console.error('⚠️ Error loading user data:', error);
                             alert('There was a problem loading your profile. Please try refreshing the page.');
                             if (container) container.classList.remove('loading');
+                            // In case of error, show the page anyway
+                            removeAuthGuard();
                         }
                     } else {
                         // User is not authenticated with Supabase - redirect to login page
@@ -847,6 +870,13 @@
                     await auth.signOut();
                     // Redirect to login page
                     window.location.href = './login.html';
+                }
+
+                function removeAuthGuard() {
+                    const guard = document.getElementById('auth-guard');
+                    if (guard) guard.remove();
+                    const loader = document.getElementById('auth-loading');
+                    if (loader) loader.remove();
                 }
             });
         })(); // End IIFE
