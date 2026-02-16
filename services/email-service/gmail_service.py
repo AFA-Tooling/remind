@@ -13,9 +13,20 @@ from google.oauth2.credentials import Credentials
 from google.oauth2 import service_account
 from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
-from dotenv import load_dotenv
 from supabase import Client, create_client
 from email_templates import get_motivating_email_body
+
+# Import shared settings
+import sys
+import os
+# Add services directory to path to import shared
+# Assuming this file is at services/email-service/gmail_service.py
+# Parent of email-service is services
+SERVICES_DIR = Path(__file__).resolve().parent.parent
+if str(SERVICES_DIR) not in sys.path:
+    sys.path.append(str(SERVICES_DIR))
+
+from shared import settings
 
 logger = logging.getLogger(__name__)
 
@@ -66,53 +77,17 @@ def format_resources(resources: Optional[List[Any]]) -> str:
 
 
 def load_supabase_env() -> Dict[str, str]:
-    """Load Supabase credentials from .env file.
-    
-    Uses the same pattern as gradesync_input/df_to_message_requests.py and db_fetch.py
-    to find .env files. Checks multiple locations in order of preference.
-    """
-    # Try loading from multiple locations, same as other files in the project
-    current_dir = Path(__file__).resolve().parent
-    env_paths = [
-        current_dir.parent / "gradesync_input" / ".env",  # gradesync_input/.env (most likely location)
-        current_dir / ".env",                    # email-service/.env
-        current_dir.parent / ".env",             # project root .env
-        current_dir.parent / "remind" / ".env",   # remind/.env (if exists)
-    ]
-    
-    loaded_path = None
-    for env_path in env_paths:
-        if env_path.exists():
-            # Load the .env file explicitly (same as db_fetch.py)
-            load_dotenv(env_path, override=True)
-            loaded_path = env_path
-            logger.info(f"Loaded .env from: {env_path}")
-            break
-    
-    # If no .env file found in specific paths, try default dotenv behavior
-    if not loaded_path:
-        load_dotenv()
-        logger.debug("Using default dotenv behavior (no .env file found in expected locations)")
-    
-    # Check if variables are now available
-    required_vars = ["SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY"]
-    missing = [var for var in required_vars if not os.getenv(var)]
-    
-    if missing:
+    """Load Supabase credentials from shared settings."""
+    if not settings.SUPABASE_URL or not settings.SUPABASE_SERVICE_ROLE_KEY:
         logger.warning(
-            f"Missing Supabase environment variables: {', '.join(missing)}. "
+            "Missing Supabase environment variables in .env.local. "
             "Resources will not be fetched from Supabase."
         )
-        if loaded_path:
-            logger.warning(f"Loaded .env from {loaded_path} but variables still missing. Check that the file contains SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY")
-        else:
-            logger.warning(f"Checked .env paths: {[str(p) for p in env_paths]}")
         return {}
     
-    logger.debug(f"Successfully loaded Supabase environment variables from {loaded_path or 'default location'}")
     return {
-        "url": os.environ["SUPABASE_URL"],
-        "service_role_key": os.environ["SUPABASE_SERVICE_ROLE_KEY"],
+        "url": settings.SUPABASE_URL,
+        "service_role_key": settings.SUPABASE_SERVICE_ROLE_KEY,
     }
 
 
@@ -377,9 +352,9 @@ def send_gmail_reminder(
     assignment_name: str,
     resources: Optional[List[Any]] = None,
     course_code: str = "",
-    credentials_path: str = "config/AutoRemindCredentials.json",
+    credentials_path: str = str(settings.OAUTH_CLIENT_SECRET_PATH),
     sender_email: str = None,
-    token_path: str = "config/token.json"
+    token_path: str = str(settings.TOKEN_PATH)
 ) -> bool:
     """
     Send a Gmail reminder to a student.

@@ -13,6 +13,17 @@ from pathlib import Path
 from typing import Dict, List, Optional
 from gmail_service import send_gmail_reminder
 
+# Import shared settings
+import sys
+# Add services directory to path to import shared
+# Assuming this file is at services/email-service/main.py
+# Parent of email-service is services
+SERVICES_DIR = Path(__file__).resolve().parent.parent
+if str(SERVICES_DIR) not in sys.path:
+    sys.path.append(str(SERVICES_DIR))
+
+from shared import settings
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
@@ -63,7 +74,7 @@ def get_student_name(row: Dict) -> str:
 
 def process_message_request_file(
     file_path: Path,
-    credentials_path: str = "config/AutoRemindCredentials.json",
+    credentials_path: str = str(settings.OAUTH_CLIENT_SECRET_PATH),
     sender_email: str = "autoremind@yourdomain.com",
     resources: List[str] = None
 ) -> Dict[str, int]:
@@ -146,7 +157,7 @@ def process_message_request_file(
 
 def process_all_message_requests(
     message_requests_dir: str = None,
-    credentials_path: str = "config/AutoRemindCredentials.json",
+    credentials_path: str = str(settings.OAUTH_CLIENT_SECRET_PATH),
     sender_email: str = "autoremind@yourdomain.com",
     resources: List[str] = None,
     specific_file: str = None
@@ -297,7 +308,7 @@ def process_all_message_requests(
                         resources=resources,
                         credentials_path=credentials_path,
                         sender_email=sender_email,
-                        token_path="config/token.json"
+                        token_path=str(settings.TOKEN_PATH)
                     )
                     
                     if success:
@@ -412,7 +423,7 @@ def main():
         "--credentials",
         "-c",
         type=str,
-        help="Path to Google service account credentials JSON file (defaults to config/AutoRemindCredentials.json)"
+        help=f"Path to Google service account credentials JSON file (defaults to {settings.OAUTH_CLIENT_SECRET_PATH})"
     )
     parser.add_argument(
         "--sender",
@@ -460,7 +471,7 @@ def main():
             logger.warning("Message request generation failed, but continuing with existing files...")
     
     # Get configuration from command line args or environment variables
-    credentials_path = args.credentials or os.getenv("GMAIL_CREDENTIALS_PATH", "config/AutoRemindCredentials.json")
+    credentials_path = args.credentials or os.getenv("GMAIL_CREDENTIALS_PATH", str(settings.OAUTH_CLIENT_SECRET_PATH))
     sender_email = args.sender or os.getenv("GMAIL_SENDER_EMAIL", "autoremind@yourdomain.com")
     message_requests_dir = args.dir or os.getenv("MESSAGE_REQUESTS_DIR")
     specific_file = args.file

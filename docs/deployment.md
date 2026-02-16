@@ -9,16 +9,26 @@ This guide walks you through deploying AutoRemind to Google Cloud Platform (GCP)
 3. **Docker**: Install Docker Desktop or Docker Engine
 4. **GCP Project**: Create a new project in the [GCP Console](https://console.cloud.google.com)
 
-## Initial Setup
+- **Frontend**: Static HTML/JS files served by Node.js (in `public/`)
+- **Backend**: Node.js server (in `src/`) + Python microservices (in `services/`)
+- **Database**: Supabase (PostgreSQL)
+- **hosting**: Google Cloud Run
+- **Authentication**: Supabase Auth
 
-### 1. Install Google Cloud SDK
+## Prerequisites
 
-```bash
-# macOS
-brew install google-cloud-sdk
+1. Google Cloud Platform (GCP) Account
+2. gcloud CLI installed and authenticated
+3. Docker installed
+4. Supabase Project
 
-# Or download from: https://cloud.google.com/sdk/docs/install
-```
+## Project Structure
+
+- `src/`: Node.js server code (`server.js`, `api/`)
+- `public/`: Frontend assets (`index.html`, `login.html`, etc.)
+- `services/`: Python microservices
+- `docs/`: Documentation
+- `.env.local`: Environment variables (local dev)
 
 ### 2. Authenticate with GCP
 
