@@ -76,15 +76,14 @@
 </head>
 
 <body>
-  <!-- Loading Screen -->
   <div id="auth-loading"
     style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center; background: #fcfcf9; z-index: 9999;">
     <div
-      style="width: 50px; height: 50px; margin-bottom: 24px; border: 4px solid rgba(47, 71, 44, 0.1); border-top: 4px solid #2f472c; border-radius: 50%; animation: spin 1s linear infinite;">
+      style="width: 40px; height: 40px; margin-bottom: 24px; border: 4px solid rgba(26, 46, 26, 0.1); border-top: 4px solid #1a2e1a; border-radius: 0; animation: spin 1s linear infinite;">
     </div>
     <div
-      style="font-family: 'Inter', sans-serif; color: #2f472c; font-weight: 600; font-size: 1.1rem; letter-spacing: -0.01em;">
-      Loading AutoRemind...</div>
+      style="font-family: 'Merriweather', serif; color: #1a2e1a; font-weight: 700; font-size: 1.1rem; letter-spacing: 0.05em; text-transform: uppercase;">
+      Loading...</div>
     <style>
       @keyframes spin {
         0% {
@@ -98,10 +97,7 @@
     </style>
   </div>
 
-  <!-- Decorative Background -->
-  <div class="bg-shape bg-shape-1"></div>
-  <div class="bg-shape bg-shape-2"></div>
-  <div class="bg-shape bg-shape-3"></div>
+
 
   <!-- Navigation -->
   <nav class="nav">
@@ -110,21 +106,33 @@
         <img src="logo.png" alt="AutoRemind Logo">
         AutoRemind
       </a>
-      <div class="nav__links">
-        <a href="./about.html">About</a>
-        <a href="https://github.com/AFA-Tooling/remind" target="_blank" class="nav__link"
-          style="display: inline-flex; align-items: center;">
-          GitHub
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-            stroke-linecap="round" stroke-linejoin="round" style="margin-left: 4px; opacity: 0.7;">
-            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
-            <polyline points="15 3 21 3 21 9"></polyline>
-            <line x1="10" y1="14" x2="21" y2="3"></line>
-          </svg>
-        </a>
-        <span id="user-email" style="display:none; font-size: 0.9rem; color: var(--color-text-muted);"></span>
-        <button id="logout-btn" class="btn btn--text" style="display:none;">Sign Out</button>
+      <div class="nav__content">
+        <div class="nav__links" id="nav-links">
+          <a href="./about.html">About</a>
+          <a href="https://github.com/AFA-Tooling/remind" target="_blank" class="nav__link"
+            style="display: inline-flex; align-items: center;">
+            GitHub
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round" style="margin-left: 4px; opacity: 0.7;">
+              <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+              <polyline points="15 3 21 3 21 9"></polyline>
+              <line x1="10" y1="14" x2="21" y2="3"></line>
+            </svg>
+          </a>
+          <span id="user-email" style="display:none; font-size: 0.9rem; color: var(--color-text-muted);"></span>
+          <button id="logout-btn" class="btn btn--text" style="display:none;">Sign Out</button>
+        </div>
+
         <a href="login.html" id="login-link" class="btn btn--outline">Log In</a>
+
+        <button class="nav__toggle" id="nav-toggle" aria-label="Toggle navigation">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <line x1="3" y1="12" x2="21" y2="12"></line>
+            <line x1="3" y1="6" x2="21" y2="6"></line>
+            <line x1="3" y1="18" x2="21" y2="18"></line>
+          </svg>
+        </button>
       </div>
     </div>
   </nav>
@@ -132,7 +140,11 @@
   <!-- Hero Section -->
   <header class="hero">
     <div class="container">
-      <img src="logo.png" alt="AutoRemind Logo" style="height: 140px; width: auto; margin-bottom: 24px;">
+      <div style="display: flex; flex-direction: column; align-items: center; margin-bottom: 48px;">
+        <img src="logo.png" alt="AutoRemind Logo" style="height: 180px; width: auto; margin-bottom: -20px;">
+        <span
+          style="font-family: 'Merriweather', serif; font-weight: 700; font-size: 3.5rem; color: var(--color-primary); letter-spacing: -0.02em; line-height: 1.1;">AutoRemind</span>
+      </div>
       <h1>Your Academic Autopilot.</h1>
       <p>Sync your assignments from everywhere. Get pinged where you actually look.</p>
 
@@ -143,14 +155,14 @@
             <path
               d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z" />
           </svg>
-          Syncs with Canvas
+          Syncs with your LMS
         </div>
         <div class="feature-pill">
           <svg viewBox="0 0 24 24">
             <path
               d="M20 2H4c-1.1 0-1.99.9-1.99 2L2 22l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-2 12H6v-2h12v2zm0-3H6V9h12v2zm0-3H6V6h12v2z" />
           </svg>
-          Discord Alerts
+          Discord & Text Alerts
         </div>
         <div class="feature-pill">
           <svg viewBox="0 0 24 24">
@@ -161,9 +173,7 @@
         </div>
       </div>
 
-      <div style="margin-top: 40px;">
-        <button class="btn btn--primary btn--cta" style="padding: 16px 32px; font-size: 1.1rem;">AutoRemind Me!</button>
-      </div>
+
     </div>
   </header>
 
@@ -285,10 +295,7 @@
       <a href="https://github.com/AFA-Tooling/remind" target="_blank" style="font-size: 0.9em; opacity: 0.8;">View
         Source</a>
     </p>
-    <div>
-      <a href="#" id="unsubscribe-link" style="font-size: 0.9em; text-decoration: none; opacity: 0.7;">Unsubscribe from
-        all alerts</a>
-    </div>
+
   </footer>
 
   <!-- Agreement Popup Modal -->
@@ -317,24 +324,15 @@
     </div>
   </div>
 
-  <!-- Unsubscribe Popup Modal -->
-  <div id="unsubscribe-modal" class="modal-overlay">
-    <div class="modal-content">
-      <h2>Unsubscribe</h2>
-      <p>Manage your notification preferences:</p>
-      <form id="unsubscribe-form" style="text-align: left; margin: 20px auto; max-width: 200px;">
-        <label style="display:block; margin:8px 0;"><input type="checkbox" name="platform" value="discord">
-          Discord</label>
-        <label style="display:block; margin:8px 0;"><input type="checkbox" name="platform" value="sms"> SMS</label>
-        <label style="display:block; margin:8px 0;"><input type="checkbox" name="platform" value="email"> Email</label>
-        <hr style="margin: 10px 0; border: 0; border-top: 1px solid #eee;">
-        <label style="display:block; margin:8px 0; font-weight: 600;"><input type="checkbox" name="platform"
-            value="all"> Unsubscribe All</label>
-      </form>
 
-      <div class="modal-actions">
-        <button id="unsubscribe-cancel" class="btn btn--outline">Cancel</button>
-        <button id="unsubscribe-confirm" class="btn btn--primary">Confirm</button>
+
+  <!-- Generic Alert Modal -->
+  <div id="alert-modal" class="modal-overlay">
+    <div class="modal-content" style="max-width: 400px; text-align: center;">
+      <h3 id="alert-title" style="margin-bottom: 16px; color: var(--color-primary);">Notice</h3>
+      <p id="alert-message" style="margin-bottom: 24px; color: var(--color-text-muted);">Something happened.</p>
+      <div class="modal-actions" style="justify-content: center;">
+        <button id="alert-ok-btn" class="btn btn--primary">OK</button>
       </div>
     </div>
   </div>
@@ -349,6 +347,23 @@
       days_before_deadline: 5,
       preferred_first_name: ''
     };
+
+    // --- Alert System ---
+    let alertCallback = null;
+    function showAlert(message, title = 'Notice', callback = null) {
+      document.getElementById('alert-message').textContent = message;
+      document.getElementById('alert-title').textContent = title;
+      document.getElementById('alert-modal').style.display = 'flex';
+      alertCallback = callback;
+    }
+
+    document.getElementById('alert-ok-btn').addEventListener('click', () => {
+      document.getElementById('alert-modal').style.display = 'none';
+      if (alertCallback) {
+        alertCallback();
+        alertCallback = null;
+      }
+    });
 
     // Toggle logic for UI
     function bindToggle(checkboxId, fieldId) {
@@ -371,7 +386,8 @@
         fieldId: 'sms-field',
         key: 'sms',
         validate: value => /^\+?[0-9\s().-]{7,}$/.test(value.trim()),
-        errorMessage: 'Please enter a valid phone number for SMS.'
+        errorMessage: 'Please enter a valid phone number for SMS.',
+        transform: value => value.replace(/\D/g, '')
       },
       {
         checkboxId: 'ch-discord',
@@ -382,6 +398,13 @@
       }
     ];
     channelConfigs.forEach(({ checkboxId, fieldId }) => bindToggle(checkboxId, fieldId));
+
+    // --- Phone Number Formatting ---
+    const phoneInput = document.getElementById('sms-field');
+    phoneInput.addEventListener('input', (e) => {
+      const x = e.target.value.replace(/\D/g, '').match(/(\d{0,3})(\d{0,3})(\d{0,4})/);
+      e.target.value = !x[2] ? x[1] : '(' + x[1] + ') ' + x[2] + (x[3] ? '-' + x[3] : '');
+    });
 
     // --- Data Fetching & Population ---
     async function fetchUserSettings(email) {
@@ -417,10 +440,13 @@
       }
 
       // SMS
+      // SMS
       if (data.phone_number) {
         document.getElementById('ch-sms').checked = true;
         const field = document.getElementById('sms-field');
-        field.value = data.phone_number;
+        // Format: (123) 456-7890
+        const x = data.phone_number.replace(/\D/g, '').match(/(\d{0,3})(\d{0,3})(\d{0,4})/);
+        field.value = !x[2] ? x[1] : '(' + x[1] + ') ' + x[2] + (x[3] ? '-' + x[3] : '');
         field.style.display = 'block';
         field.disabled = false;
       }
@@ -459,7 +485,7 @@
           }
 
           const appCard = document.querySelector('.app-card');
-          const unsubLink = document.getElementById('unsubscribe-link');
+
 
           if (user) {
             // Logged In
@@ -467,8 +493,7 @@
             emailEl.style.display = 'inline-block';
             logoutBtn.style.display = 'inline-block';
             loginLink.style.display = 'none';
-            // Show unsubscribe
-            if (unsubLink) unsubLink.parentElement.style.display = 'block';
+
 
             // Unlock App
             if (appCard) appCard.classList.remove('app-locked');
@@ -483,8 +508,7 @@
             emailEl.style.display = 'none';
             logoutBtn.style.display = 'none';
             loginLink.style.display = 'inline-flex';
-            // Hide unsubscribe
-            if (unsubLink) unsubLink.parentElement.style.display = 'none';
+
 
             // Lock App
             if (appCard) appCard.classList.add('app-locked');
@@ -549,18 +573,20 @@
         const field = document.getElementById(fieldId);
         if (checkbox.checked) {
           anyChannel = true;
-          const value = (field.value || '').trim();
+          let value = (field.value || '').trim();
           if (!validate(value)) {
-            alert(errorMessage);
-            field.focus();
+            showAlert(errorMessage, 'Validation Error', () => field.focus());
             throw new Error('validation');
+          }
+          if (typeof channelConfigs.find(c => c.key === key).transform === 'function') {
+            value = channelConfigs.find(c => c.key === key).transform(value);
           }
           payload.channels[key] = value;
         }
       }
 
       if (!anyChannel) {
-        alert('Select at least one reminder channel.');
+        showAlert('Select at least one reminder channel.', 'Missing Channel');
         throw new Error('validation');
       }
 
@@ -574,7 +600,7 @@
       } catch (err) {
         if (err.message === 'validation') return;
         console.error(err);
-        alert('There was a problem preparing your settings.');
+        showAlert('There was a problem preparing your settings.', 'Error');
         return;
       }
 
@@ -582,13 +608,14 @@
         const authInstance = window.auth;
         const loggedInEmail = authInstance?.user?.email;
         if (!loggedInEmail) {
-          alert('You must be signed in to save settings.');
-          window.location.href = 'login.html';
+          showAlert('You must be signed in to save settings.', 'Authentication Required', () => {
+            window.location.href = 'login.html';
+          });
           return;
         }
         payload.user_email = loggedInEmail;
       } catch (e) {
-        alert('Please sign in again.');
+        showAlert('Please sign in again.', 'Authentication Error');
         return;
       }
 
@@ -617,7 +644,7 @@
 
       } catch (error) {
         console.error('API Error:', error);
-        alert('Failed to save settings. Please try again.');
+        showAlert('Failed to save settings. Please try again.', 'Error');
         agreementModal.style.display = 'none';
       }
     });
@@ -645,90 +672,10 @@
       });
     }
 
-    // --- Unsubscribe Logic ---
-    const unsubModal = document.getElementById('unsubscribe-modal');
-    document.getElementById('unsubscribe-link').addEventListener('click', (e) => {
-      e.preventDefault();
-      unsubModal.style.display = 'flex';
-    });
-    document.getElementById('unsubscribe-cancel').addEventListener('click', () => {
-      unsubModal.style.display = 'none';
-    });
 
-    document.getElementById('unsubscribe-confirm').addEventListener('click', async () => {
-      const form = document.getElementById('unsubscribe-form');
-      const formData = new FormData(form);
-      const platforms = formData.getAll('platform'); // ['discord', 'sms', etc]
-
-      if (platforms.length === 0) {
-        alert('Please select at least one option.');
-        return;
-      }
-
-      const auth = window.auth;
-      if (!auth || !auth.user) {
-        alert('You must be signed in to unsubscribe.');
-        return;
-      }
-
-      // Construct payload based on current settings vs unsubscription request
-      const payload = {
-        user_email: auth.user.email,
-        days_before: currentSettings.days_before_deadline || 5, // preserve this
-        channels: {},
-        preferred_first_name: currentSettings.preferred_first_name
-      };
-
-      const unsubAll = platforms.includes('all');
-      const unsubDiscord = platforms.includes('discord');
-      const unsubSms = platforms.includes('sms');
-      const unsubEmail = platforms.includes('email');
-
-      // If NOT unsubscribing from X, keep X (send current value).
-      // If unsubscribing from X, send null (or false for boolean).
-
-      // Email
-      if (unsubAll || unsubEmail) {
-        payload.channels.email = false;
-      } else {
-        payload.channels.email = currentSettings.email_pref;
-      }
-
-      // SMS
-      if (unsubAll || unsubSms) {
-        // Don't send key, or send null? 
-        // Handler: const phoneNumber = channels.sms || null;
-        // If we send null, it wipes it.
-        payload.channels.sms = null;
-      } else {
-        payload.channels.sms = currentSettings.phone_number; // Keep existing
-      }
-
-      // Discord
-      if (unsubAll || unsubDiscord) {
-        payload.channels.discord = null;
-      } else {
-        payload.channels.discord = currentSettings.discord_id; // Keep existing
-      }
-
-      // Send update
-      try {
-        const res = await fetch('/api/reminders/settings', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        });
-
-        if (!res.ok) throw new Error('Failed to update settings');
-
-        alert('Unsubscription successful.');
-        unsubModal.style.display = 'none';
-        window.location.reload(); // Reload to reflect changes (clear form)
-
-      } catch (err) {
-        console.error(err);
-        alert('Error processing request. Please try again.');
-      }
+    // Mobile Nav Toggle
+    document.getElementById('nav-toggle').addEventListener('click', () => {
+      document.querySelector('.nav').classList.toggle('nav--open');
     });
   </script>
 </body>

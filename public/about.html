@@ -45,17 +45,23 @@
       border-radius: 4px;
     }
 
+    .about-list {
+      list-style: none;
+      padding-left: 0;
+    }
+
     .about-list li {
       position: relative;
       padding-left: 24px;
       margin-bottom: 12px;
+      color: var(--color-text-main);
     }
 
     .about-list li::before {
       content: "•";
       position: absolute;
       left: 8px;
-      color: var(--color-secondary);
+      color: var(--color-text-main);
       font-weight: bold;
     }
 
@@ -68,9 +74,7 @@
 </head>
 
 <body>
-  <!-- Decorative Background -->
-  <div class="bg-shape bg-shape-1"></div>
-  <div class="bg-shape bg-shape-3"></div>
+
 
   <!-- Navigation -->
   <nav class="nav">
@@ -79,19 +83,33 @@
         <img src="logo.png" alt="AutoRemind Logo">
         AutoRemind
       </a>
-      <div class="nav__links">
-        <a href="./about.html" style="font-weight: 600;">About</a>
-        <a href="https://github.com/AFA-Tooling/remind" target="_blank" class="nav__link"
-          style="display: inline-flex; align-items: center;">
-          GitHub
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-            stroke-linecap="round" stroke-linejoin="round" style="margin-left: 4px; opacity: 0.7;">
-            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
-            <polyline points="15 3 21 3 21 9"></polyline>
-            <line x1="10" y1="14" x2="21" y2="3"></line>
+      <div class="nav__content">
+        <div class="nav__links" id="nav-links">
+          <a href="./about.html" style="font-weight: 600;">About</a>
+          <a href="https://github.com/AFA-Tooling/remind" target="_blank" class="nav__link"
+            style="display: inline-flex; align-items: center;">
+            GitHub
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round" style="margin-left: 4px; opacity: 0.7;">
+              <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+              <polyline points="15 3 21 3 21 9"></polyline>
+              <line x1="10" y1="14" x2="21" y2="3"></line>
+            </svg>
+          </a>
+          <span id="user-email" style="display:none; font-size: 0.9rem; color: var(--color-text-muted);"></span>
+          <button id="logout-btn" class="btn btn--text" style="display:none;">Sign Out</button>
+        </div>
+
+        <a href="./login.html" id="login-link" class="btn btn--outline">Log In</a>
+
+        <button class="nav__toggle" id="nav-toggle" aria-label="Toggle navigation">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <line x1="3" y1="12" x2="21" y2="12"></line>
+            <line x1="3" y1="6" x2="21" y2="6"></line>
+            <line x1="3" y1="18" x2="21" y2="18"></line>
           </svg>
-        </a>
-        <a href="./login.html" class="btn btn--outline">Log In</a>
+        </button>
       </div>
     </div>
   </nav>
@@ -186,6 +204,81 @@
         Source</a>
     </p>
   </footer>
+  </footer>
+
+  <!-- Supabase JS Library -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <!-- Load credentials -->
+  <script>
+    (async function () {
+      await new Promise(resolve => setTimeout(resolve, 50));
+      // Try local credentials first
+      if (window.SUPABASE_URL && window.SUPABASE_ANON_KEY) {
+        loadAuth();
+        return;
+      }
+      // Fetch from API
+      try {
+        const response = await fetch('/api/config');
+        if (response.ok) {
+          const config = await response.json();
+          window.SUPABASE_URL = config.SUPABASE_URL;
+          window.SUPABASE_ANON_KEY = config.SUPABASE_ANON_KEY;
+        }
+      } catch (e) { console.error(e); }
+      loadAuth();
+
+      function loadAuth() {
+        const script = document.createElement('script');
+        script.src = './auth.js';
+        script.defer = true;
+        document.head.appendChild(script);
+      }
+    })();
+  </script>
+
+  <script>
+    // Navbar Auth Logic
+    const authCheckInterval = setInterval(() => {
+      if (window.auth) {
+        clearInterval(authCheckInterval);
+        window.auth.onAuthStateChange((user) => {
+          const emailEl = document.getElementById('user-email');
+          const logoutBtn = document.getElementById('logout-btn');
+          const loginLink = document.getElementById('login-link');
+
+          if (user) {
+            emailEl.textContent = user.email;
+            emailEl.style.display = 'inline-block';
+            logoutBtn.style.display = 'inline-block';
+            loginLink.style.display = 'none';
+          } else {
+            emailEl.style.display = 'none';
+            logoutBtn.style.display = 'none';
+            loginLink.style.display = 'inline-flex';
+          }
+        });
+      }
+    }, 100);
+
+    document.getElementById('logout-btn').addEventListener('click', async () => {
+      if (window.auth) {
+        await window.auth.signOut();
+        window.location.reload();
+      }
+    });
+  </script>
+  <script>
+    // Since auth.js is not loaded here (unless it is?), we might need to handle auth state check if we want user email.
+    // Assuming auth.js IS loaded via index.html logic or similar.
+    // Wait, about.html doesn't seem to have the auth logic script block from index.html.
+    // If it relies on auth.js, we need to make sure auth.js is included or the toggle script works regardless.
+
+    // Mobile Nav Toggle
+    document.getElementById('nav-toggle').addEventListener('click', () => {
+      document.querySelector('.nav').classList.toggle('nav--open');
+    });
+  </script>
 </body>
 
 </html>
