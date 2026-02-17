@@ -6,76 +6,38 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>About AutoRemind</title>
 
-  <!-- Fonts -->
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link
-    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Merriweather:wght@400;700&display=swap"
-    rel="stylesheet">
+  <!-- Supabase JS Library -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <!-- Load credentials -->
+  <script>
+    (async function () {
+      await new Promise(resolve => setTimeout(resolve, 50));
+      if (window.SUPABASE_URL && window.SUPABASE_ANON_KEY) {
+        const script = document.createElement('script');
+        script.src = './auth.js';
+        script.defer = true;
+        document.head.appendChild(script);
+        return;
+      }
+      try {
+        const response = await fetch('/api/config');
+        if (response.ok) {
+          const config = await response.json();
+          window.SUPABASE_URL = config.SUPABASE_URL;
+          window.SUPABASE_ANON_KEY = config.SUPABASE_ANON_KEY;
+        }
+      } catch (e) { }
+      const script = document.createElement('script');
+      script.src = './auth.js';
+      script.defer = true;
+      document.head.appendChild(script);
+    })();
+  </script>
 
-  <!-- Custom Styles -->
   <link rel="stylesheet" href="style.css">
-
-  <style>
-    /* About Specific - minimal overrides */
-    .about-section {
-      max-width: 800px;
-      margin: 0 auto;
-      padding: 40px 0;
-    }
-
-    .about-block {
-      margin-bottom: 48px;
-    }
-
-    .about-block h2 {
-      margin-bottom: 16px;
-    }
-
-    .about-block p {
-      margin-bottom: 16px;
-      color: var(--color-text-main);
-    }
-
-    .highlight {
-      color: var(--color-primary);
-      font-weight: 600;
-      background: rgba(143, 188, 143, 0.15);
-      padding: 0 4px;
-      border-radius: 4px;
-    }
-
-    .about-list {
-      list-style: none;
-      padding-left: 0;
-    }
-
-    .about-list li {
-      position: relative;
-      padding-left: 24px;
-      margin-bottom: 12px;
-      color: var(--color-text-main);
-    }
-
-    .about-list li::before {
-      content: "•";
-      position: absolute;
-      left: 8px;
-      color: var(--color-text-main);
-      font-weight: bold;
-    }
-
-    .divider {
-      height: 1px;
-      background: var(--color-border);
-      margin: 40px 0;
-    }
-  </style>
 </head>
 
 <body>
-
-
   <!-- Navigation -->
   <nav class="nav">
     <div class="container nav__container">
@@ -84,23 +46,15 @@
         AutoRemind
       </a>
       <div class="nav__content">
-        <div class="nav__links" id="nav-links">
-          <a href="./about.html" style="font-weight: 600;">About</a>
-          <a href="https://github.com/AFA-Tooling/remind" target="_blank" class="nav__link"
-            style="display: inline-flex; align-items: center;">
-            GitHub
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-              stroke-linecap="round" stroke-linejoin="round" style="margin-left: 4px; opacity: 0.7;">
-              <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
-              <polyline points="15 3 21 3 21 9"></polyline>
-              <line x1="10" y1="14" x2="21" y2="3"></line>
-            </svg>
-          </a>
-          <span id="user-email" style="display:none; font-size: 0.9rem; color: var(--color-text-muted);"></span>
-          <button id="logout-btn" class="btn btn--text" style="display:none;">Sign Out</button>
-        </div>
+        <div class="nav__links">
+          <a href="./about.html" class="nav__link" style="font-weight: 600; text-decoration: underline;">About Us</a>
+          <!-- Contact Us -->
+          <a href="mailto:autoremind@berkeley.edu" class="btn btn--primary" style="text-decoration:none;">Contact Us</a>
 
-        <a href="./login.html" id="login-link" class="btn btn--outline">Log In</a>
+          <span id="user-email" style="display:none; font-size:14px; color:var(--text);"></span>
+          <button id="logout-btn" class="btn btn--outline"
+            style="display:none; padding: 8px 14px; font-size: 13px;">Sign Out</button>
+        </div>
 
         <button class="nav__toggle" id="nav-toggle" aria-label="Toggle navigation">
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
@@ -115,14 +69,12 @@
   </nav>
 
   <!-- Hero -->
-  <section class="hero" style="padding-bottom: 0;">
-    <h1>About Us</h1>
-    <p>Building tools for students, by students.</p>
+  <section class="hero" style="margin-bottom: 24px;">
+    <h1>About AutoRemind</h1>
   </section>
 
   <!-- Main Content -->
-  <main class="container about-section">
-    <!-- Who We Are -->
+  <main class="container">
     <div class="about-block">
       <h2>Who We Are</h2>
       <p>
@@ -139,7 +91,6 @@
 
     <div class="divider"></div>
 
-    <!-- Berkeley Affiliation -->
     <div class="about-block">
       <h2>Our Berkeley Affiliation</h2>
       <p>
@@ -156,25 +107,24 @@
 
     <div class="divider"></div>
 
-    <!-- Purpose -->
     <div class="about-block">
       <h2>What AutoRemind Does</h2>
       <p>
         AutoRemind connects to your course platform (LMS) to send <span class="highlight">timely reminders about
           upcoming and overdue assignments</span>.
-        We understand that students juggle many responsibilities, work, extracurriculars, health, personal challenges,
-        and an extra layer of structure can make a real difference.
+        We understand that students juggle many responsibilities—work, extracurriculars, health, personal challenges—and
+        an extra layer of structure can make a real difference.
       </p>
       <p>
         AutoRemind is designed to support:
       </p>
-      <ul class="about-list">
-        <li>Students managing multiple courses and deadlines</li>
-        <li>Neurodivergent learners who benefit from external reminders and structure</li>
-        <li>First-generation students navigating new academic environments</li>
-        <li>Anyone who wants a little extra help staying on top of their coursework</li>
+      <ul style="list-style-type: disc; padding-left: 24px; line-height: 1.6; margin-top: 12px; color: var(--text);">
+        <li style="margin-bottom: 8px;">Students managing multiple courses and deadlines</li>
+        <li style="margin-bottom: 8px;">Neurodivergent learners who benefit from external reminders and structure</li>
+        <li style="margin-bottom: 8px;">First-generation students navigating new academic environments</li>
+        <li style="margin-bottom: 8px;">Anyone who wants a little extra help staying on top of their coursework</li>
       </ul>
-      <p>
+      <p style="margin-top: 16px;">
         You choose your reminder channels (email, SMS, or Discord), how far in advance you want to be notified,
         and which assignment statuses you want to hear about. It's entirely in your control.
       </p>
@@ -182,102 +132,68 @@
 
     <div class="divider"></div>
 
-    <!-- Feedback -->
     <div class="about-block">
       <h2>Share Your Feedback</h2>
       <p>
         We're constantly working to improve AutoRemind. Whether you're an instructor looking to support your students or
         a student with ideas for new features, we'd love to hear from you.
       </p>
-      <div style="margin-top: 24px; text-align: center;">
-        <a href="mailto:autoremind@berkeley.edu" class="btn btn--outline">Reach out to us</a>
-      </div>
+      <p>
+        Have suggestions? Found a bug? Or just want to share how AutoRemind has helped you?
+        <br>
+        <a href="mailto:autoremind@berkeley.edu"
+          style="color: var(--olive); font-weight: 600; display: inline-block; margin-top: 8px;">Reach out to us →</a>
+      </p>
     </div>
   </main>
 
+  <!-- Footer -->
+  <div class="arc-bg"></div>
   <footer class="site-footer container">
-    <p>
-      <span style="font-weight: 600;">Part of the <a href="https://github.com/AFA-Tooling/" target="_blank">AFA-Tooling
-          ecosystem</a>.</span><br>
-      © 2026 AutoRemind. Developed at UC Berkeley. <br>
-      <a href="https://github.com/AFA-Tooling/remind" target="_blank" style="font-size: 0.9em; opacity: 0.8;">View
-        Source</a>
-    </p>
+    <small>
+      <span class="thanks">Thanks for using AutoRemind.</span>
+      <span class="feedback"> Part of the AFA-Tooling ecosystem.</span><br>
+      <span style="font-size: 13px; color: #999; margin-top: 8px; display: inline-block;">
+        &copy; 2026 AutoRemind. All rights reserved.
+      </span>
+    </small>
   </footer>
-  </footer>
-
-  <!-- Supabase JS Library -->
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <!-- Load credentials -->
-  <script>
-    (async function () {
-      await new Promise(resolve => setTimeout(resolve, 50));
-      // Try local credentials first
-      if (window.SUPABASE_URL && window.SUPABASE_ANON_KEY) {
-        loadAuth();
-        return;
-      }
-      // Fetch from API
-      try {
-        const response = await fetch('/api/config');
-        if (response.ok) {
-          const config = await response.json();
-          window.SUPABASE_URL = config.SUPABASE_URL;
-          window.SUPABASE_ANON_KEY = config.SUPABASE_ANON_KEY;
-        }
-      } catch (e) { console.error(e); }
-      loadAuth();
-
-      function loadAuth() {
-        const script = document.createElement('script');
-        script.src = './auth.js';
-        script.defer = true;
-        document.head.appendChild(script);
-      }
-    })();
-  </script>
 
   <script>
-    // Navbar Auth Logic
-    const authCheckInterval = setInterval(() => {
-      if (window.auth) {
-        clearInterval(authCheckInterval);
-        window.auth.onAuthStateChange((user) => {
-          const emailEl = document.getElementById('user-email');
-          const logoutBtn = document.getElementById('logout-btn');
-          const loginLink = document.getElementById('login-link');
-
-          if (user) {
-            emailEl.textContent = user.email;
-            emailEl.style.display = 'inline-block';
-            logoutBtn.style.display = 'inline-block';
-            loginLink.style.display = 'none';
-          } else {
-            emailEl.style.display = 'none';
-            logoutBtn.style.display = 'none';
-            loginLink.style.display = 'inline-flex';
-          }
-        });
-      }
-    }, 100);
-
-    document.getElementById('logout-btn').addEventListener('click', async () => {
-      if (window.auth) {
-        await window.auth.signOut();
-        window.location.reload();
-      }
-    });
-  </script>
-  <script>
-    // Since auth.js is not loaded here (unless it is?), we might need to handle auth state check if we want user email.
-    // Assuming auth.js IS loaded via index.html logic or similar.
-    // Wait, about.html doesn't seem to have the auth logic script block from index.html.
-    // If it relies on auth.js, we need to make sure auth.js is included or the toggle script works regardless.
-
-    // Mobile Nav Toggle
+    // Responsive Nav
     document.getElementById('nav-toggle').addEventListener('click', () => {
       document.querySelector('.nav').classList.toggle('nav--open');
     });
+
+    // Auth Logic
+    (function () {
+      function waitForAuth(cb) {
+        let i = 0;
+        const ch = () => {
+          if (window.auth && window.auth.supabase) cb(window.auth);
+          else if (i++ < 20) setTimeout(ch, 100);
+        };
+        ch();
+      }
+      waitForAuth((auth) => {
+        const userEmail = document.getElementById('user-email');
+        const logoutBtn = document.getElementById('logout-btn');
+        auth.onAuthStateChange((user) => {
+          if (user) {
+            userEmail.textContent = user.email;
+            userEmail.style.display = 'inline-block';
+            logoutBtn.style.display = 'inline-block';
+          } else {
+            userEmail.style.display = 'none';
+            logoutBtn.style.display = 'none';
+          }
+        });
+        logoutBtn.onclick = async () => {
+          await auth.signOut();
+          window.location.reload();
+        };
+      });
+    })();
   </script>
 </body>
 
