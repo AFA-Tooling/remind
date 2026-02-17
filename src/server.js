@@ -139,17 +139,53 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+
+  // Handle /api/reminders/unsubscribe
+  if (urlPath === '/api/reminders/unsubscribe' && req.method === 'POST') {
+    let body = '';
+    req.on('data', chunk => {
+      body += chunk.toString();
+    });
+
+    req.on('end', async () => {
+      try {
+        const { default: unsubscribeHandler } = await import('./api/reminders/unsubscribe.js');
+
+        const parsedBody = body ? JSON.parse(body) : {};
+
+        const mockReq = {
+          method: req.method,
+          body: parsedBody
+        };
+
+        const mockRes = {
+          status: (code) => {
+            res.statusCode = code;
+            return mockRes;
+          },
+          json: (data) => {
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify(data));
+          }
+        };
+
+        await unsubscribeHandler(mockReq, mockRes);
+      } catch (error) {
+        console.error('Error handling unsubscribe:', error);
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Internal server error', details: error.message }));
+      }
+    });
+    return;
+  }
+
   // Serve static files - use urlPath (without query string) for file path
   // Since server.js is in src/, static files are in ../public/
   let filePath = path.join(__dirname, '../public', urlPath);
 
-  // Handle root - redirect to login.html
+  // Handle root - default to index.html (Landing Page)
   if (urlPath === '/' || urlPath === '/index.html') {
-    // If root is requested, we serve login.html by default or let the client handling redirect
-    // The previous logic was filePath = './login.html', but now we are mapping urlPath to filesystem
-    // If urlPath is /, filePath becomes .../public/
-    // We should probably redirect or serve login.html content
-    if (urlPath === '/') filePath = path.join(__dirname, '../public/login.html');
+    if (urlPath === '/') filePath = path.join(__dirname, '../public/index.html');
   }
 
   const extname = String(path.extname(filePath)).toLowerCase();

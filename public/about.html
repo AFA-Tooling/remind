@@ -6,319 +6,169 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>About AutoRemind</title>
 
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Merriweather:wght@400;700&display=swap"
+    rel="stylesheet">
+
+  <!-- Custom Styles -->
+  <link rel="stylesheet" href="style.css">
+
   <style>
-    :root {
-      --olive: #3e5f3a;
-      --olive-dark: #2f472c;
-      --pale: #e7efd9;
-      --text: #0e0e0e;
-      --muted: #6b6b6b;
-      --line: #e6e6e6;
-    }
-
-    * {
-      box-sizing: border-box;
-    }
-
-    html,
-    body {
-      margin: 0;
-      padding: 0;
-    }
-
-    body {
-      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-      color: var(--text);
-      background: #fff;
-    }
-
-    .container {
-      width: min(1100px, 92vw);
+    /* About Specific - minimal overrides */
+    .about-section {
+      max-width: 800px;
       margin: 0 auto;
-    }
-
-    /* Top nav */
-    .nav {
-      position: sticky;
-      top: 0;
-      z-index: 10;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 18px clamp(16px, 4vw, 28px);
-      background: #fff;
-    }
-
-    .brand {
-      font-size: 28px;
-      font-weight: 700;
-      text-decoration: none;
-      color: var(--text);
-      letter-spacing: 0.2px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-
-    .brand img {
-      height: 70px;
-      width: auto;
-    }
-
-    .nav__right {
-      display: flex;
-      gap: 22px;
-      align-items: center;
-    }
-
-    .nav__link {
-      text-decoration: none;
-      color: #111;
-      font-size: 15px;
-    }
-
-    .nav__link:hover {
-      text-decoration: underline;
-    }
-
-    .nav__link.active {
-      font-weight: 600;
-      color: var(--olive);
-      text-decoration: underline;
-    }
-
-    .btn {
-      border: 0;
-      cursor: pointer;
-      font-weight: 600;
-      border-radius: 999px;
-      padding: 10px 16px;
-    }
-
-    .btn--primary {
-      background: var(--olive);
-      color: #fff;
-      padding: 13px 18px;
-      text-decoration: none;
-    }
-
-    .btn--primary:hover {
-      background: var(--olive-dark);
-    }
-
-    /* Hero section */
-    .hero {
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      text-align: center;
-      margin: 48px 0 24px;
-      width: 100%;
-    }
-
-    .hero h1 {
-      font-size: clamp(28px, 5vw, 42px);
-      margin: 0;
-      font-weight: 500;
-    }
-
-    /* Main content area */
-    main {
       padding: 40px 0;
     }
 
-    section {
-      margin: 48px 0;
+    .about-block {
+      margin-bottom: 48px;
     }
 
-    section h2 {
-      font-size: 24px;
+    .about-block h2 {
+      margin-bottom: 16px;
+    }
+
+    .about-block p {
+      margin-bottom: 16px;
+      color: var(--color-text-main);
+    }
+
+    .highlight {
+      color: var(--color-primary);
       font-weight: 600;
-      color: var(--olive);
-      margin: 24px 0 16px;
+      background: rgba(143, 188, 143, 0.15);
+      padding: 0 4px;
+      border-radius: 4px;
     }
 
-    section p {
-      font-size: 16px;
-      line-height: 1.6;
-      color: var(--text);
-      margin: 12px 0;
-    }
-
-    section ul {
+    .about-list {
       list-style: none;
-      padding: 0;
-      margin: 12px 0;
+      padding-left: 0;
     }
 
-    section li {
-      font-size: 16px;
-      line-height: 1.6;
-      color: var(--text);
-      margin: 8px 0 8px 24px;
+    .about-list li {
       position: relative;
+      padding-left: 24px;
+      margin-bottom: 12px;
+      color: var(--color-text-main);
     }
 
-    section li::before {
+    .about-list li::before {
       content: "•";
       position: absolute;
-      left: -16px;
-      color: var(--olive);
+      left: 8px;
+      color: var(--color-text-main);
       font-weight: bold;
     }
 
     .divider {
-      position: relative;
-      height: 32px;
-      margin: 40px 0;
-    }
-
-    .divider::before {
-      content: "";
-      position: absolute;
-      left: 0;
-      right: 0;
-      top: 50%;
       height: 1px;
-      background: var(--line);
-      transform: translateY(-50%);
-    }
-
-    .highlight {
-      color: var(--olive);
-      font-weight: 600;
-    }
-
-    .feedback-link {
-      color: var(--olive);
-      text-decoration: none;
-      font-weight: 500;
-    }
-
-    .feedback-link:hover {
-      text-decoration: underline;
-    }
-
-    /* Big green arc background */
-    .arc-bg {
-      position: fixed;
-      left: 50%;
-      transform: translateX(-50%);
-      bottom: -35vh;
-      width: 130vw;
-      height: 60vh;
-      border-radius: 50% 50% 0 0 / 100% 100% 0 0;
-      background: var(--pale);
-      z-index: -1;
-    }
-
-    /* Footer */
-    .site-footer {
-      text-align: center;
-      margin: 48px auto 36px;
-      background: transparent !important;
-    }
-
-    .site-footer small,
-    .site-footer small * {
-      outline: none;
-      border: none;
-      background: transparent;
-      box-shadow: none;
-    }
-
-    .thanks {
-      color: var(--olive-dark);
-      font-weight: 600;
-    }
-
-    .feedback {
-      color: var(--olive);
-    }
-
-    /* Responsive */
-    @media (max-width: 768px) {
-      section h2 {
-        font-size: 20px;
-      }
-
-      section p,
-      section li {
-        font-size: 15px;
-      }
+      background: var(--color-border);
+      margin: 40px 0;
     }
   </style>
 </head>
 
 <body>
-  <!-- Top Nav -->
-  <header class="nav">
-    <div class="nav__left">
-      <a class="brand" href="./login.html"><img src="logo.png" alt="AutoRemind Logo">AutoRemind</a>
+
+
+  <!-- Navigation -->
+  <nav class="nav">
+    <div class="container nav__container">
+      <a class="brand" href="./index.html">
+        <img src="logo.png" alt="AutoRemind Logo">
+        AutoRemind
+      </a>
+      <div class="nav__content">
+        <div class="nav__links" id="nav-links">
+          <a href="./about.html" style="font-weight: 600;">About</a>
+          <a href="https://github.com/AFA-Tooling/remind" target="_blank" class="nav__link"
+            style="display: inline-flex; align-items: center;">
+            GitHub
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round" style="margin-left: 4px; opacity: 0.7;">
+              <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+              <polyline points="15 3 21 3 21 9"></polyline>
+              <line x1="10" y1="14" x2="21" y2="3"></line>
+            </svg>
+          </a>
+          <span id="user-email" style="display:none; font-size: 0.9rem; color: var(--color-text-muted);"></span>
+          <button id="logout-btn" class="btn btn--text" style="display:none;">Sign Out</button>
+        </div>
+
+        <a href="./login.html" id="login-link" class="btn btn--outline">Log In</a>
+
+        <button class="nav__toggle" id="nav-toggle" aria-label="Toggle navigation">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <line x1="3" y1="12" x2="21" y2="12"></line>
+            <line x1="3" y1="6" x2="21" y2="6"></line>
+            <line x1="3" y1="18" x2="21" y2="18"></line>
+          </svg>
+        </button>
+      </div>
     </div>
-    <nav class="nav__right">
-      <a href="./about.html" class="nav__link active">About Us</a>
-      <a href="mailto:autoremind@berkeley.edu" class="btn btn--primary" style="text-decoration: none;">Contact Us</a>
-    </nav>
-  </header>
+  </nav>
 
   <!-- Hero -->
-  <section class="hero">
-    <h1>About AutoRemind</h1>
+  <section class="hero" style="padding-bottom: 0;">
+    <h1>About Us</h1>
+    <p>Building tools for students, by students.</p>
   </section>
 
   <!-- Main Content -->
-  <main class="container">
+  <main class="container about-section">
     <!-- Who We Are -->
-    <section>
+    <div class="about-block">
       <h2>Who We Are</h2>
       <p>
         AutoRemind is being developed by <span class="highlight">students and researchers in Dan Garcia's R&D group at
           UC Berkeley</span>,
         as part of the <span class="highlight">AFA-Tooling ecosystem</span>. We're committed to creating practical tools
-        that
-        solve real problems for students and educators.
+        that solve real problems for students and educators.
       </p>
       <p>
         Our work is grounded in the belief that better tools can help students stay organized, reduce stress, and focus
         on what matters: learning.
       </p>
-    </section>
+    </div>
 
     <div class="divider"></div>
 
     <!-- Berkeley Affiliation -->
-    <section>
+    <div class="about-block">
       <h2>Our Berkeley Affiliation</h2>
       <p>
         AutoRemind is developed within the <span class="highlight">UC Berkeley EECS department</span> as a research and
         teaching tool.
         While we benefit from UC Berkeley's resources and expertise, AutoRemind is <span class="highlight">not an
-          official
-          communication channel of the university</span>.
+          official communication channel of the university</span>.
       </p>
       <p>
         For official university communications, please refer to your course syllabus and the official UC Berkeley
         communication channels provided by your instructor or department.
       </p>
-    </section>
+    </div>
 
     <div class="divider"></div>
 
     <!-- Purpose -->
-    <section>
+    <div class="about-block">
       <h2>What AutoRemind Does</h2>
       <p>
         AutoRemind connects to your course platform (LMS) to send <span class="highlight">timely reminders about
           upcoming and overdue assignments</span>.
         We understand that students juggle many responsibilities, work, extracurriculars, health, personal challenges,
-        and an extra layer of structure
-        can make a real difference.
+        and an extra layer of structure can make a real difference.
       </p>
       <p>
         AutoRemind is designed to support:
       </p>
-      <ul>
+      <ul class="about-list">
         <li>Students managing multiple courses and deadlines</li>
         <li>Neurodivergent learners who benefit from external reminders and structure</li>
         <li>First-generation students navigating new academic environments</li>
@@ -328,35 +178,107 @@
         You choose your reminder channels (email, SMS, or Discord), how far in advance you want to be notified,
         and which assignment statuses you want to hear about. It's entirely in your control.
       </p>
-    </section>
+    </div>
 
     <div class="divider"></div>
 
     <!-- Feedback -->
-    <section>
+    <div class="about-block">
       <h2>Share Your Feedback</h2>
       <p>
         We're constantly working to improve AutoRemind. Whether you're an instructor looking to support your students or
         a student with ideas for new features, we'd love to hear from you.
       </p>
-      <p>
-        Have suggestions? Found a bug? Or just want to share how AutoRemind has helped you?
-        <a href="mailto:autoremind@berkeley.edu" class="feedback-link">Reach out to us →</a>
-      </p>
-    </section>
+      <div style="margin-top: 24px; text-align: center;">
+        <a href="mailto:autoremind@berkeley.edu" class="btn btn--outline">Reach out to us</a>
+      </div>
+    </div>
   </main>
 
-  <!-- Arc + Footer -->
-  <div class="arc-bg"></div>
   <footer class="site-footer container">
-    <small>
-      <span class="thanks">Thanks for using AutoRemind.</span>
-      <span class="feedback"> Part of the AFA-Tooling ecosystem.</span><br>
-      <span style="font-size: 13px; color: #999; margin-top: 8px; display: inline-block;">
-        © 2025 AutoRemind. Developed at UC Berkeley.
-      </span>
-    </small>
+    <p>
+      <span style="font-weight: 600;">Part of the <a href="https://github.com/AFA-Tooling/" target="_blank">AFA-Tooling
+          ecosystem</a>.</span><br>
+      © 2026 AutoRemind. Developed at UC Berkeley. <br>
+      <a href="https://github.com/AFA-Tooling/remind" target="_blank" style="font-size: 0.9em; opacity: 0.8;">View
+        Source</a>
+    </p>
   </footer>
+  </footer>
+
+  <!-- Supabase JS Library -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <!-- Load credentials -->
+  <script>
+    (async function () {
+      await new Promise(resolve => setTimeout(resolve, 50));
+      // Try local credentials first
+      if (window.SUPABASE_URL && window.SUPABASE_ANON_KEY) {
+        loadAuth();
+        return;
+      }
+      // Fetch from API
+      try {
+        const response = await fetch('/api/config');
+        if (response.ok) {
+          const config = await response.json();
+          window.SUPABASE_URL = config.SUPABASE_URL;
+          window.SUPABASE_ANON_KEY = config.SUPABASE_ANON_KEY;
+        }
+      } catch (e) { console.error(e); }
+      loadAuth();
+
+      function loadAuth() {
+        const script = document.createElement('script');
+        script.src = './auth.js';
+        script.defer = true;
+        document.head.appendChild(script);
+      }
+    })();
+  </script>
+
+  <script>
+    // Navbar Auth Logic
+    const authCheckInterval = setInterval(() => {
+      if (window.auth) {
+        clearInterval(authCheckInterval);
+        window.auth.onAuthStateChange((user) => {
+          const emailEl = document.getElementById('user-email');
+          const logoutBtn = document.getElementById('logout-btn');
+          const loginLink = document.getElementById('login-link');
+
+          if (user) {
+            emailEl.textContent = user.email;
+            emailEl.style.display = 'inline-block';
+            logoutBtn.style.display = 'inline-block';
+            loginLink.style.display = 'none';
+          } else {
+            emailEl.style.display = 'none';
+            logoutBtn.style.display = 'none';
+            loginLink.style.display = 'inline-flex';
+          }
+        });
+      }
+    }, 100);
+
+    document.getElementById('logout-btn').addEventListener('click', async () => {
+      if (window.auth) {
+        await window.auth.signOut();
+        window.location.reload();
+      }
+    });
+  </script>
+  <script>
+    // Since auth.js is not loaded here (unless it is?), we might need to handle auth state check if we want user email.
+    // Assuming auth.js IS loaded via index.html logic or similar.
+    // Wait, about.html doesn't seem to have the auth logic script block from index.html.
+    // If it relies on auth.js, we need to make sure auth.js is included or the toggle script works regardless.
+
+    // Mobile Nav Toggle
+    document.getElementById('nav-toggle').addEventListener('click', () => {
+      document.querySelector('.nav').classList.toggle('nav--open');
+    });
+  </script>
 </body>
 
 </html>
