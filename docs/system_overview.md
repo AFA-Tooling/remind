@@ -21,6 +21,7 @@ graph TD
 ## Services
 
 | Service | Directory | Description |
+|---------|---------|-------------|
 | self | `services/gradesync_input` | Ingests data, calculates deadlines, generates message queues. |
 | **Email** | `services/email-service` | Sends rich HTML emails via Gmail API. |
 | **Discord** | `services/discord_service` | Sends DMs via Discord Bot. |
