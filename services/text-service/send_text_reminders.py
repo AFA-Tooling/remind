@@ -2,16 +2,24 @@ import os
 import csv
 import time
 import re
-from dotenv import load_dotenv
+# from dotenv import load_dotenv
 from pathlib import Path
 from twilio.rest import Client
 from twilio.base.exceptions import TwilioRestException
 
-load_dotenv()
+# Import shared settings
+import sys
+SERVICES_DIR = Path(__file__).resolve().parent.parent
+if str(SERVICES_DIR) not in sys.path:
+    sys.path.append(str(SERVICES_DIR))
 
-ACCOUNT_SID = os.environ["TWILIO_ACCOUNT_SID"]
-AUTH_TOKEN = os.environ["TWILIO_AUTH_TOKEN"]
-MESSAGING_SERVICE_SID = os.environ["TWILIO_MESSAGING_SERVICE_SID"]
+from shared import settings
+
+# load_dotenv()
+
+ACCOUNT_SID = settings.TWILIO_ACCOUNT_SID
+AUTH_TOKEN = settings.TWILIO_AUTH_TOKEN
+MESSAGING_SERVICE_SID = settings.TWILIO_MESSAGING_SERVICE_SID
 
 CSV_FOLDER = Path(os.getenv("CSV_FOLDER", r"text-service\message_requests"))
 

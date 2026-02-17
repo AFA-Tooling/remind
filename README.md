@@ -1,73 +1,57 @@
-Automated reminders for students, powered by a single source of truth.
+# AutoRemind
 
-AutoRemind is a microservice designed to centralize communication with students about their coursework. By integrating with Learning Management Systems (LMS), starting with GradeView, AutoRemind delivers timely, automated messages containing critical course information and direct access to related resources.
+**Automated reminders for students, powered by a single source of truth.**
 
-Notable Features
+AutoRemind is a modular notification system that integrates with Grade Sources (like Google Sheets) and Learning Management Systems to send automated, personalized reminders via Email, Discord, and SMS.
 
-1. Automated Messaging: Sends reminders via email or SMS about coursework deadlines, announcements, and updates.
+## Documentation
 
-2. Resource Links: Includes a curated list of resources for students to access directly from their messages.
+Comprehensive documentation is available in the `docs/` directory:
 
-3. LMS Integration: Seamlessly integrates with LMS platforms, beginning with GradeView.
+- **[System Overview](docs/system_overview.md)**: Architecture and high-level design.
+- **[Deployment Guide](docs/deployment.md)**: How to deploy to Google Cloud Platform.
+- **Services**:
+  - [Email Service](docs/services/email-service.md)
+  - [GradeSync Service](docs/services/gradesync-service.md) (Data Ingestion)
+  - [Discord Service](docs/services/discord-service.md)
+  - [Text Service](docs/services/text-service.md)
 
-4. Single Source of Truth: Ensures consistency and accuracy by pulling data from a unified backend.
+## Quick Start
 
-5. API Calls: Utilizes Twilio for SMS notifications and SendGrid for email delivery.
+### 1. Setup
 
-Integration with LMS (GradeView)
+```bash
+# Install Python dependencies for all services
+pip install -r services/requirements.txt
 
-AutoRemind will use the GradeView API to fetch and push course-related updates. The system ensures that students receive reminders tailored to their enrolled courses (CS 10 for now). Future updates will include expanded integration with other LMS platforms and courses.
+# Install Node.js dependencies for the web dashboard
+npm install
+```
 
-RUN SITE LOCALLY:
-- create a .env.local file at root populate with:
-    - SUPABASE_URL = https://<project-id>.supabase.co
-    - SUPABASE_ANON_KEY = <anon-key>
-    - SUPABASE_SERVICE_ROLE_KEY = <service-role-key>
+### 2. Configuration
 
-HOW TO GET YOUR SUPABASE CREDENTIALS:
+Copy the example environment file and fill in your credentials in the **project root**:
 
-1. Go to https://supabase.com and sign in (or create a free account)
-2. Create a new project or select an existing project
-3. Once in your project dashboard:
-   
-   a) SUPABASE_URL:
-      - Go to: Project Settings (gear icon in left sidebar) → General
-      - Find "Project URL" or "Reference ID"
-      - Copy the URL (format: https://xxxxxxxxxxxxx.supabase.co)
-      - OR use: https://<project-id>.supabase.co where <project-id> is your Project ID
-   
-   b) SUPABASE_ANON_KEY:
-      - Go to: Project Settings → API Keys
-      - Find the "anon" or "public" key
-      - Click "Reveal" if needed, then copy it
-      - This is safe to expose in client-side code
-   
-   c) SUPABASE_SERVICE_ROLE_KEY:
-      - Go to: Project Settings → API Keys
-      - Find the "service_role" or "secret" key
-      - Click "Reveal" (you'll need to confirm), then copy it
-      - ⚠️ KEEP THIS SECRET - Never expose this in client-side code!
+```bash
+cp .env.example .env.local
+# Edit .env.local with your keys (Supabase, Google, Twilio, Discord)
+```
 
-IMPORTANT:
-- SUPABASE_ANON_KEY is used for client-side authentication (in HTML/JS)
-- SUPABASE_SERVICE_ROLE_KEY is used for server-side operations (in API routes)
-- DO NOT commit/push .env.local - IF YOU PUSH IT, GENERATE NEW KEYS
+**Important**: Do not create `.env` files inside individual service directories. The system only reads from the root `.env.local`.
 
-- use `npm run test-server` to run server.js
+### 3. Run Locally
 
-AUTHENTICATION:
-- The app uses Supabase Auth for user authentication
-- Users can sign in with Google via login.html
-- index.html is protected and requires authentication
-- The server automatically injects Supabase credentials into HTML files
+**Backend Server (Web Dashboard)**
+```bash
+npm run dev
+```
 
-GOOGLE OAUTH SETUP:
-To enable Google sign-in, you need to configure it in Supabase:
-1. Go to your Supabase project dashboard
-2. Navigate to: Authentication → Providers
-3. Enable "Google" provider
-4. Add your Google OAuth credentials:
-   - Get Client ID and Client Secret from Google Cloud Console
-   - Create OAuth 2.0 credentials at: https://console.cloud.google.com/apis/credentials
-   - Add authorized redirect URI: https://<your-project-id>.supabase.co/auth/v1/callback
-5. Save the configuration
+**Microservices**
+Refer to the individual service documentation in `docs/services/` for running specific pipelines.
+
+## Project Structure
+
+- **`public/`**: Frontend assets (HTML/CSS/JS).
+- **`src/`**: Node.js backend server.
+- **`services/`**: Python microservices.
+- **`docs/`**: Project documentation.

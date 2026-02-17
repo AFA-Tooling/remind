@@ -1,0 +1,13 @@
+services:
+  app:
+    build: .
+    ports:
+      - "8080:8080"
+    env_file:
+      - .env.local
+    environment:
+      - PORT=8080
+    volumes:
+      # Mount source code for live updates
+      - ./src:/app/src
+      - ./public:/app/public

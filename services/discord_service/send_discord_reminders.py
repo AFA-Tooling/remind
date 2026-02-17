@@ -1,11 +1,17 @@
 import os, requests, time, csv
 from pathlib import Path
-from dotenv import load_dotenv
 
-load_dotenv()
+# Add services directory to path to import shared
+import sys
+SERVICES_DIR = Path(__file__).resolve().parent.parent
+if str(SERVICES_DIR) not in sys.path:
+    sys.path.append(str(SERVICES_DIR))
 
-TOKEN = os.getenv("DISCORD_BOT_TOKEN")
-GUILD_ID  = os.getenv("DISCORD_GUILD_ID") 
+from shared import settings
+
+# Settings module loads .env.local
+TOKEN = settings.DISCORD_BOT_TOKEN
+GUILD_ID  = settings.DISCORD_GUILD_ID 
 
 BASE = "https://discord.com/api/v10"
 HEADERS = {"Authorization": f"Bot {TOKEN}", "Content-Type": "application/json"}

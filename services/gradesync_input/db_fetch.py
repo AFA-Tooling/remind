@@ -12,8 +12,17 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 from unicodedata import lookup
 
-from dotenv import load_dotenv
+# from dotenv import load_dotenv
 from supabase import Client, create_client
+
+# Import shared settings
+import sys
+from pathlib import Path
+SERVICES_DIR = Path(__file__).resolve().parent.parent
+if str(SERVICES_DIR) not in sys.path:
+    sys.path.append(str(SERVICES_DIR))
+
+from shared import settings
 
 
 DEFAULT_STUDENTS_TABLE = "students_duplicate"
@@ -99,20 +108,14 @@ def parse_args() -> argparse.Namespace:
 
 
 def load_supabase_env() -> Dict[str, str]:
-    env_path = Path(__file__).resolve().parent / ".env"
-    load_dotenv(env_path)
-
-    required_vars = ["SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY"]
-    missing = [var for var in required_vars if not os.getenv(var)]
-
-    if missing:
+    if not settings.SUPABASE_URL or not settings.SUPABASE_SERVICE_ROLE_KEY:
         raise ValueError(
-            "Missing required environment variables: " + ", ".join(missing)
+            "Missing required environment variables: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY"
         )
 
     return {
-        "url": os.environ["SUPABASE_URL"],
-        "service_role_key": os.environ["SUPABASE_SERVICE_ROLE_KEY"],
+        "url": settings.SUPABASE_URL,
+        "service_role_key": settings.SUPABASE_SERVICE_ROLE_KEY,
     }
 
 

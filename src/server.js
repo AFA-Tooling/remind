@@ -9,7 +9,8 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 // Load environment variables - use absolute path
-const envPath = path.join(__dirname, '.env.local');
+// Since server.js is now in src/, we look for .env.local in the parent directory
+const envPath = path.join(__dirname, '../.env.local');
 dotenv.config({ path: envPath });
 
 // Import the serverless function logic
@@ -139,11 +140,16 @@ const server = http.createServer(async (req, res) => {
   }
 
   // Serve static files - use urlPath (without query string) for file path
-  let filePath = '.' + urlPath;
+  // Since server.js is in src/, static files are in ../public/
+  let filePath = path.join(__dirname, '../public', urlPath);
 
   // Handle root - redirect to login.html
-  if (filePath === './' || filePath === '/') {
-    filePath = './login.html';
+  if (urlPath === '/' || urlPath === '/index.html') {
+    // If root is requested, we serve login.html by default or let the client handling redirect
+    // The previous logic was filePath = './login.html', but now we are mapping urlPath to filesystem
+    // If urlPath is /, filePath becomes .../public/
+    // We should probably redirect or serve login.html content
+    if (urlPath === '/') filePath = path.join(__dirname, '../public/login.html');
   }
 
   const extname = String(path.extname(filePath)).toLowerCase();

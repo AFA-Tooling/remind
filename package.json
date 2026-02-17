@@ -3,9 +3,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "start": "node server.js",
-    "dev": "node server.js",
-    "test-server": "node server.js"
+    "start": "node src/server.js",
+    "dev": "node src/server.js",
+    "test-server": "node src/server.js"
   },
   "dependencies": {
     "@supabase/auth-ui-react": "^0.4.7",

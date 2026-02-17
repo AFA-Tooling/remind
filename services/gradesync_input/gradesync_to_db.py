@@ -22,17 +22,26 @@ from google.auth.transport.requests import Request
 from google.auth.exceptions import RefreshError
 
 # Supabase
-from dotenv import load_dotenv
+# from dotenv import load_dotenv
 from supabase import Client, create_client
+
+# Import shared settings
+import sys
+SERVICES_DIR = Path(__file__).resolve().parent.parent
+if str(SERVICES_DIR) not in sys.path:
+    sys.path.append(str(SERVICES_DIR))
+
+from shared import settings
 
 # Sheet & credentials config
 # OLD test sheet:
 #google_sheet_id = '11H0hRtJOHCy59jaxbdRSp7JhDtkaiOibvexZ4Shj4wE'
 # Replacing with CS10 Autoreminder ID:
 google_sheet_id = '1jQLrBjhSDbzARCHCQCVinnFqJxmT0OmenjdhcnxIm2s'
-google_sheet_credentials = 'credentials.json'
-config_folder = os.path.join(os.path.dirname(__file__), 'config')
-credentials_path = os.path.join(config_folder, google_sheet_credentials)
+# google_sheet_credentials = 'credentials.json'
+# config_folder = os.path.join(os.path.dirname(__file__), 'config')
+# credentials_path = os.path.join(config_folder, google_sheet_credentials)
+credentials_path = str(settings.SERVICE_ACCOUNT_PATH)
 
 if not os.path.exists(credentials_path):
     logging.error(f"Credentials file not found: {credentials_path}")
@@ -134,23 +143,17 @@ def preprocess_df(df, tab_name):
 
 def load_supabase_env() -> Dict[str, str]:
     """
-    Load Supabase environment variables from .env file.
+    Load Supabase environment variables from shared settings.
     Returns a dictionary with 'url' and 'service_role_key'.
     """
-    env_path = Path(__file__).resolve().parent / ".env"
-    load_dotenv(env_path)
-
-    required_vars = ["SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY"]
-    missing = [var for var in required_vars if not os.getenv(var)]
-
-    if missing:
+    if not settings.SUPABASE_URL or not settings.SUPABASE_SERVICE_ROLE_KEY:
         raise ValueError(
-            "Missing required environment variables: " + ", ".join(missing)
+            "Missing required environment variables: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY"
         )
 
     return {
-        "url": os.environ["SUPABASE_URL"],
-        "service_role_key": os.environ["SUPABASE_SERVICE_ROLE_KEY"],
+        "url": settings.SUPABASE_URL,
+        "service_role_key": settings.SUPABASE_SERVICE_ROLE_KEY,
     }
 
 
