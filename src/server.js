@@ -143,13 +143,9 @@ const server = http.createServer(async (req, res) => {
   // Since server.js is in src/, static files are in ../public/
   let filePath = path.join(__dirname, '../public', urlPath);
 
-  // Handle root - redirect to login.html
+  // Handle root - default to index.html (Landing Page)
   if (urlPath === '/' || urlPath === '/index.html') {
-    // If root is requested, we serve login.html by default or let the client handling redirect
-    // The previous logic was filePath = './login.html', but now we are mapping urlPath to filesystem
-    // If urlPath is /, filePath becomes .../public/
-    // We should probably redirect or serve login.html content
-    if (urlPath === '/') filePath = path.join(__dirname, '../public/login.html');
+    if (urlPath === '/') filePath = path.join(__dirname, '../public/index.html');
   }
 
   const extname = String(path.extname(filePath)).toLowerCase();

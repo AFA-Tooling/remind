@@ -6,213 +6,104 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>AutoRemind – Login</title>
 
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Merriweather:wght@400;700&display=swap"
+    rel="stylesheet">
+
+  <!-- Custom Styles -->
+  <link rel="stylesheet" href="style.css">
+
   <style>
-    :root {
-      --olive: #3e5f3a;
-      --olive-dark: #2f472c;
-      --pale: #e7efd9;
-      --text: #0e0e0e;
-      --line: #e6e6e6;
-    }
-
-    * {
-      box-sizing: border-box;
-    }
-
-    body {
-      margin: 0;
-      padding: 0;
-      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-      color: var(--text);
-      background: #fff;
+    /* Page specific adjustments */
+    .login-container {
+      min-height: 80vh;
       display: flex;
       flex-direction: column;
-      min-height: 100vh;
-    }
-
-    .container {
-      width: min(1100px, 92vw);
-      margin: 0 auto;
-    }
-
-    /* Nav */
-    .nav {
-      position: sticky;
-      top: 0;
-      z-index: 10;
-      display: flex;
       align-items: center;
-      justify-content: space-between;
-      padding: 18px clamp(16px, 4vw, 28px);
-      background: #fff;
-    }
-
-    .brand {
-      font-size: 28px;
-      font-weight: 700;
-      text-decoration: none;
-      color: var(--text);
-      letter-spacing: .2px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-
-    .brand img {
-      height: 70px;
-      width: auto;
-    }
-
-    .nav__right {
-      display: flex;
-      gap: 22px;
-      align-items: center;
-    }
-
-    .nav__link {
-      text-decoration: none;
-      color: #111;
-      font-size: 15px;
-    }
-
-    .nav__link:hover {
-      text-decoration: underline;
-    }
-
-    .btn {
-      border: 0;
-      cursor: pointer;
-      font-weight: 600;
-      border-radius: 999px;
-      padding: 13px 16px;
-    }
-
-    .btn--primary {
-      background: var(--olive);
-      color: #fff;
-      padding: 13px 18px;
-      text-decoration: none;
-    }
-
-    .btn--primary:hover {
-      background: var(--olive-dark);
-      text-decoration: none;
-    }
-
-    /* Hero section */
-    .hero {
-      display: flex;
       justify-content: center;
-      align-items: center;
-      flex-direction: column;
-      flex-grow: 1;
+    }
+
+    .login-card {
+      background: white;
+      padding: 48px;
+      border-radius: var(--radius-md);
+      box-shadow: var(--shadow-md);
       text-align: center;
-      height: 100%;
-      flex: 1;
-      margin-top: -20vh;
-    }
-
-    .hero h1 {
-      font-size: clamp(28px, 5vw, 42px);
-      margin-bottom: 24px;
-      font-weight: 500;
-    }
-
-    /* Login button */
-    .btn--login {
-      background: var(--olive);
-      color: #fff;
-      padding: 14px 28px;
-      font-size: 18px;
-      border: none;
-      border-radius: 999px;
-      cursor: pointer;
-    }
-
-    .btn--login:hover {
-      background: var(--olive-dark);
-    }
-
-    /* Green arc background */
-    .arc-bg {
-      position: fixed;
-      left: 50%;
-      transform: translateX(-50%);
-      bottom: -35vh;
-      width: 130vw;
-      height: 60vh;
-      border-radius: 50% 50% 0 0 / 100% 100% 0 0;
-      background: var(--pale);
-      z-index: -1;
-    }
-
-    footer {
-      text-align: center;
-      margin: 16px 0 32px;
-      font-size: 14px;
-      color: #444;
+      width: 100%;
+      max-width: 420px;
+      border: 1px solid rgba(0, 0, 0, 0.05);
     }
   </style>
 </head>
 
 <body>
+  <!-- Decorative Background -->
+  <div class="bg-shape bg-shape-1"></div>
+  <div class="bg-shape bg-shape-2"></div>
+
   <!-- Navigation -->
-  <header class="nav">
-    <div class="nav__left">
-      <a class="brand" href="./login.html"><img src="logo.png" alt="AutoRemind Logo">AutoRemind</a>
+  <nav class="nav">
+    <div class="container nav__container">
+      <a class="brand" href="./index.html">
+        <img src="logo.png" alt="AutoRemind Logo">
+        AutoRemind
+      </a>
+      <div class="nav__links">
+        <a href="./about.html">About</a>
+        <a href="mailto:autoremind@berkeley.edu" class="btn btn--primary">Contact Us</a>
+      </div>
     </div>
-    <nav class="nav__right">
-      <a href="./about.html" class="nav__link">About Us</a>
-      <a href="mailto:autoremind@berkeley.edu" class="btn btn--primary" style="text-decoration:none;">Contact Us</a>
-    </nav>
-  </header>
+  </nav>
 
-  <!-- Login Hero -->
-  <section class="hero">
-    <h1>Welcome!</h1>
-    <button class="btn--login">Log In</button>
-  </section>
+  <!-- Login Main -->
+  <main class="container login-container">
+    <div class="login-card">
+      <h1 style="font-size: 2rem; margin-bottom: 24px;">Welcome Back</h1>
+      <p style="color: var(--color-text-muted); margin-bottom: 32px;">
+        Sign in to manage your notifications and stay on top of your coursework.
+      </p>
 
-  <div class="arc-bg"></div>
-  <footer>
-    <small>© 2025 AutoRemind. All rights reserved.</small>
+      <button class="btn btn--primary btn--login" style="width: 100%; padding: 16px; font-size: 1.1rem;">
+        Sign In with Google
+      </button>
+
+      <p style="margin-top: 24px; font-size: 0.9rem; color: #999;">
+        Powered by Supabase Auth
+      </p>
+    </div>
+  </main>
+
+  <footer class="site-footer container">
+    <p>© 2025 AutoRemind. All rights reserved.</p>
   </footer>
 
   <!-- Supabase JS Library -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <!-- Load credentials - works with both local (server.js injection) and Vercel (API endpoint) -->
+  <!-- Load credentials -->
   <script>
     (async function () {
       await new Promise(resolve => setTimeout(resolve, 50));
-
       if (window.SUPABASE_URL && window.SUPABASE_ANON_KEY) {
-        console.log('✅ Using server-injected credentials (local dev)');
-        const script = document.createElement('script');
-        script.src = './auth.js';
-        script.defer = true;
-        document.head.appendChild(script);
+        console.log('✅ Using server-injected credentials');
+        loadAuth();
         return;
       }
-
       try {
         const response = await fetch('/api/config');
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         const config = await response.json();
-
-        if (!config.SUPABASE_URL || !config.SUPABASE_ANON_KEY) {
-          throw new Error('Config missing required values');
-        }
-
         window.SUPABASE_URL = config.SUPABASE_URL;
         window.SUPABASE_ANON_KEY = config.SUPABASE_ANON_KEY;
-        console.log('✅ Using API-fetched credentials (Vercel)');
-
-        const script = document.createElement('script');
-        script.src = './auth.js';
-        script.defer = true;
-        document.head.appendChild(script);
+        loadAuth();
       } catch (error) {
         console.error('❌ Error loading credentials:', error);
+        loadAuth(); // Try anyway
+      }
+
+      function loadAuth() {
         const script = document.createElement('script');
         script.src = './auth.js';
         script.defer = true;
@@ -233,8 +124,6 @@
         } else if (attempts < maxAttempts) {
           setTimeout(checkAuth, 200);
         } else {
-          console.error('Auth not available, but continuing with login page');
-          // Continue anyway - user can still click login button
           callback(null);
         }
       };
@@ -243,28 +132,21 @@
 
     document.addEventListener('DOMContentLoaded', () => {
       waitForAuth((auth) => {
-        // If user is already logged in, redirect to index
         if (auth) {
           auth.onAuthStateChange((user, session, loading) => {
             if (!loading && user) {
-              // User is authenticated, redirect to main page
               window.location.href = './index.html';
             }
           });
         }
 
-        // Handle login button click
         const loginButton = document.querySelector('.btn--login');
-        if (!loginButton) {
-          console.error('Login button not found!');
-          return;
+        if (loginButton) {
+          loginButton.addEventListener('click', (e) => {
+            e.preventDefault();
+            window.location.href = './auth.html';
+          });
         }
-
-        loginButton.addEventListener('click', (e) => {
-          e.preventDefault();
-          // Redirect to auth page
-          window.location.href = './auth.html';
-        });
       });
     });
   </script>
