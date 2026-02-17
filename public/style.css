@@ -49,10 +49,14 @@
 
 body {
     font-family: var(--font-main);
-    background-color: var(--color-bg);
+    background-color: #fcfcf9;
+    /* Dot pattern + Gradients */
     background-image:
-        radial-gradient(circle at 10% 10%, rgba(143, 188, 143, 0.15) 0%, transparent 40%),
-        radial-gradient(circle at 90% 90%, rgba(47, 71, 44, 0.08) 0%, transparent 40%);
+        radial-gradient(#e0e0e0 1px, transparent 1px),
+        radial-gradient(circle at 10% 10%, rgba(143, 188, 143, 0.25) 0%, transparent 40%),
+        radial-gradient(circle at 90% 90%, rgba(47, 71, 44, 0.15) 0%, transparent 40%);
+    background-size: 20px 20px, 100% 100%, 100% 100%;
+    /* Dot sizing */
     background-attachment: fixed;
     color: var(--color-text-main);
     line-height: 1.6;
@@ -88,36 +92,38 @@ ul {
     position: fixed;
     z-index: -1;
     border-radius: 50%;
-    filter: blur(60px);
-    opacity: 0.6;
+    filter: blur(50px);
+    /* Less blur for more definition */
+    opacity: 0.8;
+    /* Higher opacity */
     animation: float 20s infinite ease-in-out;
 }
 
 .bg-shape-1 {
-    width: 400px;
-    height: 400px;
-    background: rgba(143, 188, 143, 0.3);
-    /* Sage */
+    width: 450px;
+    height: 450px;
+    background: rgba(143, 188, 143, 0.4);
+    /* Stronger Sage */
     top: -100px;
     right: -100px;
     animation-delay: 0s;
 }
 
 .bg-shape-2 {
-    width: 500px;
-    height: 500px;
-    background: rgba(212, 225, 87, 0.15);
-    /* Lime tint */
+    width: 550px;
+    height: 550px;
+    background: rgba(212, 225, 87, 0.25);
+    /* Stronger Lime */
     bottom: -150px;
     left: -100px;
     animation-delay: -5s;
 }
 
 .bg-shape-3 {
-    width: 300px;
-    height: 300px;
-    background: rgba(47, 71, 44, 0.1);
-    /* Dark Green */
+    width: 350px;
+    height: 350px;
+    background: rgba(47, 71, 44, 0.15);
+    /* Stronger Dark Green */
     top: 40%;
     left: 20%;
     transform: translate(-50%, -50%);
@@ -190,6 +196,32 @@ ul {
 
 .btn--text:hover {
     color: var(--color-primary);
+}
+
+/* Google Sign In Button */
+.btn--google {
+    background-color: white;
+    color: #1f1f1f;
+    border: 1px solid var(--color-border);
+    position: relative;
+    padding-left: 48px;
+    /* Space for icon */
+    transition: var(--transition);
+}
+
+.btn--google:hover {
+    background-color: #f8f9fa;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+    border-color: #d2d2d2;
+}
+
+.btn--google svg {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 24px;
+    height: 24px;
 }
 
 /* Navbar */

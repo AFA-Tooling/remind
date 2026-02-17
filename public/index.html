@@ -112,6 +112,16 @@
       </a>
       <div class="nav__links">
         <a href="./about.html">About</a>
+        <a href="https://github.com/AFA-Tooling/remind" target="_blank" class="nav__link"
+          style="display: inline-flex; align-items: center;">
+          GitHub
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round" style="margin-left: 4px; opacity: 0.7;">
+            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+            <polyline points="15 3 21 3 21 9"></polyline>
+            <line x1="10" y1="14" x2="21" y2="3"></line>
+          </svg>
+        </a>
         <span id="user-email" style="display:none; font-size: 0.9rem; color: var(--color-text-muted);"></span>
         <button id="logout-btn" class="btn btn--text" style="display:none;">Sign Out</button>
         <a href="login.html" id="login-link" class="btn btn--outline">Log In</a>
@@ -122,6 +132,7 @@
   <!-- Hero Section -->
   <header class="hero">
     <div class="container">
+      <img src="logo.png" alt="AutoRemind Logo" style="height: 140px; width: auto; margin-bottom: 24px;">
       <h1>Your Academic Autopilot.</h1>
       <p>Sync your assignments from everywhere. Get pinged where you actually look.</p>
 
@@ -241,7 +252,6 @@
             </p>
           </div>
 
-          <!-- JavaScript for Sync -->
           <script>
             // keep number input and slider in sync both ways
             const num = document.getElementById('days');
@@ -251,6 +261,11 @@
               num.value = v; rng.value = v;
             });
           </script>
+
+          <!-- Save Button -->
+          <div style="margin-top: 32px; text-align: right;">
+            <button id="save-settings-btn" class="btn btn--primary">Save Changes</button>
+          </div>
         </div>
 
         <!-- Auth Overlay (Visible when locked) -->
@@ -263,9 +278,16 @@
   </main>
 
   <footer class="site-footer container">
-    <p>Made for students, by students.</p>
+    <p>
+      <span style="font-weight: 600;">Part of the <a href="https://github.com/AFA-Tooling/" target="_blank">AFA-Tooling
+          ecosystem</a>.</span><br>
+      © 2026 AutoRemind. Developed at UC Berkeley. <br>
+      <a href="https://github.com/AFA-Tooling/remind" target="_blank" style="font-size: 0.9em; opacity: 0.8;">View
+        Source</a>
+    </p>
     <div>
-      <a href="#" id="unsubscribe-link">Unsubscribe from all alerts</a>
+      <a href="#" id="unsubscribe-link" style="font-size: 0.9em; text-decoration: none; opacity: 0.7;">Unsubscribe from
+        all alerts</a>
     </div>
   </footer>
 
@@ -437,6 +459,7 @@
           }
 
           const appCard = document.querySelector('.app-card');
+          const unsubLink = document.getElementById('unsubscribe-link');
 
           if (user) {
             // Logged In
@@ -444,6 +467,8 @@
             emailEl.style.display = 'inline-block';
             logoutBtn.style.display = 'inline-block';
             loginLink.style.display = 'none';
+            // Show unsubscribe
+            if (unsubLink) unsubLink.parentElement.style.display = 'block';
 
             // Unlock App
             if (appCard) appCard.classList.remove('app-locked');
@@ -458,6 +483,8 @@
             emailEl.style.display = 'none';
             logoutBtn.style.display = 'none';
             loginLink.style.display = 'inline-flex';
+            // Hide unsubscribe
+            if (unsubLink) unsubLink.parentElement.style.display = 'none';
 
             // Lock App
             if (appCard) appCard.classList.add('app-locked');
@@ -598,6 +625,25 @@
     document.getElementById('success-ok-btn').addEventListener('click', () => {
       document.getElementById('success-modal').style.display = 'none';
     });
+
+    // Wire up the new Save Button to the same logic
+    const saveBtn = document.getElementById('save-settings-btn');
+    if (saveBtn) {
+      saveBtn.addEventListener('click', async () => {
+        // Re-use the save logic used by the agreement modal
+        // But we can skip the agreement modal if we want, or just trigger it.
+        // For now, let's trigger the same flow as it handles validation/auth checks.
+
+        // If not logged in, redirect
+        if (!window.auth || !window.auth.user) {
+          window.location.href = 'login.html';
+          return;
+        }
+
+        // Trigger the save directly
+        document.getElementById('agree-btn').click();
+      });
+    }
 
     // --- Unsubscribe Logic ---
     const unsubModal = document.getElementById('unsubscribe-modal');

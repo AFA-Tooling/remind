@@ -36,6 +36,17 @@
       max-width: 420px;
       border: 1px solid rgba(0, 0, 0, 0.05);
     }
+
+    .error-message {
+      background: #fef2f2;
+      color: #d32f2f;
+      padding: 12px;
+      border-radius: 8px;
+      font-size: 14px;
+      margin-bottom: 20px;
+      border: 1px solid #fecaca;
+      display: none;
+    }
   </style>
 </head>
 
@@ -53,7 +64,17 @@
       </a>
       <div class="nav__links">
         <a href="./about.html">About</a>
-        <a href="mailto:autoremind@berkeley.edu" class="btn btn--primary">Contact Us</a>
+        <a href="https://github.com/AFA-Tooling/remind" target="_blank" class="nav__link"
+          style="display: inline-flex; align-items: center;">
+          GitHub
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round" style="margin-left: 4px; opacity: 0.7;">
+            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+            <polyline points="15 3 21 3 21 9"></polyline>
+            <line x1="10" y1="14" x2="21" y2="3"></line>
+          </svg>
+        </a>
+        <a href="./login.html" class="btn btn--outline">Log In</a>
       </div>
     </div>
   </nav>
@@ -66,18 +87,34 @@
         Sign in to manage your notifications and stay on top of your coursework.
       </p>
 
-      <button class="btn btn--primary btn--login" style="width: 100%; padding: 16px; font-size: 1.1rem;">
-        Sign In with Google
-      </button>
+      <div id="error-message" class="error-message"></div>
 
-      <p style="margin-top: 24px; font-size: 0.9rem; color: #999;">
-        Powered by Supabase Auth
-      </p>
+      <button id="google-signin-btn" class="btn btn--google btn--login"
+        style="width: 100%; padding: 12px; font-size: 1rem;">
+        <svg viewBox="0 0 48 48">
+          <path fill="#EA4335"
+            d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z" />
+          <path fill="#4285F4"
+            d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z" />
+          <path fill="#FBBC05"
+            d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.28-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z" />
+          <path fill="#34A853"
+            d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z" />
+          <path fill="none" d="M0 0h48v48H0z" />
+        </svg>
+        Sign in with Google
+      </button>
     </div>
   </main>
 
   <footer class="site-footer container">
-    <p>© 2025 AutoRemind. All rights reserved.</p>
+    <p>
+      <span style="font-weight: 600;">Part of the <a href="https://github.com/AFA-Tooling/" target="_blank">AFA-Tooling
+          ecosystem</a>.</span><br>
+      © 2026 AutoRemind. Developed at UC Berkeley. <br>
+      <a href="https://github.com/AFA-Tooling/remind" target="_blank" style="font-size: 0.9em; opacity: 0.8;">View
+        Source</a>
+    </p>
   </footer>
 
   <!-- Supabase JS Library -->
@@ -133,19 +170,48 @@
     document.addEventListener('DOMContentLoaded', () => {
       waitForAuth((auth) => {
         if (auth) {
+          // If already logged in, redirect to index
           auth.onAuthStateChange((user, session, loading) => {
             if (!loading && user) {
               window.location.href = './index.html';
             }
           });
-        }
 
-        const loginButton = document.querySelector('.btn--login');
-        if (loginButton) {
-          loginButton.addEventListener('click', (e) => {
-            e.preventDefault();
-            window.location.href = './auth.html';
-          });
+          // Handle Google Sign In
+          const loginBtn = document.getElementById('google-signin-btn');
+          const errorEl = document.getElementById('error-message');
+
+          if (loginBtn) {
+            loginBtn.addEventListener('click', async (e) => {
+              e.preventDefault();
+              errorEl.style.display = 'none';
+              loginBtn.disabled = true;
+              loginBtn.innerHTML = 'Sign in with Google...'; // Simple loading state
+
+              try {
+                const { error } = await auth.signInWithGoogle();
+                if (error) {
+                  throw error;
+                }
+                // Redirect handling is done by Supabase/OAuth flow
+              } catch (err) {
+                console.error(err);
+                errorEl.textContent = err.message || 'Failed to sign in';
+                errorEl.style.display = 'block';
+                loginBtn.disabled = false;
+                loginBtn.innerHTML = `
+                    <svg viewBox="0 0 48 48" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); width: 24px; height: 24px;">
+                      <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z" />
+                      <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z" />
+                      <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.28-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z" />
+                      <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z" />
+                      <path fill="none" d="M0 0h48v48H0z" />
+                    </svg>
+                    Sign in with Google
+                  `;
+              }
+            });
+          }
         }
       });
     });
