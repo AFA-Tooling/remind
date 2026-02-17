@@ -222,6 +222,9 @@
               </label>
               <input id="sms-field" class="text-input expansion-field" type="tel" name="sms_number"
                 placeholder="(555) 123-4567" inputmode="tel" />
+              <div
+                style="font-size: 0.8rem; color: var(--color-text-muted); margin-top: 4px; padding-left: 12px; font-style: italic;">
+                Standard messaging rates apply.</div>
             </div>
 
             <!-- Discord -->
@@ -237,6 +240,9 @@
               </label>
               <input id="discord-field" class="text-input expansion-field" type="text" name="discord_username"
                 placeholder="username#1234" inputmode="text" />
+              <div
+                style="font-size: 0.8rem; color: var(--color-text-muted); margin-top: 4px; padding-left: 12px; font-style: italic;">
+                Bot must also be added to your server/DM.</div>
             </div>
           </div>
         </div>
@@ -293,7 +299,9 @@
           ecosystem</a>.</span><br>
       © 2026 AutoRemind. Developed at UC Berkeley. <br>
       <a href="https://github.com/AFA-Tooling/remind" target="_blank" style="font-size: 0.9em; opacity: 0.8;">View
-        Source</a>
+        Source</a><br>
+      <a href="#" id="unsubscribe-link"
+        style="font-size: 0.9em; opacity: 0.8; text-decoration: underline; margin-top: 8px; display: inline-block;">Unsubscribe</a>
     </p>
 
   </footer>
@@ -304,7 +312,7 @@
       <h2>Stay on track?</h2>
       <p style="margin: 12px 0 20px;">Do you consent to receive informational messages & alerts from AutoRemind?</p>
       <p style="font-size: 0.8rem; color: var(--color-text-muted); margin-bottom: 24px;">Message frequency varies.
-        Message & data rates may apply. Reply STOP to cancel.</p>
+        Message & data rates may apply. You can unsubscribe at any time from the link below.</p>
 
       <div class="modal-actions">
         <button id="cancel-btn" class="btn btn--outline">Cancel</button>
@@ -320,6 +328,70 @@
       <p style="margin: 16px 0;">Your reminder settings have been saved.</p>
       <div class="modal-actions">
         <button id="success-ok-btn" class="btn btn--primary">Awesome</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Unsubscribe Popup Modal -->
+  <div id="unsubscribe-modal" class="modal-overlay">
+    <div class="modal-content" style="max-width: 500px;">
+      <h2 style="margin-top:0; color: var(--color-primary);">Unsubscribe</h2>
+      <p style="font-size: 1rem; color: var(--color-text-muted); margin-bottom: 24px;">
+        Select platforms to stop receiving notifications:
+      </p>
+
+      <div class="channel-list" style="margin-bottom: 24px;">
+        <div class="channel-item">
+          <label class="channel-label">
+            <input type="checkbox" value="discord" class="channel-input unsub-item">
+            <div class="custom-checkbox">
+              <svg viewBox="0 0 24 24">
+                <path fill="currentColor" d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
+              </svg>
+            </div>
+            <span>Discord</span>
+          </label>
+        </div>
+        <div class="channel-item">
+          <label class="channel-label">
+            <input type="checkbox" value="sms" class="channel-input unsub-item">
+            <div class="custom-checkbox">
+              <svg viewBox="0 0 24 24">
+                <path fill="currentColor" d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
+              </svg>
+            </div>
+            <span>SMS Text</span>
+          </label>
+        </div>
+        <div class="channel-item">
+          <label class="channel-label">
+            <input type="checkbox" value="email" class="channel-input unsub-item">
+            <div class="custom-checkbox">
+              <svg viewBox="0 0 24 24">
+                <path fill="currentColor" d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
+              </svg>
+            </div>
+            <span>Email</span>
+          </label>
+        </div>
+
+        <div class="channel-item"
+          style="border-top: 1px solid var(--color-border-light); padding-top: 12px; margin-top: 8px;">
+          <label class="channel-label" style="border: none; background: transparent; padding: 0;">
+            <input type="checkbox" id="unsub-all" class="channel-input">
+            <div class="custom-checkbox">
+              <svg viewBox="0 0 24 24">
+                <path fill="currentColor" d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
+              </svg>
+            </div>
+            <span style="font-weight: 700;">Turn off all notifications</span>
+          </label>
+        </div>
+      </div>
+
+      <div class="modal-actions">
+        <button id="unsubscribe-cancel" class="btn btn--outline">Cancel</button>
+        <button id="unsubscribe-confirm" class="btn btn--primary">Unsubscribe</button>
       </div>
     </div>
   </div>
@@ -409,7 +481,8 @@
     // --- Data Fetching & Population ---
     async function fetchUserSettings(email) {
       try {
-        const res = await fetch(`/api/reminders/get?user_email=${encodeURIComponent(email)}`);
+        const ts = new Date().getTime();
+        const res = await fetch(`/api/reminders/get?user_email=${encodeURIComponent(email)}&t=${ts}`);
         if (!res.ok) {
           if (res.status === 404) return; // New user, nothing to load
           throw new Error('Failed to fetch settings');
@@ -440,24 +513,41 @@
       }
 
       // SMS
-      // SMS
+      const smsCheckbox = document.getElementById('ch-sms');
+      const smsField = document.getElementById('sms-field');
+
       if (data.phone_number) {
-        document.getElementById('ch-sms').checked = true;
-        const field = document.getElementById('sms-field');
-        // Format: (123) 456-7890
+        // Populate value if exists
         const x = data.phone_number.replace(/\D/g, '').match(/(\d{0,3})(\d{0,3})(\d{0,4})/);
-        field.value = !x[2] ? x[1] : '(' + x[1] + ') ' + x[2] + (x[3] ? '-' + x[3] : '');
-        field.style.display = 'block';
-        field.disabled = false;
+        smsField.value = !x[2] ? x[1] : '(' + x[1] + ') ' + x[2] + (x[3] ? '-' + x[3] : '');
+      }
+
+      if (data.phone_pref) {
+        smsCheckbox.checked = true;
+        smsField.style.display = 'block';
+        smsField.disabled = false;
+      } else {
+        smsCheckbox.checked = false;
+        smsField.style.display = 'none';
+        smsField.disabled = true;
       }
 
       // Discord
+      const discordCheckbox = document.getElementById('ch-discord');
+      const discordField = document.getElementById('discord-field');
+
       if (data.discord_id) {
-        document.getElementById('ch-discord').checked = true;
-        const field = document.getElementById('discord-field');
-        field.value = data.discord_id;
-        field.style.display = 'block';
-        field.disabled = false;
+        discordField.value = data.discord_id;
+      }
+
+      if (data.discord_pref) {
+        discordCheckbox.checked = true;
+        discordField.style.display = 'block';
+        discordField.disabled = false;
+      } else {
+        discordCheckbox.checked = false;
+        discordField.style.display = 'none';
+        discordField.disabled = true;
       }
     }
 
@@ -493,6 +583,7 @@
             emailEl.style.display = 'inline-block';
             logoutBtn.style.display = 'inline-block';
             loginLink.style.display = 'none';
+            if (unsubLink) unsubLink.style.display = 'inline-block';
 
 
             // Unlock App
@@ -508,6 +599,7 @@
             emailEl.style.display = 'none';
             logoutBtn.style.display = 'none';
             loginLink.style.display = 'inline-flex';
+            if (unsubLink) unsubLink.style.display = 'none';
 
 
             // Lock App
@@ -667,10 +759,91 @@
           return;
         }
 
-        // Trigger the save directly
-        document.getElementById('agree-btn').click();
+        // Trigger the save CONFIRMATION directly
+        agreementModal.style.display = 'flex';
       });
     }
+
+    // --- Unsubscribe Logic ---
+    const unsubscribeModal = document.getElementById('unsubscribe-modal');
+    const unsubLink = document.getElementById('unsubscribe-link');
+
+    // Only show link when logged in (already handled by auth listener? no, let's add it there)
+    // Actually, I'll add logic to toggle visibility in auth listener below
+
+    if (unsubLink) {
+      unsubLink.addEventListener('click', (e) => {
+        e.preventDefault();
+        // Reset form
+        document.querySelectorAll('.unsub-item').forEach(el => el.checked = false);
+        document.getElementById('unsub-all').checked = false;
+        unsubscribeModal.style.display = 'flex';
+      });
+    }
+
+    document.getElementById('unsubscribe-cancel').addEventListener('click', () => {
+      unsubscribeModal.style.display = 'none';
+    });
+
+    // Unsubscribe "Check All" Logic
+    const unsubAll = document.getElementById('unsub-all');
+    const unsubItems = document.querySelectorAll('.unsub-item');
+
+    unsubAll.addEventListener('change', () => {
+      const isChecked = unsubAll.checked;
+      unsubItems.forEach(item => item.checked = isChecked);
+    });
+
+    unsubItems.forEach(item => {
+      item.addEventListener('change', () => {
+        if (!item.checked) {
+          unsubAll.checked = false;
+        } else {
+          const allChecked = Array.from(unsubItems).every(i => i.checked);
+          if (allChecked) unsubAll.checked = true;
+        }
+      });
+    });
+
+    document.getElementById('unsubscribe-confirm').addEventListener('click', async () => {
+      const selected = Array.from(document.querySelectorAll('.unsub-item:checked')).map(i => i.value);
+      if (!selected.length) {
+        showAlert('Select at least one platform to unsubscribe from.', 'Selection Required');
+        return;
+      }
+
+      try {
+        const email = window.auth?.user?.email;
+        if (!email) throw new Error('No user email');
+
+        const payload = {
+          platforms: selected,
+          user_email: email,
+          email: email
+        };
+
+        const response = await fetch('/api/reminders/unsubscribe', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        if (!response.ok) {
+          const txt = await response.text();
+          throw new Error(txt || 'Server returned ' + response.status);
+        }
+
+        showAlert('You have been unsubscribed from the selected channels.', 'Unsubscibe Successful');
+        unsubscribeModal.style.display = 'none';
+
+        // Reload settings
+        if (email) fetchUserSettings(email);
+
+      } catch (e) {
+        console.error('Unsubscribe error:', e);
+        showAlert(`Error unsubscribing: ${e.message}`, 'Error');
+      }
+    });
 
 
     // Mobile Nav Toggle
