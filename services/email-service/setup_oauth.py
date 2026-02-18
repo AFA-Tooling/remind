@@ -16,10 +16,21 @@ import os
 import sys
 from pathlib import Path
 
-# Add current directory to path
-sys.path.insert(0, str(Path(__file__).parent))
+# Add services directory to path to import shared
+SERVICES_DIR = Path(__file__).resolve().parent.parent
+if str(SERVICES_DIR) not in sys.path:
+    sys.path.append(str(SERVICES_DIR))
 
-from gmail_service import get_credentials
+# Import shared settings
+from shared import settings
+
+# Import gmail_service from the same directory
+try:
+    from gmail_service import get_credentials
+except ImportError:
+    # If this fails, try to add current directory explicitly (though it should be there)
+    sys.path.insert(0, str(Path(__file__).parent))
+    from gmail_service import get_credentials
 
 def main():
     print("=" * 60)
@@ -29,12 +40,12 @@ def main():
     print("This is a ONE-TIME setup. After this, emails will send automatically.")
     print()
     print("You will need:")
-    print("  1. OAuth 2.0 credentials file (config/AutoRemindCredentials.json)")
+    print(f"  1. OAuth 2.0 credentials file ({settings.OAUTH_CLIENT_SECRET_PATH})")
     print("  2. A browser to log in with the Gmail account you want to send from")
     print()
     
     # Check for credentials file
-    credentials_path = Path(__file__).parent / "config" / "AutoRemindCredentials.json"
+    credentials_path = settings.OAUTH_CLIENT_SECRET_PATH
     if not credentials_path.exists():
         print(f"❌ Error: Credentials file not found at {credentials_path}")
         print()
@@ -52,7 +63,7 @@ def main():
     print("you want to send emails from.")
     print()
     
-    token_path = Path(__file__).parent / "config" / "token.json"
+    token_path = settings.TOKEN_PATH
     
     try:
         # Get credentials (this will open browser for one-time login)
