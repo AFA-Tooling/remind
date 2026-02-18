@@ -6,213 +6,32 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>AutoRemind – Login</title>
 
-  <style>
-    :root {
-      --olive: #3e5f3a;
-      --olive-dark: #2f472c;
-      --pale: #e7efd9;
-      --text: #0e0e0e;
-      --line: #e6e6e6;
-    }
-
-    * {
-      box-sizing: border-box;
-    }
-
-    body {
-      margin: 0;
-      padding: 0;
-      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-      color: var(--text);
-      background: #fff;
-      display: flex;
-      flex-direction: column;
-      min-height: 100vh;
-    }
-
-    .container {
-      width: min(1100px, 92vw);
-      margin: 0 auto;
-    }
-
-    /* Nav */
-    .nav {
-      position: sticky;
-      top: 0;
-      z-index: 10;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 18px clamp(16px, 4vw, 28px);
-      background: #fff;
-    }
-
-    .brand {
-      font-size: 28px;
-      font-weight: 700;
-      text-decoration: none;
-      color: var(--text);
-      letter-spacing: .2px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-
-    .brand img {
-      height: 70px;
-      width: auto;
-    }
-
-    .nav__right {
-      display: flex;
-      gap: 22px;
-      align-items: center;
-    }
-
-    .nav__link {
-      text-decoration: none;
-      color: #111;
-      font-size: 15px;
-    }
-
-    .nav__link:hover {
-      text-decoration: underline;
-    }
-
-    .btn {
-      border: 0;
-      cursor: pointer;
-      font-weight: 600;
-      border-radius: 999px;
-      padding: 13px 16px;
-    }
-
-    .btn--primary {
-      background: var(--olive);
-      color: #fff;
-      padding: 13px 18px;
-      text-decoration: none;
-    }
-
-    .btn--primary:hover {
-      background: var(--olive-dark);
-      text-decoration: none;
-    }
-
-    /* Hero section */
-    .hero {
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      flex-direction: column;
-      flex-grow: 1;
-      text-align: center;
-      height: 100%;
-      flex: 1;
-      margin-top: -20vh;
-    }
-
-    .hero h1 {
-      font-size: clamp(28px, 5vw, 42px);
-      margin-bottom: 24px;
-      font-weight: 500;
-    }
-
-    /* Login button */
-    .btn--login {
-      background: var(--olive);
-      color: #fff;
-      padding: 14px 28px;
-      font-size: 18px;
-      border: none;
-      border-radius: 999px;
-      cursor: pointer;
-    }
-
-    .btn--login:hover {
-      background: var(--olive-dark);
-    }
-
-    /* Green arc background */
-    .arc-bg {
-      position: fixed;
-      left: 50%;
-      transform: translateX(-50%);
-      bottom: -35vh;
-      width: 130vw;
-      height: 60vh;
-      border-radius: 50% 50% 0 0 / 100% 100% 0 0;
-      background: var(--pale);
-      z-index: -1;
-    }
-
-    footer {
-      text-align: center;
-      margin: 16px 0 32px;
-      font-size: 14px;
-      color: #444;
-    }
-  </style>
-</head>
-
-<body>
-  <!-- Navigation -->
-  <header class="nav">
-    <div class="nav__left">
-      <a class="brand" href="./login.html"><img src="logo.png" alt="AutoRemind Logo">AutoRemind</a>
-    </div>
-    <nav class="nav__right">
-      <a href="./about.html" class="nav__link">About Us</a>
-      <a href="mailto:autoremind@berkeley.edu" class="btn btn--primary" style="text-decoration:none;">Contact Us</a>
-    </nav>
-  </header>
-
-  <!-- Login Hero -->
-  <section class="hero">
-    <h1>Welcome!</h1>
-    <button class="btn--login">Log In</button>
-  </section>
-
-  <div class="arc-bg"></div>
-  <footer>
-    <small>© 2025 AutoRemind. All rights reserved.</small>
-  </footer>
-
   <!-- Supabase JS Library -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <!-- Load credentials - works with both local (server.js injection) and Vercel (API endpoint) -->
+  <!-- Load credentials -->
   <script>
     (async function () {
       await new Promise(resolve => setTimeout(resolve, 50));
-
       if (window.SUPABASE_URL && window.SUPABASE_ANON_KEY) {
-        console.log('✅ Using server-injected credentials (local dev)');
+        console.log('✅ Using server-injected credentials');
         const script = document.createElement('script');
         script.src = './auth.js';
         script.defer = true;
         document.head.appendChild(script);
         return;
       }
-
       try {
         const response = await fetch('/api/config');
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        if (!response.ok) throw new Error('Failed to fetch config');
         const config = await response.json();
-
-        if (!config.SUPABASE_URL || !config.SUPABASE_ANON_KEY) {
-          throw new Error('Config missing required values');
-        }
-
         window.SUPABASE_URL = config.SUPABASE_URL;
         window.SUPABASE_ANON_KEY = config.SUPABASE_ANON_KEY;
-        console.log('✅ Using API-fetched credentials (Vercel)');
-
         const script = document.createElement('script');
         script.src = './auth.js';
         script.defer = true;
         document.head.appendChild(script);
       } catch (error) {
-        console.error('❌ Error loading credentials:', error);
+        console.error(error);
         const script = document.createElement('script');
         script.src = './auth.js';
         script.defer = true;
@@ -221,50 +40,145 @@
     })();
   </script>
 
-  <script>
-    // Wait for auth to be available
-    function waitForAuth(callback, maxAttempts = 10) {
-      let attempts = 0;
-      const checkAuth = () => {
-        attempts++;
-        const authInstance = window.auth || (typeof auth !== 'undefined' ? auth : null);
-        if (authInstance && authInstance.supabase) {
-          callback(authInstance);
-        } else if (attempts < maxAttempts) {
-          setTimeout(checkAuth, 200);
-        } else {
-          console.error('Auth not available, but continuing with login page');
-          // Continue anyway - user can still click login button
-          callback(null);
-        }
-      };
-      checkAuth();
+  <link rel="stylesheet" href="style.css">
+  <style>
+    /* Login specific overrides */
+    body {
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
     }
 
-    document.addEventListener('DOMContentLoaded', () => {
-      waitForAuth((auth) => {
-        // If user is already logged in, redirect to index
-        if (auth) {
-          auth.onAuthStateChange((user, session, loading) => {
-            if (!loading && user) {
-              // User is authenticated, redirect to main page
-              window.location.href = './index.html';
-            }
-          });
-        }
+    .hero {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      margin-top: -10vh;
+      /* Adjust for visual balance */
+    }
 
-        // Handle login button click
-        const loginButton = document.querySelector('.btn--login');
-        if (!loginButton) {
-          console.error('Login button not found!');
-          return;
-        }
+    .btn--login {
+      background: var(--olive);
+      color: #fff;
+      padding: 14px 32px;
+      font-size: 18px;
+      border: none;
+      border-radius: 999px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+      transition: background 0.2s;
+    }
 
-        loginButton.addEventListener('click', (e) => {
-          e.preventDefault();
-          // Redirect to auth page
-          window.location.href = './auth.html';
-        });
+    .btn--login:hover {
+      background: var(--olive-dark);
+    }
+
+    .error-message {
+      color: #d32f2f;
+      background: #fef2f2;
+      padding: 10px;
+      border-radius: 8px;
+      margin-top: 16px;
+      display: none;
+    }
+  </style>
+</head>
+
+<body>
+  <!-- Navigation -->
+  <nav class="nav">
+    <div class="container nav__container">
+      <a class="brand" href="./index.html">
+        <img src="logo.png" alt="AutoRemind Logo">
+        AutoRemind
+      </a>
+      <div class="nav__content">
+        <div class="nav__links">
+          <a href="./about.html" class="nav__link">About Us</a>
+          <a href="mailto:autoremind@berkeley.edu" class="btn btn--primary" style="text-decoration:none;">Contact Us</a>
+        </div>
+        <button class="nav__toggle" id="nav-toggle" aria-label="Toggle navigation">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <line x1="3" y1="12" x2="21" y2="12"></line>
+            <line x1="3" y1="6" x2="21" y2="6"></line>
+            <line x1="3" y1="18" x2="21" y2="18"></line>
+          </svg>
+        </button>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Login Hero -->
+  <section class="hero">
+    <h1>Welcome!</h1>
+    <p style="margin-bottom: 32px; color: var(--muted);">Sign in to manage your notifications.</p>
+
+    <button id="google-signin-btn" class="btn--login">
+      <!-- Simple Google Icon -->
+      <svg viewBox="0 0 48 48" width="24" height="24">
+        <path fill="white"
+          d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z" />
+        <path fill="white"
+          d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z" />
+        <path fill="white"
+          d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.28-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z" />
+        <path fill="white"
+          d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z" />
+        <path fill="none" d="M0 0h48v48H0z" />
+      </svg>
+      Sign In with Google
+    </button>
+    <div id="error-message" class="error-message"></div>
+  </section>
+
+  <div class="arc-bg"></div>
+  <footer class="site-footer container">
+    <small>© 2026 AutoRemind. All rights reserved.</small>
+  </footer>
+
+  <script>
+    document.getElementById('nav-toggle').addEventListener('click', () => {
+      document.querySelector('.nav').classList.toggle('nav--open');
+    });
+
+    // Wait for auth
+    function waitForAuth(callback) {
+      let attempts = 0;
+      const check = () => {
+        if (window.auth && window.auth.supabase) callback(window.auth);
+        else if (attempts++ < 20) setTimeout(check, 100);
+      };
+      check();
+    }
+
+    waitForAuth((auth) => {
+      // Redirect if already logged in
+      auth.onAuthStateChange((user, session, loading) => {
+        if (!loading && user) window.location.href = './index.html';
+      });
+
+      const btn = document.getElementById('google-signin-btn');
+      const err = document.getElementById('error-message');
+
+      btn.addEventListener('click', async () => {
+        btn.disabled = true;
+        btn.style.opacity = '0.7';
+        btn.innerHTML = 'Signing in...';
+        try {
+          const { error } = await auth.signInWithGoogle();
+          if (error) throw error;
+        } catch (e) {
+          console.error(e);
+          err.textContent = e.message;
+          err.style.display = 'block';
+          btn.disabled = false;
+          btn.style.opacity = '1';
+          btn.innerHTML = 'Sign In with Google';
+        }
       });
     });
   </script>
