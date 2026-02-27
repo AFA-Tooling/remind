@@ -29,6 +29,7 @@ DEFAULT_STUDENTS_TABLE = "students_duplicate"
 DEFAULT_RESOURCES_TABLE = "assignment_resources"
 DEFAULT_DEADLINES_CSV = "shared_data/deadlines.csv"
 DEFAULT_FREQ_FIELD = "days_before_deadline"
+DEFAULT_DEADLINES_TABLE = "deadlines"
 
 
 def mask_secret(secret: str) -> str:
@@ -104,6 +105,11 @@ def parse_args() -> argparse.Namespace:
             "in the message_requests directory with columns: name, sid, email, assignment, message_requests"
         ),
     )
+    parser.add_argument(
+    "--deadlines-table",
+    default=DEFAULT_DEADLINES_TABLE,
+    help="Supabase table name containing deadlines (default: deadlines)",
+    )
     return parser.parse_args()
 
 
@@ -165,43 +171,40 @@ def base_assignment_code(code: Optional[str]) -> Optional[str]:
     if match:
         return match.group(1)
     return None
+    
 
-
-def load_deadlines(
-    csv_path: Path, *, debug: bool = False
+def load_deadlines_from_rows(
+    deadline_rows: List[Dict[str, Any]], *, debug: bool = False
 ) -> DeadlineMap:
     deadlines: DeadlineMap = {}
-    if not csv_path.exists():
-        raise FileNotFoundError(f"Deadlines CSV not found: {csv_path}")
 
-    with csv_path.open(newline="", encoding="utf-8") as handle:
-        reader = csv.DictReader(handle)
-        for raw_row in reader:
-            row = {(key or "").strip(): (value or "") for key, value in raw_row.items()}
-            assignment = (row.get("assignment_name") or row.get("assignment") or "").strip()
-            assignment_code = row.get("assignment_code", "").strip()
-            due_str = row.get("due")
-            course_code = row.get("course_code", "").strip()
-            due_date = parse_deadline(due_str)
-            if not due_date:
-                continue
+    for raw_row in deadline_rows:
+        # Normalize keys/values similarly to CSV version
+        course_code = (raw_row.get("course_code") or "").strip()
+        assignment_code = (raw_row.get("assignment_code") or "").strip()
+        assignment_name = (raw_row.get("assignment_name") or raw_row.get("assignment") or "").strip()
+        due_str = raw_row.get("due")
 
-            course_deadlines = deadlines.setdefault(
-                course_code,
-                {"code": {}, "name": {}},
-            )
-            if assignment_code:
-                course_deadlines["code"][assignment_code] = due_date
-            if assignment:
-                course_deadlines["name"][assignment] = due_date
-            scope = course_code or "(default)"
-            debug_print(
-                debug,
-                (
-                    f"Loaded deadline code='{assignment_code or 'n/a'}' "
-                    f"name='{assignment or 'n/a'}' [{scope}] → {due_date.isoformat(sep=' ')}"
-                ),
-            )
+        due_date = parse_deadline(str(due_str) if due_str is not None else "")
+        if not due_date:
+            continue
+
+        course_deadlines = deadlines.setdefault(course_code, {"code": {}, "name": {}})
+
+        if assignment_code:
+            course_deadlines["code"][assignment_code] = due_date
+        if assignment_name:
+            course_deadlines["name"][assignment_name] = due_date
+
+        scope = course_code or "(default)"
+        debug_print(
+            debug,
+            (
+                f"Loaded deadline code='{assignment_code or 'n/a'}' "
+                f"name='{assignment_name or 'n/a'}' [{scope}] → {due_date.isoformat(sep=' ')}"
+            ),
+        )
+
     return deadlines
 
 
@@ -757,9 +760,9 @@ def write_gmail_csv(reminders: List[Dict[str, Any]], output_dir: Path) -> None:
 def gather_reminders(
     supabase: Client,
     args: argparse.Namespace,
-    csv_path: Path,
 ) -> List[Dict[str, Any]]:
-    deadlines = load_deadlines(csv_path, debug=args.debug)
+    deadline_rows = fetch_table_rows(supabase, args.deadlines_table, debug=args.debug)
+    deadlines = load_deadlines_from_rows(deadline_rows, debug=args.debug)
     resource_rows = fetch_table_rows(
         supabase,
         args.resources_table,
@@ -888,8 +891,7 @@ def run_raw_mode(supabase: Client, args: argparse.Namespace) -> None:
 
 
 def run_reminder_mode(supabase: Client, args: argparse.Namespace) -> None:
-    csv_path = Path(__file__).resolve().parent / args.deadlines_csv
-    reminders = gather_reminders(supabase, args, csv_path)
+    reminders = gather_reminders(supabase, args)
 
     if not reminders:
         print("✅ No students currently fall within their notification windows.")
