@@ -1,0 +1,17 @@
+steps:
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['build', '-t', '$_IMAGE', '-f', 'Dockerfile.job', '.']
+    id: 'build-job-image'
+
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', '$_IMAGE']
+    id: 'push-job-image'
+
+images:
+  - '$_IMAGE'
+
+options:
+  logging: CLOUD_LOGGING_ONLY
+  machineType: 'E2_HIGHCPU_8'
+
+timeout: '1200s'
