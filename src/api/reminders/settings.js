@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { sendWelcomeEmail } from '../../services/welcomeEmail.js';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -36,6 +37,16 @@ export default async function handler(req, res) {
 
     const preferredFirstName = preferred_first_name ? preferred_first_name.trim() : null;
 
+    // Check if user already exists (to detect new vs returning user)
+    const { data: existingUser } = await supabase
+      .from('students_duplicate')
+      .select('email, welcome_email_sent')
+      .eq('email', loginEmail)
+      .single();
+
+    const isNewUser = !existingUser;
+    const alreadySentWelcome = existingUser?.welcome_email_sent === true;
+
     const studentData = {
       email: loginEmail, // Email is locked to authenticated user - cannot be changed
       phone_number: phoneNumber ? phoneNumber.trim() : null,
@@ -61,6 +72,39 @@ export default async function handler(req, res) {
 
     if (error) {
       return res.status(500).json({ error: error.message });
+    }
+
+    // Send welcome email for new users with email enabled who haven't received one yet
+    if (isNewUser && wantsEmailChannel && !alreadySentWelcome) {
+      try {
+        console.log(`[Settings] Sending welcome email to new user: ${loginEmail}`);
+
+        const welcomeResult = await sendWelcomeEmail({
+          email: loginEmail,
+          preferred_name: preferredFirstName || 'there',
+          channels: {
+            email: { enabled: wantsEmailChannel },
+            sms: { enabled: !!phoneNumber, value: phoneNumber },
+            discord: { enabled: !!discordId, value: discordId }
+          },
+          days_before: clampedDays
+        });
+
+        if (welcomeResult.success) {
+          console.log(`[Settings] Welcome email sent successfully to ${loginEmail}`);
+
+          // Update welcome_email_sent flag
+          await supabase
+            .from('students_duplicate')
+            .update({ welcome_email_sent: true })
+            .eq('email', loginEmail);
+        } else {
+          console.error(`[Settings] Failed to send welcome email: ${welcomeResult.error}`);
+        }
+      } catch (welcomeError) {
+        // Log error but don't fail the settings save
+        console.error(`[Settings] Welcome email error: ${welcomeError.message}`);
+      }
     }
 
     return res.status(200).json({ success: true, data: data });
