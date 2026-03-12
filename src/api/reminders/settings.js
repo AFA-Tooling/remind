@@ -1,4 +1,5 @@
 import { getDb } from '../firestore.js';
+import { sendWelcomeEmail } from '../../services/welcomeEmail.js';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -24,6 +25,15 @@ export default async function handler(req, res) {
     const clampedDays = Math.max(0, Math.min(7, Math.round(days_before)));
     const preferredFirstName = preferred_first_name ? preferred_first_name.trim() : null;
 
+    const db = getDb();
+    const docRef = db.collection('students').doc(loginEmail);
+
+    // Check if user already exists (to detect new vs returning user)
+    const existingDoc = await docRef.get();
+    const existingUser = existingDoc.exists ? existingDoc.data() : null;
+    const isNewUser = !existingUser;
+    const alreadySentWelcome = existingUser?.welcome_email_sent === true;
+
     const studentData = {
       email: loginEmail,
       phone_number: phoneNumber ? phoneNumber.trim() : null,
@@ -36,11 +46,37 @@ export default async function handler(req, res) {
       updated_at: new Date().toISOString(),
     };
 
-    const db = getDb();
     // Document ID = email — set(merge:true) acts as upsert
-    const docRef = db.collection('students').doc(loginEmail);
     await docRef.set(studentData, { merge: true });
     const saved = (await docRef.get()).data();
+
+    // Send welcome email for new users with email enabled who haven't received one yet
+    if (isNewUser && wantsEmailChannel && !alreadySentWelcome) {
+      try {
+        console.log(`[Settings] Sending welcome email to new user: ${loginEmail}`);
+
+        const welcomeResult = await sendWelcomeEmail({
+          email: loginEmail,
+          preferred_name: preferredFirstName || 'there',
+          channels: {
+            email: { enabled: wantsEmailChannel },
+            sms: { enabled: !!phoneNumber, value: phoneNumber },
+            discord: { enabled: !!discordId, value: discordId }
+          },
+          days_before: clampedDays
+        });
+
+        if (welcomeResult.success) {
+          console.log(`[Settings] Welcome email sent successfully to ${loginEmail}`);
+          await docRef.update({ welcome_email_sent: true });
+        } else {
+          console.error(`[Settings] Failed to send welcome email: ${welcomeResult.error}`);
+        }
+      } catch (welcomeError) {
+        // Log error but don't fail the settings save
+        console.error(`[Settings] Welcome email error: ${welcomeError.message}`);
+      }
+    }
 
     return res.status(200).json({ success: true, data: saved });
 
