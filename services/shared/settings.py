@@ -19,10 +19,12 @@ OAUTH_CLIENT_SECRET_PATH = CONFIG_DIR / "oauth_client_secret.json"
 SERVICE_ACCOUNT_PATH = CONFIG_DIR / "service_account.json"
 TOKEN_PATH = CONFIG_DIR / "token.json"
 
-# Environment Variables
-SUPABASE_URL = os.getenv("SUPABASE_URL")
-SUPABASE_ANON_KEY = os.getenv("SUPABASE_ANON_KEY")
-SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+# Firebase Configuration
+FIREBASE_PROJECT_ID = os.getenv("FIREBASE_PROJECT_ID")
+# Path to a Firebase-enabled service account JSON.
+# Defaults to the existing service_account.json used for Google Sheets.
+_sa_env = os.getenv("FIREBASE_SERVICE_ACCOUNT_PATH")
+FIREBASE_SERVICE_ACCOUNT_PATH = Path(_sa_env) if _sa_env else SERVICE_ACCOUNT_PATH
 
 # Twilio Configuration
 TWILIO_ACCOUNT_SID = os.getenv("TWILIO_ACCOUNT_SID")

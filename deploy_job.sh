@@ -16,9 +16,10 @@
 #   - Docker installed locally
 #   - All secret source files present:
 #       services/config/oauth_client_secret.json
-#       services/config/service_account.json
+#       services/config/service_account.json         ← Google Sheets service account (eecs-gradeview)
+#       services/config/firebase_service_account.json ← Firebase/Firestore service account (autoremind-480200)
 #       services/config/token.json           ← must exist (run setup_oauth.py first)
-#       .env.local                            ← contains env-var secrets
+#       .env.local                            ← contains env-var secrets (FIREBASE_PROJECT_ID, etc.)
 
 set -e
 
@@ -81,6 +82,11 @@ create_or_update_secret_from_value() {
     local NAME="$1"
     local VALUE="$2"
 
+    if [ -z "$VALUE" ]; then
+        echo "  ✗ ERROR: Value for secret '$NAME' is empty. Check .env.local."
+        exit 1
+    fi
+
     if secret_exists "$NAME"; then
         if [ "$REFRESH_SECRETS" = true ]; then
             echo -n "$VALUE" | gcloud secrets versions add "$NAME" \
@@ -106,6 +112,7 @@ info "Pre-flight checks"
 REQUIRED_FILES=(
     "services/config/oauth_client_secret.json"
     "services/config/service_account.json"
+    "services/config/firebase_service_account.json"
     "services/config/token.json"
     ".env.local"
     "Dockerfile.job"
@@ -142,21 +149,23 @@ success "APIs enabled"
 # ─── 3. Create / update secrets ───────────────────────────────────────────────
 info "Uploading secrets to Secret Manager"
 
-# Load .env.local
-set -a
-# shellcheck disable=SC1091
-source .env.local
-set +a
+# Load specific env vars from .env.local — parse directly to avoid bash sourcing issues
+# (FIREBASE_SERVICE_ACCOUNT_JSON contains raw JSON that bash cannot source safely)
+_env_get() { grep "^${1}=" .env.local | head -1 | cut -d= -f2-; }
+FIREBASE_PROJECT_ID="$(_env_get FIREBASE_PROJECT_ID)"
+DISCORD_BOT_TOKEN="$(_env_get DISCORD_BOT_TOKEN)"
+DISCORD_CHANNEL_ID="$(_env_get DISCORD_CHANNEL_ID)"
+DISCORD_PUBLIC_KEY="$(_env_get DISCORD_PUBLIC_KEY)"
+DISCORD_GUILD_ID="$(_env_get DISCORD_GUILD_ID)"
 
 # JSON file secrets
-create_or_update_secret_from_file "oauth_client_secret" "services/config/oauth_client_secret.json"
-create_or_update_secret_from_file "service_account"     "services/config/service_account.json"
-create_or_update_secret_from_file "gmail_token"         "services/config/token.json"
+create_or_update_secret_from_file "oauth_client_secret"     "services/config/oauth_client_secret.json"
+create_or_update_secret_from_file "service_account"         "services/config/service_account.json"
+create_or_update_secret_from_file "firebase_service_account" "services/config/firebase_service_account.json"
+create_or_update_secret_from_file "gmail_token"             "services/config/token.json"
 
 # Env-var secrets
-create_or_update_secret_from_value "SUPABASE_URL"              "$SUPABASE_URL"
-create_or_update_secret_from_value "SUPABASE_ANON_KEY"         "$SUPABASE_ANON_KEY"
-create_or_update_secret_from_value "SUPABASE_SERVICE_ROLE_KEY" "$SUPABASE_SERVICE_ROLE_KEY"
+create_or_update_secret_from_value "FIREBASE_PROJECT_ID"       "$FIREBASE_PROJECT_ID"
 create_or_update_secret_from_value "DISCORD_BOT_TOKEN"         "$DISCORD_BOT_TOKEN"
 create_or_update_secret_from_value "DISCORD_CHANNEL_ID"        "$DISCORD_CHANNEL_ID"
 create_or_update_secret_from_value "DISCORD_PUBLIC_KEY"        "$DISCORD_PUBLIC_KEY"
@@ -181,8 +190,8 @@ success "Service account: $SERVICE_ACCOUNT"
 # Grant the service account access to all secrets
 info "Granting secret access to Cloud Run service account"
 SECRETS=(
-    oauth_client_secret service_account gmail_token
-    SUPABASE_URL SUPABASE_ANON_KEY SUPABASE_SERVICE_ROLE_KEY
+    oauth_client_secret service_account firebase_service_account gmail_token
+    FIREBASE_PROJECT_ID
     DISCORD_BOT_TOKEN DISCORD_CHANNEL_ID DISCORD_PUBLIC_KEY DISCORD_GUILD_ID
 )
 for SECRET in "${SECRETS[@]}"; do
@@ -204,9 +213,7 @@ info "Deploying Cloud Run Job: $JOB_NAME"
 # File secrets land at the exact path specified (no subdirectory).
 ALL_SECRETS=(
     # Env-var secrets
-    "SUPABASE_URL=SUPABASE_URL:latest"
-    "SUPABASE_ANON_KEY=SUPABASE_ANON_KEY:latest"
-    "SUPABASE_SERVICE_ROLE_KEY=SUPABASE_SERVICE_ROLE_KEY:latest"
+    "FIREBASE_PROJECT_ID=FIREBASE_PROJECT_ID:latest"
     "DISCORD_BOT_TOKEN=DISCORD_BOT_TOKEN:latest"
     "DISCORD_CHANNEL_ID=DISCORD_CHANNEL_ID:latest"
     "DISCORD_PUBLIC_KEY=DISCORD_PUBLIC_KEY:latest"
@@ -215,6 +222,7 @@ ALL_SECRETS=(
     # (Cloud Run only allows one secret mounted per directory)
     "/secrets/oauth/oauth_client_secret.json=oauth_client_secret:latest"
     "/secrets/sa/service_account.json=service_account:latest"
+    "/secrets/firebase_sa/firebase_service_account.json=firebase_service_account:latest"
     "/secrets/gmail/token.json=gmail_token:latest"
 )
 

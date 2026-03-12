@@ -1,5 +1,4 @@
-
-import { createClient } from '@supabase/supabase-js';
+import { getDb } from '../firestore.js';
 
 export default async function handler(req, res) {
     if (req.method !== 'POST') {
@@ -7,16 +6,6 @@ export default async function handler(req, res) {
     }
 
     try {
-        const supabaseUrl = process.env.SUPABASE_URL;
-        const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-        if (!supabaseUrl || !supabaseKey) {
-            console.error('Server configuration error: Missing Supabase credentials');
-            return res.status(500).json({ error: 'Server configuration error' });
-        }
-
-        const supabase = createClient(supabaseUrl, supabaseKey);
-
         let body = req.body;
         if (typeof body === 'string') {
             try {
@@ -47,27 +36,16 @@ export default async function handler(req, res) {
             if (platformList.includes('discord')) updates.discord_pref = false;
         }
 
-        if (Object.keys(updates).length === 0 && platformList.length > 0) {
-            // Platforms provided but none matched known keys? 
-            // Or empty list?
-            // If empty list, do nothing?
-            // If platform list has items but no updates, maybe invalid items.
-            // But for now let's just proceed.
+        if (Object.keys(updates).length === 0) {
+            return res.status(400).json({ error: 'No valid platforms provided' });
         }
 
-        // Perform UPDATE
-        const { data, error } = await supabase
-            .from('students_duplicate')
-            .update(updates)
-            .eq('email', targetEmail)
-            .select();
+        const db = getDb();
+        const docRef = db.collection('students').doc(targetEmail.trim().toLowerCase());
+        await docRef.update(updates);
+        const updated = (await docRef.get()).data();
 
-        if (error) {
-            console.error('Supabase update error:', error);
-            return res.status(500).json({ error: error.message });
-        }
-
-        return res.status(200).json({ success: true, message: 'Unsbscribed successfully', data });
+        return res.status(200).json({ success: true, message: 'Unsubscribed successfully', data: updated });
 
     } catch (error) {
         console.error('Unsubscribe handler error:', error);

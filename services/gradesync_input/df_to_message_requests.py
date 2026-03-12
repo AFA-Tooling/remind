@@ -6,205 +6,183 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
-from dotenv import load_dotenv
-from supabase import Client, create_client
+import firebase_admin
+from firebase_admin import credentials as fb_creds, firestore as fb_firestore
+
+# Import shared settings
+import sys
+SERVICES_DIR = Path(__file__).resolve().parent.parent
+if str(SERVICES_DIR) not in sys.path:
+    sys.path.append(str(SERVICES_DIR))
+from shared import settings
 
 
-def load_supabase_env() -> dict:
-    """Load Supabase credentials from .env file."""
-    # Try loading from current directory first, then project root
-    current_dir = Path(__file__).resolve().parent
-    env_paths = [
-        current_dir / ".env",
-        current_dir.parent / ".env",
-        current_dir.parent / "remind" / ".env",
-    ]
-    
-    for env_path in env_paths:
-        if env_path.exists():
-            load_dotenv(env_path)
-            break
-    else:
-        # Fallback to default dotenv behavior
-        load_dotenv()
-
-    required_vars = ["SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY"]
-    missing = [var for var in required_vars if not os.getenv(var)]
-
-    if missing:
-        raise ValueError(
-            "Missing required environment variables: " + ", ".join(missing)
-        )
-
-    return {
-        "url": os.environ["SUPABASE_URL"],
-        "service_role_key": os.environ["SUPABASE_SERVICE_ROLE_KEY"],
-    }
+def _init_firestore() -> fb_firestore.Client:
+    """Initialize Firebase Admin SDK and return a Firestore client."""
+    if not firebase_admin._apps:
+        sa_path = str(settings.FIREBASE_SERVICE_ACCOUNT_PATH)
+        cred = fb_creds.Certificate(sa_path)
+        firebase_admin.initialize_app(cred, {
+            "projectId": settings.FIREBASE_PROJECT_ID,
+        })
+    return fb_firestore.client()
 
 
-def load_deadlines_from_supabase() -> pd.DataFrame:
+
+def load_deadlines_from_firestore() -> pd.DataFrame:
     """
-    Load deadlines from Supabase database and return as pandas DataFrame.
-    
+    Load deadlines from Firestore and return as pandas DataFrame.
+
     Returns:
         DataFrame with columns: assignment_name, due, course_code, assignment_code
         The 'assignment' column is set to assignment_name for compatibility.
     """
-    print("📊 Loading deadlines from Supabase...")
-    
+    print("📊 Loading deadlines from Firestore...")
+
     try:
-        config = load_supabase_env()
-        supabase: Client = create_client(config["url"], config["service_role_key"])
-        
-        # Fetch all deadlines from the database
-        response = supabase.table("deadlines").select("*").execute()
-        
-        if not response.data:
-            print("⚠️  No deadlines found in database. Returning empty DataFrame.")
+        db = _init_firestore()
+        docs = db.collection("deadlines").stream()
+        data = [doc.to_dict() for doc in docs]
+
+        if not data:
+            print("⚠️  No deadlines found in Firestore. Returning empty DataFrame.")
             return pd.DataFrame(columns=["assignment", "due", "course_code", "assignment_code", "assignment_name"])
-        
-        # Convert to DataFrame
-        df = pd.DataFrame(response.data)
-        
-        # Rename assignment_name to 'assignment' for compatibility with existing code
+
+        df = pd.DataFrame(data)
+
         if "assignment_name" in df.columns:
             df["assignment"] = df["assignment_name"]
-        
-        # Convert 'due' to datetime if it's a string
+
         if "due" in df.columns:
             df["due"] = pd.to_datetime(df["due"], errors="coerce")
-        
-        print(f"✅ Loaded {len(df)} deadline(s) from Supabase")
+
+        print(f"✅ Loaded {len(df)} deadline(s) from Firestore")
         return df
-        
+
     except Exception as e:
-        print(f"❌ Error loading deadlines from Supabase: {e}")
-        print("⚠️  Falling back to empty DataFrame. Deadlines will not be matched.")
+        print(f"❌ Error loading deadlines from Firestore: {e}")
+        print("⚠️  Falling back to empty DataFrame.")
         return pd.DataFrame(columns=["assignment", "due", "course_code", "assignment_code", "assignment_name"])
 
 
-def load_student_preferences_from_supabase() -> pd.DataFrame:
+# Backward-compatible alias
+load_deadlines_from_supabase = load_deadlines_from_firestore
+
+
+def load_student_preferences_from_firestore() -> pd.DataFrame:
     """
-    Load student preferences (including preferred_first_name) from Supabase.
-    
+    Load student preferences from Firestore 'students' collection.
+
     Returns:
         DataFrame with columns: email, preferred_first_name, and other student fields
     """
-    print("📊 Loading student preferences from Supabase...")
-    
+    print("📊 Loading student preferences from Firestore...")
+
     try:
-        config = load_supabase_env()
-        supabase: Client = create_client(config["url"], config["service_role_key"])
-        
-        # Fetch student preferences from students_duplicate table
-        response = supabase.table("students_duplicate").select("email, preferred_first_name").execute()
-        
-        if not response.data:
-            print("⚠️  No student preferences found in database.")
+        db = _init_firestore()
+        docs = db.collection("students").stream()
+        data = [{"email": doc.id, **doc.to_dict()} for doc in docs]
+
+        if not data:
+            print("⚠️  No student preferences found in Firestore.")
             return pd.DataFrame(columns=["email", "preferred_first_name"])
-        
-        # Convert to DataFrame
-        df = pd.DataFrame(response.data)
-        
-        print(f"✅ Loaded {len(df)} student preference record(s) from Supabase")
+
+        df = pd.DataFrame(data)
+        print(f"✅ Loaded {len(df)} student preference record(s) from Firestore")
         return df
-        
+
     except Exception as e:
         print(f"⚠️  Warning: Could not load student preferences: {e}")
         print("   Messages will use first name from assignment_submissions instead.")
         return pd.DataFrame(columns=["email", "preferred_first_name"])
 
 
-def load_assignment_submissions_from_supabase(
+# Backward-compatible alias
+load_student_preferences_from_supabase = load_student_preferences_from_firestore
+
+
+def load_assignment_submissions_from_firestore(
     assignment_name: Optional[str] = None
 ) -> pd.DataFrame:
     """
-    Load assignment submissions from Supabase database.
-    
+    Load assignment submissions from Firestore 'assignment_submissions' collection.
+
     Args:
-        assignment_name: Optional assignment name to filter by. If None, loads all assignments.
-    
+        assignment_name: Optional assignment name to filter by. If None, loads all.
+
     Returns:
         DataFrame with columns: assignment_name, sid, name, email, status
         The 'assignment' column is set to assignment_name for compatibility.
     """
-    print("📊 Loading assignment submissions from Supabase...")
-    
+    print("📊 Loading assignment submissions from Firestore...")
+
     try:
-        config = load_supabase_env()
-        supabase: Client = create_client(config["url"], config["service_role_key"])
-        
-        # Build query
-        query = supabase.table("assignment_submissions").select("*")
-        
-        # Filter by assignment_name if provided
+        db = _init_firestore()
+        query = db.collection("assignment_submissions")
         if assignment_name:
-            query = query.eq("assignment_name", assignment_name)
-        
-        # Execute query
-        response = query.execute()
-        
-        if not response.data:
-            print("⚠️  No assignment submissions found in database.")
+            query = query.where("assignment_name", "==", assignment_name)
+
+        docs = query.stream()
+        data = [doc.to_dict() for doc in docs]
+
+        if not data:
+            print("⚠️  No assignment submissions found in Firestore.")
             return pd.DataFrame(columns=["assignment", "sid", "name", "email", "status", "submission time"])
-        
-        # Convert to DataFrame
-        df = pd.DataFrame(response.data)
-        
-        # Rename assignment_name to 'assignment' for compatibility with existing code
+
+        df = pd.DataFrame(data)
+
         if "assignment_name" in df.columns:
             df["assignment"] = df["assignment_name"]
-        
-        # Add 'submission time' column if it doesn't exist (for compatibility)
-        # Use updated_at as a proxy if available
+
         if "submission time" not in df.columns:
             if "updated_at" in df.columns:
                 df["submission time"] = df["updated_at"]
             else:
                 df["submission time"] = pd.NaT
-        
-        print(f"✅ Loaded {len(df)} submission record(s) from Supabase")
+
+        print(f"✅ Loaded {len(df)} submission record(s) from Firestore")
         if assignment_name:
             print(f"   Filtered by assignment: {assignment_name}")
         else:
             unique_assignments = df["assignment"].nunique() if "assignment" in df.columns else 0
             print(f"   Found {unique_assignments} unique assignment(s)")
-        
+
         return df
-        
+
     except Exception as e:
-        print(f"❌ Error loading assignment submissions from Supabase: {e}")
+        print(f"❌ Error loading assignment submissions from Firestore: {e}")
         raise
 
 
-def process_assignment_from_supabase(
+# Backward-compatible alias
+load_assignment_submissions_from_supabase = load_assignment_submissions_from_firestore
+
+
+def process_assignment_from_firestore(
     assignment_name: str,
     deadlines_df: Optional[pd.DataFrame] = None,
     notification_frequency_df=None
 ):
     """
-    Process a single assignment from Supabase and generate message requests.
-    
+    Process a single assignment from Firestore and generate message requests.
+
     Args:
         assignment_name: Name of the assignment to process
-        deadlines_df: Optional DataFrame with deadlines. If None, loads from Supabase.
-        notification_frequency_df: Optional DataFrame with notification frequencies. If None, expects CSV.
+        deadlines_df: Optional DataFrame with deadlines. If None, loads from Firestore.
+        notification_frequency_df: Optional DataFrame with notification frequencies.
     """
-    # ------------------------------
-    # Step 1: Load Assignment Data from Supabase
-    # ------------------------------
     
     print(f"\n📄 Processing assignment: {assignment_name}")
-    
-    # Load assignment submissions from Supabase
-    assignment_df = load_assignment_submissions_from_supabase(assignment_name=assignment_name)
+
+    # Load assignment submissions from Firestore
+    assignment_df = load_assignment_submissions_from_firestore(assignment_name=assignment_name)
     
     if assignment_df.empty:
         print(f"⚠️  No submissions found for assignment: {assignment_name}")
         return
     
-    # Load student preferences (including preferred_first_name) and merge with assignment data
-    student_prefs_df = load_student_preferences_from_supabase()
+    # Load student preferences and merge with assignment data
+    student_prefs_df = load_student_preferences_from_firestore()
     
     # Merge preferred_first_name into assignment_df based on email
     if not student_prefs_df.empty and 'email' in assignment_df.columns:
@@ -233,9 +211,9 @@ def process_assignment_from_supabase(
     # Step 2: Integrate with Deadlines
     # ------------------------------
 
-    # Load deadlines from Supabase if not provided
+    # Load deadlines from Firestore if not provided
     if deadlines_df is None:
-        deadlines_df = load_deadlines_from_supabase()
+        deadlines_df = load_deadlines_from_firestore()
     
     # Ensure deadlines_df has the expected structure
     if deadlines_df.empty:
@@ -426,25 +404,19 @@ def process_assignment_from_supabase(
     print(f"✅ Message requests saved to {output_path}")
 
 
-def process_all_assignments_from_supabase(
+def process_all_assignments_from_firestore(
     deadlines_df: Optional[pd.DataFrame] = None,
     notification_frequency_df=None,
     assignment_filter: Optional[str] = None
 ):
     """
-    Process all assignments from Supabase and generate message requests.
-    
-    Args:
-        deadlines_df: Optional DataFrame with deadlines. If None, loads from Supabase.
-        notification_frequency_df: Optional DataFrame with notification frequencies.
-        assignment_filter: Optional string to filter assignments (e.g., "Project" to only process projects).
+    Process all assignments from Firestore and generate message requests.
     """
     print("=" * 60)
-    print("Processing All Assignments from Supabase")
+    print("Processing All Assignments from Firestore")
     print("=" * 60)
-    
-    # Load all assignment submissions
-    all_submissions_df = load_assignment_submissions_from_supabase()
+
+    all_submissions_df = load_assignment_submissions_from_firestore()
     
     if all_submissions_df.empty:
         print("⚠️  No assignment submissions found in database.")
@@ -464,10 +436,9 @@ def process_all_assignments_from_supabase(
     
     print(f"\n📚 Found {len(unique_assignments)} unique assignment(s) to process")
     
-    # Process each assignment
     for assignment_name in unique_assignments:
         try:
-            process_assignment_from_supabase(
+            process_assignment_from_firestore(
                 assignment_name=assignment_name,
                 deadlines_df=deadlines_df,
                 notification_frequency_df=notification_frequency_df
@@ -475,10 +446,14 @@ def process_all_assignments_from_supabase(
         except Exception as e:
             print(f"❌ Error processing {assignment_name}: {e}")
             continue
-    
+
     print("\n" + "=" * 60)
     print("✅ All assignments processed!")
     print("=" * 60)
+
+
+# Backward-compatible alias
+process_all_assignments_from_supabase = process_all_assignments_from_firestore
 
 
 # Backward compatibility: Keep the old function name but redirect to new implementation
@@ -498,12 +473,16 @@ def process_assignment_file(assignment_name_or_file: str, deadlines_df: Optional
     else:
         assignment_name = assignment_name_or_file
     
-    # Process from Supabase
-    process_assignment_from_supabase(
+    # Process from Firestore
+    process_assignment_from_firestore(
         assignment_name=assignment_name,
         deadlines_df=deadlines_df,
         notification_frequency_df=notification_frequency_df
     )
+
+
+# Backward-compatible alias at function level too
+process_assignment_from_supabase = process_assignment_from_firestore
 
 
 def main():
@@ -523,7 +502,7 @@ def main():
     import argparse
     
     parser = argparse.ArgumentParser(
-        description="Generate message requests from Supabase assignment submissions"
+        description="Generate message requests from Firestore assignment submissions"
     )
     parser.add_argument(
         "--assignment",
@@ -568,16 +547,14 @@ def main():
     
     # Process based on arguments
     if args.assignment:
-        # Process a specific assignment
-        process_assignment_from_supabase(
+        process_assignment_from_firestore(
             assignment_name=args.assignment,
-            deadlines_df=None,  # Will load from Supabase
+            deadlines_df=None,
             notification_frequency_df=notification_frequency_df
         )
     else:
-        # Process all assignments (with optional filter)
-        process_all_assignments_from_supabase(
-            deadlines_df=None,  # Will load from Supabase
+        process_all_assignments_from_firestore(
+            deadlines_df=None,
             notification_frequency_df=notification_frequency_df,
             assignment_filter=args.filter
         )

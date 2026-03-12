@@ -1,4 +1,4 @@
-import { createClient } from '@supabase/supabase-js';
+import { getDb } from '../firestore.js';
 
 export default async function handler(req, res) {
     if (req.method !== 'GET') {
@@ -6,15 +6,6 @@ export default async function handler(req, res) {
     }
 
     try {
-        const supabaseUrl = process.env.SUPABASE_URL;
-        const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-        if (!supabaseUrl || !supabaseKey) {
-            return res.status(500).json({ error: 'Server configuration error' });
-        }
-
-        const supabase = createClient(supabaseUrl, supabaseKey);
-
         // Get user_email from query parameters
         const userEmail = req.query.user_email;
 
@@ -24,24 +15,15 @@ export default async function handler(req, res) {
 
         const loginEmail = userEmail.trim().toLowerCase();
 
-        // Query students_duplicate table by email
-        const { data, error } = await supabase
-            .from('students_duplicate')
-            .select('preferred_first_name, phone_number, discord_id, days_before_deadline, email_pref, phone_pref, discord_pref, email')
-            .eq('email', loginEmail)
-            .single();
+        const db = getDb();
+        // Documents in 'students' collection are keyed by email
+        const docSnap = await db.collection('students').doc(loginEmail).get();
 
-        if (error) {
-            if (error.code === 'PGRST116') {
-                // No rows returned (user not found)
-                return res.status(404).json({ error: 'User not found' });
-            }
-            return res.status(500).json({ error: error.message });
-        }
-
-        if (!data) {
+        if (!docSnap.exists) {
             return res.status(404).json({ error: 'User not found' });
         }
+
+        const data = docSnap.data();
 
         // Return user data
         return res.status(200).json({
@@ -62,4 +44,3 @@ export default async function handler(req, res) {
         return res.status(500).json({ error: 'Internal server error', details: error.message });
     }
 }
-

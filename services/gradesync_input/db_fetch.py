@@ -1,4 +1,4 @@
-"""Reminder helper: read Supabase data + deadlines CSV and draft messages."""
+"""Reminder helper: read Firestore data and draft messages."""
 
 from __future__ import annotations
 
@@ -12,8 +12,8 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 from unicodedata import lookup
 
-# from dotenv import load_dotenv
-from supabase import Client, create_client
+import firebase_admin
+from firebase_admin import credentials, firestore
 
 # Import shared settings
 import sys
@@ -25,7 +25,7 @@ if str(SERVICES_DIR) not in sys.path:
 from shared import settings
 
 
-DEFAULT_STUDENTS_TABLE = "students_duplicate"
+DEFAULT_STUDENTS_TABLE = "students"
 DEFAULT_RESOURCES_TABLE = "assignment_resources"
 DEFAULT_DEADLINES_CSV = "shared_data/deadlines.csv"
 DEFAULT_FREQ_FIELD = "days_before_deadline"
@@ -60,8 +60,8 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--table",
-        default=os.getenv("SUPABASE_TABLE", DEFAULT_STUDENTS_TABLE),
-        help="Table to query when --mode=raw (default: students)",
+        default=os.getenv("FIRESTORE_STUDENTS_COLLECTION", DEFAULT_STUDENTS_TABLE),
+        help="Collection to query when --mode=raw (default: students)",
     )
     parser.add_argument(
         "--limit",
@@ -72,7 +72,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--resources-table",
         default=DEFAULT_RESOURCES_TABLE,
-        help="Supabase table that stores assignment resources",
+        help="Firestore collection that stores assignment resources",
     )
     parser.add_argument(
         "--deadlines-csv",
@@ -108,46 +108,40 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
     "--deadlines-table",
     default=DEFAULT_DEADLINES_TABLE,
-    help="Supabase table name containing deadlines (default: deadlines)",
+    help="Firestore collection name containing deadlines (default: deadlines)",
     )
     return parser.parse_args()
 
 
-def load_supabase_env() -> Dict[str, str]:
-    if not settings.SUPABASE_URL or not settings.SUPABASE_SERVICE_ROLE_KEY:
-        raise ValueError(
-            "Missing required environment variables: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY"
-        )
-
-    return {
-        "url": settings.SUPABASE_URL,
-        "service_role_key": settings.SUPABASE_SERVICE_ROLE_KEY,
-    }
+def init_firestore() -> firestore.Client:
+    """Initialize Firebase Admin SDK and return a Firestore client."""
+    if not firebase_admin._apps:
+        sa_path = str(settings.FIREBASE_SERVICE_ACCOUNT_PATH)
+        cred = credentials.Certificate(sa_path)
+        firebase_admin.initialize_app(cred, {
+            "projectId": settings.FIREBASE_PROJECT_ID,
+        })
+    return firestore.client()
 
 
 def debug_print(enabled: bool, message: str) -> None:
     if enabled:
         print(f"[debug] {message}")
 
-
-def fetch_table_rows(
-    supabase: Client,
-    table_name: str,
+def fetch_collection_docs(
+    db: firestore.Client,
+    collection_name: str,
     limit: Optional[int] = None,
     *,
     debug: bool = False,
 ) -> List[Dict[str, Any]]:
-    query = supabase.table(table_name).select("*")
+    query = db.collection(collection_name)
     if limit:
         query = query.limit(limit)
 
-    response = query.execute()
-
-    if getattr(response, "error", None):
-        raise RuntimeError(f"Supabase error: {response.error}")
-
-    rows = response.data or []
-    debug_print(debug, f"Fetched {len(rows)} rows from '{table_name}'")
+    docs = query.stream()
+    rows = [doc.to_dict() for doc in docs]
+    debug_print(debug, f"Fetched {len(rows)} docs from '{collection_name}'")
     return rows
 
 
@@ -758,13 +752,13 @@ def write_gmail_csv(reminders: List[Dict[str, Any]], output_dir: Path) -> None:
 
 
 def gather_reminders(
-    supabase: Client,
+    db: firestore.Client,
     args: argparse.Namespace,
 ) -> List[Dict[str, Any]]:
-    deadline_rows = fetch_table_rows(supabase, args.deadlines_table, debug=args.debug)
+    deadline_rows = fetch_collection_docs(db, args.deadlines_table, debug=args.debug)
     deadlines = load_deadlines_from_rows(deadline_rows, debug=args.debug)
-    resource_rows = fetch_table_rows(
-        supabase,
+    resource_rows = fetch_collection_docs(
+        db,
         args.resources_table,
         debug=args.debug,
     )
@@ -774,8 +768,8 @@ def gather_reminders(
         debug=args.debug,
     )
 
-    students = fetch_table_rows(
-        supabase,
+    students = fetch_collection_docs(
+        db,
         DEFAULT_STUDENTS_TABLE,
         limit=args.limit,
         debug=args.debug,
@@ -877,21 +871,21 @@ def gather_reminders(
     return reminders
 
 
-def run_raw_mode(supabase: Client, args: argparse.Namespace) -> None:
-    print(f"Fetching data from table '{args.table}'")
-    rows = fetch_table_rows(
-        supabase,
+def run_raw_mode(db: firestore.Client, args: argparse.Namespace) -> None:
+    print(f"Fetching data from collection '{args.table}'")
+    rows = fetch_collection_docs(
+        db,
         args.table,
         args.limit,
         debug=args.debug,
     )
-    print(f"Retrieved {len(rows)} rows.")
+    print(f"Retrieved {len(rows)} docs.")
     for idx, row in enumerate(rows, start=1):
-        print(f"Row {idx}: {row}")
+        print(f"Doc {idx}: {row}")
 
 
-def run_reminder_mode(supabase: Client, args: argparse.Namespace) -> None:
-    reminders = gather_reminders(supabase, args)
+def run_reminder_mode(db: firestore.Client, args: argparse.Namespace) -> None:
+    reminders = gather_reminders(db, args)
 
     if not reminders:
         print("✅ No students currently fall within their notification windows.")
@@ -935,18 +929,17 @@ def run_reminder_mode(supabase: Client, args: argparse.Namespace) -> None:
 
 def main() -> None:
     args = parse_args()
-    config = load_supabase_env()
 
-    print("Connecting to Supabase...")
-    print(f"Project URL: {config['url']}")
-    print(f"Service role key: {mask_secret(config['service_role_key'])}")
+    print("Connecting to Firestore...")
+    print(f"Firebase Project ID: {settings.FIREBASE_PROJECT_ID}")
+    print(f"Service account: {settings.FIREBASE_SERVICE_ACCOUNT_PATH}")
 
-    supabase: Client = create_client(config["url"], config["service_role_key"])
+    db = init_firestore()
 
     if args.mode == "raw":
-        run_raw_mode(supabase, args)
+        run_raw_mode(db, args)
     else:
-        run_reminder_mode(supabase, args)
+        run_reminder_mode(db, args)
 
 
 if __name__ == "__main__":

@@ -6,13 +6,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>About AutoRemind</title>
 
-  <!-- Supabase JS Library -->
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <!-- Firebase JS SDK (compat v9) -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
   <!-- Load credentials -->
   <script>
     (async function () {
       await new Promise(resolve => setTimeout(resolve, 50));
-      if (window.SUPABASE_URL && window.SUPABASE_ANON_KEY) {
+      if (window.FIREBASE_API_KEY && window.FIREBASE_AUTH_DOMAIN) {
         const script = document.createElement('script');
         script.src = './auth.js';
         script.defer = true;
@@ -23,8 +24,9 @@
         const response = await fetch('/api/config');
         if (response.ok) {
           const config = await response.json();
-          window.SUPABASE_URL = config.SUPABASE_URL;
-          window.SUPABASE_ANON_KEY = config.SUPABASE_ANON_KEY;
+          window.FIREBASE_API_KEY = config.FIREBASE_API_KEY;
+          window.FIREBASE_AUTH_DOMAIN = config.FIREBASE_AUTH_DOMAIN;
+          window.FIREBASE_PROJECT_ID = config.FIREBASE_PROJECT_ID;
         }
       } catch (e) { }
       const script = document.createElement('script');
@@ -170,7 +172,7 @@
       function waitForAuth(cb) {
         let i = 0;
         const ch = () => {
-          if (window.auth && window.auth.supabase) cb(window.auth);
+          if (window.auth && window.auth._auth) cb(window.auth);
           else if (i++ < 20) setTimeout(ch, 100);
         };
         ch();

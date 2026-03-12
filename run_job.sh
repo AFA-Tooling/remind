@@ -24,9 +24,12 @@ copy_secret() {
     fi
 }
 
-copy_secret "/secrets/oauth/oauth_client_secret.json" "$CONFIG_DIR/oauth_client_secret.json" "oauth_client_secret.json"
-copy_secret "/secrets/sa/service_account.json"       "$CONFIG_DIR/service_account.json"     "service_account.json"
-copy_secret "/secrets/gmail/token.json"              "$CONFIG_DIR/token.json"               "token.json"
+copy_secret "/secrets/oauth/oauth_client_secret.json"              "$CONFIG_DIR/oauth_client_secret.json"        "oauth_client_secret.json"
+copy_secret "/secrets/sa/service_account.json"                     "$CONFIG_DIR/service_account.json"            "service_account.json"
+copy_secret "/secrets/firebase_sa/firebase_service_account.json"   "$CONFIG_DIR/firebase_service_account.json"   "firebase_service_account.json"
+copy_secret "/secrets/gmail/token.json"                            "$CONFIG_DIR/token.json"                      "token.json"
+
+export FIREBASE_SERVICE_ACCOUNT_PATH="$CONFIG_DIR/firebase_service_account.json"
 
 echo ""
 echo "==> Starting AutoRemind pipeline"

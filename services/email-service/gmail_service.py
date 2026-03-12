@@ -13,7 +13,8 @@ from google.oauth2.credentials import Credentials
 from google.oauth2 import service_account
 from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
-from supabase import Client, create_client
+import firebase_admin
+from firebase_admin import credentials as fb_creds, firestore as fb_firestore
 from email_templates import get_motivating_email_body
 
 # Import shared settings
@@ -76,19 +77,15 @@ def format_resources(resources: Optional[List[Any]]) -> str:
     return "\n".join(formatted_lines) if formatted_lines else ""
 
 
-def load_supabase_env() -> Dict[str, str]:
-    """Load Supabase credentials from shared settings."""
-    if not settings.SUPABASE_URL or not settings.SUPABASE_SERVICE_ROLE_KEY:
-        logger.warning(
-            "Missing Supabase environment variables in .env.local. "
-            "Resources will not be fetched from Supabase."
-        )
-        return {}
-    
-    return {
-        "url": settings.SUPABASE_URL,
-        "service_role_key": settings.SUPABASE_SERVICE_ROLE_KEY,
-    }
+def _init_firestore() -> fb_firestore.Client:
+    """Initialize Firebase Admin SDK and return a Firestore client."""
+    if not firebase_admin._apps:
+        sa_path = str(settings.FIREBASE_SERVICE_ACCOUNT_PATH)
+        cred = fb_creds.Certificate(sa_path)
+        firebase_admin.initialize_app(cred, {
+            "projectId": settings.FIREBASE_PROJECT_ID,
+        })
+    return fb_firestore.client()
 
 
 def extract_assignment_code(assignment_name: str) -> str:
@@ -114,65 +111,62 @@ def extract_assignment_code(assignment_name: str) -> str:
 def fetch_assignment_resources(
     assignment_code: str,
     course_code: str = "",
-    supabase_client: Optional[Client] = None
+    db: Optional[fb_firestore.Client] = None
 ) -> List[Dict[str, Any]]:
     """
-    Fetch assignment resources from Supabase.
-    
+    Fetch assignment resources from Firestore 'assignment_resources' collection.
+
     Args:
         assignment_code: Assignment code (e.g., "Project 1")
-        course_code: Course code (optional, defaults to empty string)
-        supabase_client: Optional Supabase client (will create one if not provided)
-        
+        course_code: Course code (optional)
+        db: Optional Firestore client (will create one if not provided)
+
     Returns:
         List of resource dictionaries with keys: resource_type, resource_name, link
     """
     if not assignment_code:
         return []
-    
+
     try:
-        # Create Supabase client if not provided
-        if supabase_client is None:
-            config = load_supabase_env()
-            if not config:
-                return []
-            supabase_client = create_client(config["url"], config["service_role_key"])
-        
-        # Query assignment_resources table
-        query = supabase_client.table("assignment_resources").select(
-            "resource_type, resource_name, link"
+        if db is None:
+            db = _init_firestore()
+
+        query = (
+            db.collection("assignment_resources")
+            .where("assignment_code", "==", assignment_code)
         )
-        
-        # Filter by assignment_code
-        query = query.eq("assignment_code", assignment_code)
-        
-        # Filter by course_code
         if course_code:
-            query = query.eq("course_code", course_code)
-        else:
-            # If no course_code provided, try empty string first (default course)
-            query = query.eq("course_code", "")
-        
-        response = query.execute()
-        
-        # If no results with empty course_code, try without course_code filter
-        if not response.data and not course_code:
-            logger.debug(f"No resources found with empty course_code, trying without course filter...")
-            query = supabase_client.table("assignment_resources").select(
-                "resource_type, resource_name, link"
-            ).eq("assignment_code", assignment_code)
-            response = query.execute()
-        
-        if response.data:
+            query = query.where("course_code", "==", course_code)
+
+        docs = query.stream()
+        resources = [
+            {k: v for k, v in doc.to_dict().items() if k in ("resource_type", "resource_name", "link")}
+            for doc in docs
+        ]
+
+        # If no results and no course_code was specified, try without course filter
+        if not resources and not course_code:
+            logger.debug("No resources found, retrying without course filter...")
+            docs = (
+                db.collection("assignment_resources")
+                .where("assignment_code", "==", assignment_code)
+                .stream()
+            )
+            resources = [
+                {k: v for k, v in doc.to_dict().items() if k in ("resource_type", "resource_name", "link")}
+                for doc in docs
+            ]
+
+        if resources:
             logger.info(
-                f"Found {len(response.data)} resource(s) for assignment '{assignment_code}' "
+                f"Found {len(resources)} resource(s) for assignment '{assignment_code}' "
                 f"(course: '{course_code or 'any'}')"
             )
-            return response.data
         else:
-            logger.debug(f"No resources found for assignment '{assignment_code}' (course: '{course_code or 'any'}')")
-            return []
-            
+            logger.debug(f"No resources found for assignment '{assignment_code}'")
+
+        return resources
+
     except Exception as e:
         logger.warning(f"Error fetching resources for assignment '{assignment_code}': {e}")
         return []
@@ -373,7 +367,7 @@ def send_gmail_reminder(
         True if email was sent successfully, False otherwise
     """
     try:
-        # Fetch resources from Supabase if not provided
+        # Fetch resources from Firestore if not provided
         if resources is None:
             assignment_code = extract_assignment_code(assignment_name)
             if assignment_code:

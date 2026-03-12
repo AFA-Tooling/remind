@@ -21,9 +21,9 @@ from google.oauth2 import service_account
 from google.auth.transport.requests import Request
 from google.auth.exceptions import RefreshError
 
-# Supabase
-# from dotenv import load_dotenv
-from supabase import Client, create_client
+# Firestore (Firebase Admin SDK)
+import firebase_admin
+from firebase_admin import credentials as fb_credentials, firestore
 
 # Import shared settings
 import sys
@@ -47,8 +47,8 @@ if not os.path.exists(credentials_path):
     logging.error(f"Credentials file not found: {credentials_path}")
     sys.exit(1)
 
-# Supabase configuration
-DEFAULT_SUPABASE_TABLE = "assignment_submissions"
+# Firestore configuration
+DEFAULT_FIRESTORE_COLLECTION = "assignment_submissions"
 
 def safe_filename_for_windows(name: str) -> str:
     """
@@ -141,127 +141,117 @@ def preprocess_df(df, tab_name):
     return filtered_df
 
 
-def load_supabase_env() -> Dict[str, str]:
-    """
-    Load Supabase environment variables from shared settings.
-    Returns a dictionary with 'url' and 'service_role_key'.
-    """
-    if not settings.SUPABASE_URL or not settings.SUPABASE_SERVICE_ROLE_KEY:
-        raise ValueError(
-            "Missing required environment variables: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY"
-        )
-
-    return {
-        "url": settings.SUPABASE_URL,
-        "service_role_key": settings.SUPABASE_SERVICE_ROLE_KEY,
-    }
+def init_firestore() -> firestore.Client:
+    """Initialize Firebase Admin SDK and return a Firestore client."""
+    if not firebase_admin._apps:
+        sa_path = str(settings.FIREBASE_SERVICE_ACCOUNT_PATH)
+        cred = fb_credentials.Certificate(sa_path)
+        firebase_admin.initialize_app(cred, {
+            "projectId": settings.FIREBASE_PROJECT_ID,
+        })
+    return firestore.client()
 
 
 
 
 
 
-def upsert_submissions_to_supabase(
+def upsert_submissions_to_firestore(
     df: pd.DataFrame,
-    supabase: Client,
-    table_name: str
+    db: firestore.Client,
+    collection_name: str
 ) -> None:
     """
-    Upsert assignment submission data to Supabase table.
-    
+    Upsert assignment submission data to a Firestore collection.
+
     Args:
         df: DataFrame with columns: assignment, name, sid, email, status
-        supabase: Supabase client instance
-        table_name: Name of the Supabase table
-    
+        db: Firestore client instance
+        collection_name: Name of the Firestore collection
+
     Note:
-        Primary key is (assignment_name, name). Records with missing names
-        will be skipped with a warning. Uses upsert to update existing records
-        or insert new ones.
+        Document ID is derived from (assignment_name, name) to ensure
+        idempotent upserts. Uses set(merge=True) to update existing docs
+        or create new ones.
     """
     if df.empty:
         logging.warning("DataFrame is empty, nothing to upsert")
         return
-    
-    # Prepare records for upsert
-    records: List[Dict[str, Any]] = []
-    
+
+    batch = db.batch()
+    batch_size = 0
+    total_written = 0
+
     for _, row in df.iterrows():
-        # Build record
-        # Note: name is required (part of primary key), so ensure it's not None
         name_value = str(row.get('name', '')).strip() if pd.notna(row.get('name')) else ''
         if not name_value:
             logging.warning(f"Skipping record with missing name for assignment {row.get('assignment', '')}")
             continue
-        
-        # Handle SID - convert empty strings to None
+
         sid_value = row.get('sid', '')
         if pd.isna(sid_value) or (isinstance(sid_value, str) and sid_value.strip() == ''):
             sid_value = None
         else:
             sid_value = str(sid_value).strip()
-        
-        # Handle email - convert empty strings to None
+
         email_value = row.get('email', '')
         if pd.isna(email_value) or (isinstance(email_value, str) and email_value.strip() == ''):
             email_value = None
         else:
             email_value = str(email_value).strip()
-        
-        # Handle status - convert empty strings to None
+
         status_value = row.get('status', '')
         if pd.isna(status_value) or (isinstance(status_value, str) and status_value.strip() == ''):
             status_value = None
         else:
             status_value = str(status_value).strip()
-        
+
+        assignment_name = str(row.get('assignment', ''))
+        # Composite key: assignment_name + name (underscore-joined, url-safe)
+        doc_id = f"{assignment_name}__{name_value}".replace('/', '_').replace(' ', '_')
+
         record = {
-            'assignment_name': str(row.get('assignment', '')),
+            'assignment_name': assignment_name,
             'sid': sid_value,
             'name': name_value,
             'email': email_value,
             'status': status_value,
             'updated_at': datetime.now().isoformat()
         }
-        
-        records.append(record)
-    
-    if not records:
-        logging.warning("No valid records to upsert")
-        return
-    
-    try:
-        # Upsert with conflict resolution on (assignment_name, name)
-        # The upsert method will update existing records or insert new ones
-        # based on the primary key constraint (assignment_name, name)
-        response = supabase.table(table_name).upsert(records).execute()
-        
-        if hasattr(response, 'error') and response.error:
-            raise RuntimeError(f"Supabase error: {response.error}")
-        
-        print(f"✅ Successfully upserted {len(records)} records to {table_name}")
-        
-    except Exception as e:
-        logging.error(f"Error upserting to Supabase: {e}")
-        raise
+
+        doc_ref = db.collection(collection_name).document(doc_id)
+        batch.set(doc_ref, record, merge=True)
+        batch_size += 1
+        total_written += 1
+
+        # Firestore batch limit is 500 writes
+        if batch_size >= 499:
+            batch.commit()
+            batch = db.batch()
+            batch_size = 0
+
+    if batch_size > 0:
+        batch.commit()
+
+    print(f"✅ Successfully upserted {total_written} records to '{collection_name}'")  
 
 
 if __name__ == "__main__":
     # Parse command-line arguments
     parser = argparse.ArgumentParser(
-        description="Fetch assignment data from Google Sheets and upload to Supabase"
+        description="Fetch assignment data from Google Sheets and upload to Firestore"
     )
     parser.add_argument(
-        "--supabase",
+        "--firestore",
         action="store_true",
         default=True,
-        help="Enable Supabase upload (default: True)"
+        help="Enable Firestore upload (default: True)"
     )
     parser.add_argument(
-        "--no-supabase",
-        dest="supabase",
+        "--no-firestore",
+        dest="firestore",
         action="store_false",
-        help="Disable Supabase upload"
+        help="Disable Firestore upload"
     )
     parser.add_argument(
         "--csv-fallback",
@@ -269,9 +259,9 @@ if __name__ == "__main__":
         help="Also write CSV files for debugging"
     )
     parser.add_argument(
-        "--table",
-        default=DEFAULT_SUPABASE_TABLE,
-        help=f"Supabase table name (default: {DEFAULT_SUPABASE_TABLE})"
+        "--collection",
+        default=DEFAULT_FIRESTORE_COLLECTION,
+        help=f"Firestore collection name (default: {DEFAULT_FIRESTORE_COLLECTION})"
     )
     parser.add_argument(
         "--test",
@@ -283,25 +273,21 @@ if __name__ == "__main__":
     # Initialize Google Sheets credentials
     creds = get_credentials()
     tab_names = get_all_tab_names(google_sheet_id, creds)
-    
-    # Initialize Supabase client if enabled
-    supabase_client = None
-    if args.supabase:
+
+    # Initialize Firestore client if enabled
+    db_client = None
+    if args.firestore:
         try:
-            supabase_config = load_supabase_env()
-            supabase_client = create_client(
-                supabase_config["url"],
-                supabase_config["service_role_key"]
-            )
-            print("✅ Connected to Supabase")
-        except ValueError as e:
-            logging.error(f"Failed to load Supabase credentials: {e}")
+            db_client = init_firestore()
+            print("✅ Connected to Firestore")
+        except Exception as e:
+            logging.error(f"Failed to initialize Firestore: {e}")
             if not args.csv_fallback:
-                print("❌ Supabase upload required but credentials not available. Exiting.")
+                print("❌ Firestore upload required but credentials not available. Exiting.")
                 sys.exit(1)
             else:
-                print("⚠️  Supabase upload disabled, falling back to CSV only")
-                args.supabase = False
+                print("⚠️  Firestore upload disabled, falling back to CSV only")
+                args.firestore = False
 
     processed_count = 0
     
@@ -333,24 +319,24 @@ if __name__ == "__main__":
             print(f"Cleaned {tab} DataFrame:")
             print(df.head())  # Preview the cleaned data
 
-            # 3. Upload to Supabase (if enabled)
-            if args.supabase and supabase_client:
+            # 3. Upload to Firestore (if enabled)
+            if args.firestore and db_client:
                 try:
-                    upsert_submissions_to_supabase(
+                    upsert_submissions_to_firestore(
                         df,
-                        supabase_client,
-                        args.table
+                        db_client,
+                        args.collection
                     )
                     processed_count += 1
                     print(f"✅ Successfully processed {tab}")
                 except Exception as e:
-                    logging.error(f"Error uploading {tab} to Supabase: {e}")
+                    logging.error(f"Error uploading {tab} to Firestore: {e}")
                     if not args.csv_fallback:
-                        print(f"❌ Failed to upload {tab} to Supabase. Continuing with next tab...")
+                        print(f"❌ Failed to upload {tab} to Firestore. Continuing with next tab...")
                         continue
 
-            # 4. Export to CSV (if fallback enabled or Supabase disabled)
-            if args.csv_fallback or not args.supabase:
+            # 4. Export to CSV (if fallback enabled or Firestore disabled)
+            if args.csv_fallback or not args.firestore:
                 output_filename = f"{safe_filename_for_windows(tab)}.csv"
                 output_path = os.path.join(output_folder, output_filename)
 

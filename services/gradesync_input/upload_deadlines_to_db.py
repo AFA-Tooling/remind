@@ -1,8 +1,9 @@
 """
-Upload deadlines from CSV file to Supabase database.
+Upload deadlines from CSV file to Firestore database.
 
-This script reads deadlines.csv and uploads it to the deadlines table in Supabase.
-It handles duplicates by updating existing records based on the unique constraint.
+This script reads deadlines.csv and uploads it to the 'deadlines' collection
+in Firestore. Uses document IDs derived from (course_code, assignment_name)
+so re-running the script is always idempotent (set with merge=True).
 """
 
 import csv
@@ -11,42 +12,26 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional
 
-from dotenv import load_dotenv
-from supabase import Client, create_client
+import firebase_admin
+from firebase_admin import credentials, firestore
+
+import sys
+SERVICES_DIR = Path(__file__).resolve().parent.parent
+if str(SERVICES_DIR) not in sys.path:
+    sys.path.append(str(SERVICES_DIR))
+
+from shared import settings
 
 
-def load_supabase_env() -> Dict[str, str]:
-    """Load Supabase credentials from .env file."""
-    # Try loading from current directory first, then project root
-    current_dir = Path(__file__).resolve().parent
-    env_paths = [
-        current_dir / ".env",
-        current_dir.parent / ".env",
-        current_dir.parent / "remind" / ".env",
-    ]
-    
-    for env_path in env_paths:
-        if env_path.exists():
-            load_dotenv(env_path)
-            print(f"✅ Loaded .env from: {env_path}")
-            break
-    else:
-        # Fallback to default dotenv behavior
-        load_dotenv()
-        print("⚠️  Using default .env loading (may not find file)")
-
-    required_vars = ["SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY"]
-    missing = [var for var in required_vars if not os.getenv(var)]
-
-    if missing:
-        raise ValueError(
-            "Missing required environment variables: " + ", ".join(missing)
-        )
-
-    return {
-        "url": os.environ["SUPABASE_URL"],
-        "service_role_key": os.environ["SUPABASE_SERVICE_ROLE_KEY"],
-    }
+def init_firestore() -> firestore.Client:
+    """Initialize Firebase Admin SDK and return a Firestore client."""
+    if not firebase_admin._apps:
+        sa_path = str(settings.FIREBASE_SERVICE_ACCOUNT_PATH)
+        cred = credentials.Certificate(sa_path)
+        firebase_admin.initialize_app(cred, {
+            "projectId": settings.FIREBASE_PROJECT_ID,
+        })
+    return firestore.client()
 
 
 def parse_deadline(value: str) -> Optional[datetime]:
@@ -70,16 +55,16 @@ def load_deadlines_csv(csv_path: Path) -> List[Dict[str, any]]:
         reader = csv.DictReader(handle)
         for raw_row in reader:
             row = {(key or "").strip(): (value or "") for key, value in raw_row.items()}
-            
+
             course_code = row.get("course_code", "").strip()
             assignment_code = row.get("assignment_code", "").strip() or None
             assignment_name = row.get("assignment_name", "").strip()
             due_str = row.get("due", "").strip()
-            
+
             if not assignment_name:
                 print(f"⚠️  Skipping row with missing assignment_name: {row}")
                 continue
-            
+
             due_date = parse_deadline(due_str)
             if not due_date:
                 print(f"⚠️  Skipping row with invalid due date '{due_str}': {row}")
@@ -95,130 +80,82 @@ def load_deadlines_csv(csv_path: Path) -> List[Dict[str, any]]:
     return deadlines
 
 
-def upload_deadlines_to_supabase(
-    supabase: Client, deadlines: List[Dict[str, any]], *, upsert: bool = True
+def upload_deadlines_to_firestore(
+    db: firestore.Client, deadlines: List[Dict[str, any]]
 ) -> Dict[str, int]:
     """
-    Upload deadlines to Supabase.
-    
-    Args:
-        supabase: Supabase client instance
-        deadlines: List of deadline dictionaries
-        upsert: If True, update existing records; if False, skip duplicates
-    
+    Upload deadlines to Firestore using batched set(merge=True).
+
+    Document ID is '{course_code}__{assignment_name}' (url-safe).
+    Re-running is safe — existing docs are updated only if the due date changed.
+
     Returns:
-        Dictionary with counts of inserted, updated, and error records
+        Dictionary with counts of inserted, updated (no-op), and error records.
     """
     stats = {"inserted": 0, "updated": 0, "errors": 0}
-    
+    collection_ref = db.collection("deadlines")
+
     for deadline in deadlines:
+        assignment_name = deadline.get("assignment_name", "")
+        course_code = deadline.get("course_code", "")
+
+        # Build a stable, URL-safe document ID
+        raw_id = f"{course_code}__{assignment_name}"
+        doc_id = raw_id.replace("/", "_").replace(" ", "_")
+
+        doc_ref = collection_ref.document(doc_id)
+
         try:
-            if upsert:
-                # First, check if a record with the same unique key exists
-                course_code = deadline.get("course_code", "")
-                assignment_code = deadline.get("assignment_code")
-                assignment_name = deadline.get("assignment_name", "")
-                
-                # Query for existing record based on unique constraint
-                query = supabase.table("deadlines").select("id, due, updated_at")
-                query = query.eq("course_code", course_code)
-                query = query.eq("assignment_name", assignment_name)
-                
-                # Handle assignment_code (can be None)
-                if assignment_code:
-                    query = query.eq("assignment_code", assignment_code)
+            existing = doc_ref.get()
+
+            if existing.exists:
+                existing_due = existing.to_dict().get("due")
+                new_due = deadline.get("due")
+
+                if existing_due != new_due:
+                    doc_ref.set({**deadline, "updated_at": datetime.now().isoformat()}, merge=True)
+                    stats["updated"] += 1
+                    print(f"   ✅ Updated: {assignment_name} (course: {course_code}) - Due: {new_due}")
                 else:
-                    query = query.is_("assignment_code", "null")
-                
-                existing = query.execute()
-                
-                if existing.data and len(existing.data) > 0:
-                    # Record exists - update it
-                    existing_id = existing.data[0]["id"]
-                    existing_due = existing.data[0].get("due")
-                    new_due = deadline.get("due")
-                    
-                    # Only update if the due date has changed
-                    if existing_due != new_due:
-                        update_data = {
-                            "due": deadline.get("due"),
-                            "updated_at": datetime.now().isoformat()
-                        }
-                        # Also update assignment_code if it changed
-                        if "assignment_code" in deadline:
-                            update_data["assignment_code"] = deadline.get("assignment_code")
-                        
-                        result = supabase.table("deadlines").update(update_data).eq("id", existing_id).execute()
-                        if result.data:
-                            stats["updated"] += 1
-                            print(f"   ✅ Updated: {assignment_name} (course: {course_code}) - Due: {deadline.get('due')}")
-                        else:
-                            stats["errors"] += 1
-                    else:
-                        # No change needed
-                        stats["updated"] += 1
-                        print(f"   ⏭️  No change: {assignment_name} (course: {course_code})")
-                else:
-                    # Record doesn't exist - insert it
-                    result = supabase.table("deadlines").insert(deadline).execute()
-                    if result.data:
-                        stats["inserted"] += 1
-                        print(f"   ➕ Inserted: {assignment_name} (course: {course_code}) - Due: {deadline.get('due')}")
-                    else:
-                        stats["errors"] += 1
+                    stats["updated"] += 1
+                    print(f"   ⏭️  No change: {assignment_name} (course: {course_code})")
             else:
-                # Try to insert, skip if duplicate
-                try:
-                    result = supabase.table("deadlines").insert(deadline).execute()
-                    if result.data:
-                        stats["inserted"] += 1
-                except Exception as e:
-                    if "duplicate" in str(e).lower() or "unique" in str(e).lower():
-                        print(f"   ⏭️  Skipped duplicate: {deadline.get('assignment_name', 'unknown')}")
-                        stats["updated"] += 1  # Count as updated for stats
-                    else:
-                        raise
+                doc_ref.set({**deadline, "updated_at": datetime.now().isoformat()})
+                stats["inserted"] += 1
+                print(f"   ➕ Inserted: {assignment_name} (course: {course_code}) - Due: {deadline.get('due')}")
+
         except Exception as e:
-            print(f"❌ Error uploading deadline {deadline.get('assignment_name', 'unknown')}: {e}")
+            print(f"❌ Error uploading deadline '{assignment_name}': {e}")
             stats["errors"] += 1
-    
+
     return stats
 
 
 def main():
-    """Main function to upload deadlines from CSV to Supabase."""
+    """Main function to upload deadlines from CSV to Firestore."""
     print("=" * 60)
-    print("Uploading Deadlines to Supabase")
+    print("Uploading Deadlines to Firestore")
     print("=" * 60)
-    
+
     # 1. Setup paths
     current_dir = Path(__file__).resolve().parent
     csv_path = current_dir / "shared_data" / "deadlines.csv"
-    
-    # 2. Load Supabase credentials
-    print("\n📋 Step 1: Loading Supabase credentials...")
+
+    # 2. Connect to Firestore
+    print("\n🔌 Step 1: Connecting to Firestore...")
     try:
-        config = load_supabase_env()
-        print("✅ Credentials loaded")
-    except ValueError as e:
-        print(f"❌ Error: {e}")
-        return
-    
-    # 3. Connect to Supabase
-    print("\n🔌 Step 2: Connecting to Supabase...")
-    try:
-        supabase: Client = create_client(config["url"], config["service_role_key"])
-        print("✅ Connected to Supabase")
+        db = init_firestore()
+        print(f"✅ Connected to Firestore project: {settings.FIREBASE_PROJECT_ID}")
     except Exception as e:
-        print(f"❌ Error connecting to Supabase: {e}")
+        print(f"❌ Error connecting to Firestore: {e}")
         return
-    
-    # 4. Load deadlines from CSV
-    print(f"\n📂 Step 3: Loading deadlines from {csv_path}...")
+
+    # 3. Load deadlines from CSV
+    print(f"\n📂 Step 2: Loading deadlines from {csv_path}...")
     try:
         deadlines = load_deadlines_csv(csv_path)
         print(f"✅ Loaded {len(deadlines)} deadline(s) from CSV")
-        
+
         # Show preview
         if deadlines:
             print("\n📋 Preview of deadlines to upload:")
@@ -232,23 +169,23 @@ def main():
     except Exception as e:
         print(f"❌ Error loading CSV: {e}")
         return
-    
-    # 5. Upload to Supabase
-    print("\n⬆️  Step 4: Uploading deadlines to Supabase...")
+
+    # 4. Upload to Firestore
+    print("\n⬆️  Step 3: Uploading deadlines to Firestore...")
     try:
-        stats = upload_deadlines_to_supabase(supabase, deadlines, upsert=True)
-        
+        stats = upload_deadlines_to_firestore(db, deadlines)
+
         print("\n✅ Upload complete!")
         print(f"   Inserted: {stats['inserted']}")
-        print(f"   Updated: {stats['updated']}")
+        print(f"   Updated/no-op: {stats['updated']}")
         print(f"   Errors: {stats['errors']}")
-        
+
         if stats["errors"] > 0:
             print("\n⚠️  Some deadlines failed to upload. Check the errors above.")
     except Exception as e:
-        print(f"❌ Error uploading to Supabase: {e}")
+        print(f"❌ Error uploading to Firestore: {e}")
         return
-    
+
     print("\n" + "=" * 60)
     print("✅ Process complete!")
     print("=" * 60)
@@ -256,4 +193,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

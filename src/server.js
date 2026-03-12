@@ -16,6 +16,7 @@ dotenv.config({ path: envPath });
 // Import the serverless function logic
 import settingsHandler from './api/reminders/settings.js';
 import getHandler from './api/reminders/get.js';
+import registerHandler from './api/reminders/register.js';
 
 // Use PORT from environment variable (GCP Cloud Run sets this) or default to 3000 for local dev
 const PORT = process.env.PORT || 3000;
@@ -46,15 +47,17 @@ const server = http.createServer(async (req, res) => {
     urlPath = '/' + urlPath;
   }
 
-  // Handle /api/config endpoint (public, for Supabase credentials)
+  // Handle /api/config endpoint (public, for Firebase client credentials)
   if (urlPath === '/api/config' && req.method === 'GET') {
-    const supabaseUrl = process.env.SUPABASE_URL || '';
-    const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || '';
+    const firebaseApiKey = process.env.FIREBASE_API_KEY || '';
+    const firebaseAuthDomain = process.env.FIREBASE_AUTH_DOMAIN || '';
+    const firebaseProjectId = process.env.FIREBASE_PROJECT_ID || '';
 
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({
-      SUPABASE_URL: supabaseUrl,
-      SUPABASE_ANON_KEY: supabaseAnonKey
+      FIREBASE_API_KEY: firebaseApiKey,
+      FIREBASE_AUTH_DOMAIN: firebaseAuthDomain,
+      FIREBASE_PROJECT_ID: firebaseProjectId,
     }));
     return;
   }
@@ -97,6 +100,25 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(500, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: 'Internal server error', details: error.message }));
     }
+    return;
+  }
+
+  if (urlPath === '/api/reminders/register' && req.method === 'POST') {
+    let body = '';
+    req.on('data', chunk => { body += chunk.toString(); });
+    req.on('end', async () => {
+      try {
+        const mockReq = { method: req.method, body: body ? JSON.parse(body) : {} };
+        const mockRes = {
+          status: (code) => { res.statusCode = code; return mockRes; },
+          json: (data) => { res.setHeader('Content-Type', 'application/json'); res.end(JSON.stringify(data)); }
+        };
+        await registerHandler(mockReq, mockRes);
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Internal server error', details: error.message }));
+      }
+    });
     return;
   }
 
@@ -208,20 +230,22 @@ const server = http.createServer(async (req, res) => {
         res.end(`Server Error: ${error.code}`, 'utf-8');
       }
     } else {
-      // Inject Supabase credentials into HTML files
+      // Inject Firebase credentials into HTML files
       if (extname === '.html') {
-        const supabaseUrl = process.env.SUPABASE_URL || '';
-        const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || '';
+        const firebaseApiKey = process.env.FIREBASE_API_KEY || '';
+        const firebaseAuthDomain = process.env.FIREBASE_AUTH_DOMAIN || '';
+        const firebaseProjectId = process.env.FIREBASE_PROJECT_ID || '';
 
         let htmlContent = content.toString();
 
         // Inject credentials as the FIRST script in <head> to ensure it runs first
         const credentialsScript = `
     <script>
-      // Supabase credentials injected by server - MUST RUN FIRST
+      // Firebase credentials injected by server - MUST RUN FIRST
       (function() {
-        window.SUPABASE_URL = '${supabaseUrl}';
-        window.SUPABASE_ANON_KEY = '${supabaseAnonKey}';
+        window.FIREBASE_API_KEY = '${firebaseApiKey}';
+        window.FIREBASE_AUTH_DOMAIN = '${firebaseAuthDomain}';
+        window.FIREBASE_PROJECT_ID = '${firebaseProjectId}';
       })();
     </script>`;
 

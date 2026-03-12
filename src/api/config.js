@@ -1,5 +1,5 @@
-// API endpoint to serve Supabase public credentials for Vercel
-// This is safe because ANON_KEY is meant to be public
+// API endpoint to serve Firebase public credentials
+// Firebase client-side credentials are safe to expose
 export default async function handler(req, res) {
   // Enable CORS
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -16,21 +16,22 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const supabaseUrl = process.env.SUPABASE_URL || '';
-  const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || '';
+  const firebaseApiKey = process.env.FIREBASE_API_KEY || '';
+  const firebaseAuthDomain = process.env.FIREBASE_AUTH_DOMAIN || '';
+  const firebaseProjectId = process.env.FIREBASE_PROJECT_ID || '';
 
-  if (!supabaseUrl || !supabaseAnonKey) {
-    console.error('Missing Supabase environment variables');
-    return res.status(500).json({ 
+  if (!firebaseApiKey || !firebaseAuthDomain) {
+    console.error('Missing Firebase environment variables');
+    return res.status(500).json({
       error: 'Server configuration error',
-      message: 'Supabase credentials not configured'
+      message: 'Firebase credentials not configured'
     });
   }
 
   // Return public credentials (safe to expose)
   return res.status(200).json({
-    SUPABASE_URL: supabaseUrl,
-    SUPABASE_ANON_KEY: supabaseAnonKey
+    FIREBASE_API_KEY: firebaseApiKey,
+    FIREBASE_AUTH_DOMAIN: firebaseAuthDomain,
+    FIREBASE_PROJECT_ID: firebaseProjectId,
   });
 }
-
