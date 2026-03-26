@@ -13,26 +13,6 @@ steps:
     args: ['push', 'gcr.io/$PROJECT_ID/autoremind:latest']
     id: 'push-image-latest'
 
-  # Deploy container image to Cloud Run
-  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
-    entrypoint: gcloud
-    args:
-      - 'run'
-      - 'deploy'
-      - 'autoremind'
-      - '--image'
-      - 'gcr.io/$PROJECT_ID/autoremind:$SHORT_SHA'
-      - '--region'
-      - 'us-central1'
-      - '--platform'
-      - 'managed'
-      - '--allow-unauthenticated'
-      - '--port'
-      - '8080'
-      - '--set-env-vars'
-      - 'PORT=8080'
-    id: 'deploy-cloud-run'
-
 images:
   - 'gcr.io/$PROJECT_ID/autoremind:$SHORT_SHA'
   - 'gcr.io/$PROJECT_ID/autoremind:latest'

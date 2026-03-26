@@ -5,8 +5,12 @@
  * Reuses the existing Gmail infrastructure (gmail_service.py).
  */
 
-const { spawn } = require('child_process');
-const path = require('path');
+import { spawn } from 'child_process';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Path to the Python script
 const SCRIPT_PATH = path.join(__dirname, '..', '..', 'services', 'email-service', 'send_welcome_email.py');
@@ -26,7 +30,7 @@ async function sendWelcomeEmail(userData) {
     try {
       const jsonData = JSON.stringify(userData);
 
-      const process = spawn('python3', [SCRIPT_PATH, jsonData], {
+      const child = spawn('python3', [SCRIPT_PATH, jsonData], {
         cwd: path.dirname(SCRIPT_PATH),
         env: { ...process.env }
       });
@@ -34,16 +38,15 @@ async function sendWelcomeEmail(userData) {
       let stdout = '';
       let stderr = '';
 
-      process.stdout.on('data', (data) => {
+      child.stdout.on('data', (data) => {
         stdout += data.toString();
       });
 
-      process.stderr.on('data', (data) => {
+      child.stderr.on('data', (data) => {
         stderr += data.toString();
       });
 
-      process.on('close', (code) => {
-        // Log stderr for debugging (it contains Python logging output)
+      child.on('close', () => {
         if (stderr) {
           console.log('[WelcomeEmail] Python logs:', stderr);
         }
@@ -62,7 +65,7 @@ async function sendWelcomeEmail(userData) {
         }
       });
 
-      process.on('error', (err) => {
+      child.on('error', (err) => {
         console.error('[WelcomeEmail] Process error:', err);
         resolve({
           success: false,
@@ -80,4 +83,4 @@ async function sendWelcomeEmail(userData) {
   });
 }
 
-module.exports = { sendWelcomeEmail };
+export { sendWelcomeEmail };

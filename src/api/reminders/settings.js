@@ -31,7 +31,6 @@ export default async function handler(req, res) {
     // Check if user already exists (to detect new vs returning user)
     const existingDoc = await docRef.get();
     const existingUser = existingDoc.exists ? existingDoc.data() : null;
-    const isNewUser = !existingUser;
     const alreadySentWelcome = existingUser?.welcome_email_sent === true;
 
     const studentData = {
@@ -50,8 +49,8 @@ export default async function handler(req, res) {
     await docRef.set(studentData, { merge: true });
     const saved = (await docRef.get()).data();
 
-    // Send welcome email for new users with email enabled who haven't received one yet
-    if (isNewUser && wantsEmailChannel && !alreadySentWelcome) {
+    // Send welcome email on first settings save with email enabled
+    if (wantsEmailChannel && !alreadySentWelcome) {
       try {
         console.log(`[Settings] Sending welcome email to new user: ${loginEmail}`);
 
