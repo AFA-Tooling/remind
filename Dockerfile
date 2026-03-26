@@ -23,8 +23,9 @@ RUN mkdir -p services/config
 EXPOSE 8080
 ENV PORT=8080
 
-# Symlink mounted secrets to where settings.py expects them, then start Node
+# Copy mounted secrets to where settings.py expects them, then start Node
+# token.json must be a writable copy (not symlink) so the Gmail SDK can refresh and save tokens
 CMD ln -sf /secrets/oauth/oauth_client_secret.json /app/services/config/oauth_client_secret.json && \
     ln -sf /secrets/firebase_sa/firebase_service_account.json /app/services/config/firebase_service_account.json && \
-    ln -sf /secrets/gmail/token.json /app/services/config/token.json && \
+    cp /secrets/gmail/token.json /app/services/config/token.json && \
     exec node src/server.js
