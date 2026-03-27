@@ -17,15 +17,10 @@ COPY public/ ./public/
 COPY services/email-service/ ./services/email-service/
 COPY services/shared/ ./services/shared/
 
-# Create config directory for secret symlinks
-RUN mkdir -p services/config
+COPY entrypoint.sh ./entrypoint.sh
+RUN chmod +x entrypoint.sh && mkdir -p services/config
 
 EXPOSE 8080
 ENV PORT=8080
 
-# Copy mounted secrets to where settings.py expects them, then start Node
-# token.json must be a writable copy (not symlink) so the Gmail SDK can refresh and save tokens
-CMD ln -sf /secrets/oauth/oauth_client_secret.json /app/services/config/oauth_client_secret.json && \
-    ln -sf /secrets/firebase_sa/firebase_service_account.json /app/services/config/firebase_service_account.json && \
-    cp /secrets/gmail/token.json /app/services/config/token.json && \
-    exec node src/server.js
+ENTRYPOINT ["./entrypoint.sh"]
