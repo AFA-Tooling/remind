@@ -1,3 +1,6 @@
+substitutions:
+  _IMAGE: 'gcr.io/autoremind-480200/autoremind-job:latest'
+
 steps:
   - name: 'gcr.io/cloud-builders/docker'
     args: ['build', '-t', '$_IMAGE', '-f', 'Dockerfile.job', '.']
