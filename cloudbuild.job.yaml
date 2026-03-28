@@ -7,6 +7,24 @@ steps:
     args: ['push', '$_IMAGE']
     id: 'push-job-image'
 
+  # Deploy Cloud Run Job
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: 'deploy-job'
+    args:
+      - gcloud
+      - run
+      - jobs
+      - deploy
+      - autoremind-daily-job
+      - --image=$_IMAGE
+      - --region=us-central1
+      - --task-timeout=30m
+      - --max-retries=1
+      - >-
+        --set-secrets=FIREBASE_PROJECT_ID=FIREBASE_PROJECT_ID:latest,DISCORD_BOT_TOKEN=DISCORD_BOT_TOKEN:latest,DISCORD_CHANNEL_ID=DISCORD_CHANNEL_ID:latest,DISCORD_PUBLIC_KEY=DISCORD_PUBLIC_KEY:latest,DISCORD_GUILD_ID=DISCORD_GUILD_ID:latest,/secrets/oauth/oauth_client_secret.json=oauth_client_secret:latest,/secrets/sa/service_account.json=service_account:latest,/secrets/firebase_sa/firebase_service_account.json=firebase_service_account:latest,/secrets/gmail/token.json=gmail_token:latest
+      - --project=$PROJECT_ID
+      - --quiet
+
 images:
   - '$_IMAGE'
 
