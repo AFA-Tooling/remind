@@ -579,7 +579,9 @@ def build_assignment_payload(
     }
 
 
-def compose_message(student: Dict[str, Any], assignments: List[Dict[str, Any]]) -> str:
+def compose_message(student: Dict[str, Any], assignments: List[Dict[str, Any]], today: Optional[datetime] = None) -> str:
+    if today is None:
+        today = datetime.now()
     preferred_name = (
         student.get("preferred_first_name")
         or student.get("first_name")
@@ -592,9 +594,17 @@ def compose_message(student: Dict[str, Any], assignments: List[Dict[str, Any]]) 
     ]
 
     for assignment in assignments:
-        due_text = format_due_datetime(assignment["personal_deadline"])
+        due_dt = assignment["personal_deadline"]
+        days_until = (due_dt.date() - today.date()).days
+        due_date_str = due_dt.strftime("%B %-d")
+        if days_until == 0:
+            days_label = "due today"
+        elif days_until == 1:
+            days_label = "due in 1 day"
+        else:
+            days_label = f"due in {days_until} days"
         lines.append(
-            f"- {assignment['assignment_name']} ({assignment['assignment_code']}) → due {due_text}"
+            f"- {assignment['assignment_name']} ({assignment['assignment_code']}) → {days_label}, on {due_date_str}"
         )
         if assignment["offset_days"]:
             lines.append(
@@ -880,7 +890,7 @@ def gather_reminders(
             if is_target or args.debug:
                 print(f"   ⚠️  WARNING: No channels found! Student won't receive reminders.")
 
-        message = compose_message(student, assignments_to_notify)
+        message = compose_message(student, assignments_to_notify, today=today)
 
         reminders.append(
             {
