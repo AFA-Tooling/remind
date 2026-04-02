@@ -17,6 +17,8 @@ dotenv.config({ path: envPath });
 import settingsHandler from './api/reminders/settings.js';
 import getHandler from './api/reminders/get.js';
 import registerHandler from './api/reminders/register.js';
+import deadlinesGetHandler from './api/deadlines/get.js';
+import resourcesGetHandler from './api/resources/get.js';
 
 // Use PORT from environment variable (GCP Cloud Run sets this) or default to 3000 for local dev
 const PORT = process.env.PORT || 3000;
@@ -158,6 +160,52 @@ const server = http.createServer(async (req, res) => {
         res.end(JSON.stringify({ error: 'Internal server error', details: error.message }));
       }
     });
+    return;
+  }
+
+  // Handle /api/deadlines
+  if (urlPath === '/api/deadlines' && req.method === 'GET') {
+    const queryParams = {};
+    if (queryString) {
+      queryString.split('&').forEach(param => {
+        const [key, value] = param.split('=');
+        if (key && value) queryParams[decodeURIComponent(key)] = decodeURIComponent(value);
+      });
+    }
+    const mockReq = { method: req.method, query: queryParams };
+    const mockRes = {
+      status: (code) => { res.statusCode = code; return mockRes; },
+      json: (data) => { res.setHeader('Content-Type', 'application/json'); res.end(JSON.stringify(data)); }
+    };
+    try {
+      await deadlinesGetHandler(mockReq, mockRes);
+    } catch (error) {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Internal server error', details: error.message }));
+    }
+    return;
+  }
+
+  // Handle /api/resources
+  if (urlPath === '/api/resources' && req.method === 'GET') {
+    const queryParams = {};
+    if (queryString) {
+      queryString.split('&').forEach(param => {
+        const [key, value] = param.split('=');
+        if (key && value) queryParams[decodeURIComponent(key)] = decodeURIComponent(value);
+      });
+    }
+    const mockReq = { method: req.method, query: queryParams };
+    const mockRes = {
+      status: (code) => { res.statusCode = code; return mockRes; },
+      json: (data) => { res.setHeader('Content-Type', 'application/json'); res.end(JSON.stringify(data)); }
+    };
+    try {
+      await resourcesGetHandler(mockReq, mockRes);
+    } catch (error) {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Internal server error', details: error.message }));
+    }
     return;
   }
 

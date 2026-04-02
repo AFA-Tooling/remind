@@ -17,7 +17,10 @@
     box-sizing: border-box;
 }
 
-html,
+html {
+    overflow-x: hidden;
+}
+
 body {
     margin: 0;
     padding: 0;
@@ -210,33 +213,36 @@ body {
     font-weight: 500;
 }
 
-/* Feature Pills (Restored) */
-.hero-pills {
+/* Feature List */
+.hero-features {
     display: flex;
-    gap: 16px;
+    align-items: center;
     justify-content: center;
+    gap: 12px;
     margin-top: 32px;
     flex-wrap: wrap;
 }
 
-.pill-tag {
-    background: #fff;
-    border: 1px solid var(--line);
-    padding: 8px 16px;
-    border-radius: 999px;
+.hero-feature {
     font-size: 14px;
     color: var(--olive-dark);
     font-weight: 500;
     display: flex;
     align-items: center;
     gap: 6px;
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
 }
 
-.pill-tag svg {
+.hero-feature svg {
     width: 16px;
     height: 16px;
     opacity: 0.7;
+    flex-shrink: 0;
+}
+
+.hero-feature-sep {
+    color: var(--muted);
+    font-size: 14px;
+    line-height: 1;
 }
 
 /* --- Dividers & Pills --- */
@@ -284,6 +290,80 @@ body {
 @media (max-width: 820px) {
     .grid {
         grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 600px) {
+    /* Hide scroll arrow — not needed on mobile */
+    .scroll-arrow-wrap {
+        display: none !important;
+    }
+
+    /* First screen: don't force full height on mobile */
+    .first-screen {
+        min-height: auto;
+    }
+
+    /* Hero */
+    .hero {
+        margin: 24px 0 16px;
+    }
+
+    .hero-features {
+        gap: 8px;
+        margin-top: 14px;
+    }
+
+    .hero-feature-sep {
+        display: none;
+    }
+
+    .hero-features {
+        flex-direction: column;
+        align-items: center;
+    }
+
+    /* Settings form */
+    .first-screen .grid {
+        gap: 12px;
+    }
+
+    .first-screen .cta-wrap {
+        margin: 8px 0 12px;
+    }
+
+    .days-input-row {
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+
+    /* Preview rows: stack on small screens */
+    .preview-row {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 4px;
+    }
+
+    .preview-due {
+        text-align: left;
+    }
+
+    /* Modals: slide up from bottom */
+    .modal-overlay {
+        align-items: flex-end;
+    }
+
+    .modal-content {
+        width: 100%;
+        max-width: 100%;
+        border-radius: 20px 20px 0 0;
+        padding: 28px 20px 32px;
+        margin: 0;
+    }
+
+    /* Footer spacing */
+    .site-footer {
+        padding-bottom: 28px;
     }
 }
 
@@ -460,20 +540,21 @@ input[type="range"]::-moz-range-thumb {
 }
 
 .arc-bg {
-    position: fixed;
+    position: relative;
     left: 50%;
     transform: translateX(-50%);
-    bottom: -35vh;
     width: 130vw;
-    height: 60vh;
+    height: 160px;
     border-radius: 50% 50% 0 0 / 100% 100% 0 0;
     background: var(--pale);
-    z-index: -1;
+    margin-top: 40px;
 }
 
 .site-footer {
     text-align: center;
-    margin: 8px auto 36px;
+    margin: -100px auto 0;
+    padding: 0 0 36px;
+    position: relative;
     background: transparent !important;
 }
 
@@ -520,6 +601,114 @@ a {
 .modal-content h2 {
     margin-top: 0;
     color: var(--text);
+}
+
+/* First Screen */
+.first-screen {
+    min-height: calc(100vh - 92px);
+    display: flex;
+    flex-direction: column;
+}
+
+.first-screen .hero {
+    margin: 20px 0 12px;
+}
+
+.first-screen .hero-features {
+    margin-top: 14px;
+}
+
+.first-screen .grid {
+    gap: 20px;
+    padding-bottom: 16px;
+}
+
+.first-screen .divider {
+    margin: 14px 0 10px;
+}
+
+.first-screen .cta-wrap {
+    margin: 10px 0 16px;
+}
+
+/* Scroll Arrow */
+.scroll-arrow-wrap {
+    display: flex;
+    justify-content: center;
+    padding-bottom: 24px;
+    margin-top: auto;
+}
+
+.scroll-arrow-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--olive);
+    padding: 8px;
+    animation: arrow-bounce 2s ease-in-out infinite;
+    display: flex;
+    align-items: center;
+}
+
+.scroll-arrow-btn:hover {
+    color: var(--olive-dark);
+}
+
+@keyframes arrow-bounce {
+    0%, 100% { transform: translateY(0); }
+    50%       { transform: translateY(8px); }
+}
+
+/* Assignments Preview (home page) */
+.assignments-preview {
+    margin-bottom: 40px;
+}
+
+.preview-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--line);
+    gap: 16px;
+}
+
+.preview-row:last-child {
+    border-bottom: none;
+}
+
+.preview-name {
+    font-weight: 600;
+    font-size: 15px;
+}
+
+.preview-course {
+    font-size: 13px;
+    color: var(--muted);
+    margin-top: 2px;
+}
+
+.preview-due {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--olive-dark);
+    white-space: nowrap;
+    text-align: right;
+}
+
+.preview-due.overdue {
+    color: #b94a48;
+}
+
+.preview-view-all {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--olive);
+    text-decoration: none;
+}
+
+.preview-view-all:hover {
+    text-decoration: underline;
 }
 
 /* Login/About Specifics */

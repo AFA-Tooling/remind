@@ -51,6 +51,7 @@
       <div class="nav__content">
         <div class="nav__links">
           <a href="./about.html" class="nav__link" style="font-weight: 600; text-decoration: underline;">About Us</a>
+          <a href="./assignments.html" class="nav__link" id="nav-assignments-link" style="display:none;">Assignments</a>
           <!-- Contact Us -->
           <a href="mailto:autoremind@berkeley.edu" class="btn btn--primary" style="text-decoration:none;">Contact Us</a>
 
@@ -186,9 +187,11 @@
             userEmail.textContent = user.email;
             userEmail.style.display = 'inline-block';
             logoutBtn.style.display = 'inline-block';
+            document.getElementById('nav-assignments-link').style.display = 'inline-block';
           } else {
             userEmail.style.display = 'none';
             logoutBtn.style.display = 'none';
+            document.getElementById('nav-assignments-link').style.display = 'none';
           }
         });
         logoutBtn.onclick = async () => {

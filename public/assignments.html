@@ -1,0 +1,588 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="icon" type="image/png" href="/logo.png" />
+  <title>Upcoming Assignments – AutoRemind</title>
+
+  <!-- Firebase JS SDK (compat v9) -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+  <!-- Load credentials -->
+  <script>
+    (async function () {
+      await new Promise(resolve => setTimeout(resolve, 50));
+      if (window.FIREBASE_API_KEY && window.FIREBASE_AUTH_DOMAIN) {
+        const script = document.createElement('script');
+        script.src = './auth.js';
+        script.defer = true;
+        document.head.appendChild(script);
+        return;
+      }
+      try {
+        const response = await fetch('/api/config');
+        if (!response.ok) throw new Error('Failed to fetch config');
+        const config = await response.json();
+        window.FIREBASE_API_KEY = config.FIREBASE_API_KEY;
+        window.FIREBASE_AUTH_DOMAIN = config.FIREBASE_AUTH_DOMAIN;
+        window.FIREBASE_PROJECT_ID = config.FIREBASE_PROJECT_ID;
+        const script = document.createElement('script');
+        script.src = './auth.js';
+        script.defer = true;
+        document.head.appendChild(script);
+      } catch (error) {
+        const script = document.createElement('script');
+        script.src = './auth.js';
+        script.defer = true;
+        document.head.appendChild(script);
+      }
+    })();
+  </script>
+
+  <link rel="stylesheet" href="style.css">
+
+  <style>
+    .assignments-hero {
+      text-align: center;
+      margin: 40px 0 28px;
+    }
+
+    .assignments-hero h1 {
+      font-size: clamp(22px, 4vw, 34px);
+      font-weight: 500;
+      margin: 0 0 8px;
+    }
+
+    .assignments-hero p {
+      color: var(--muted);
+      font-size: 15px;
+      margin: 0;
+    }
+
+    .assignments-list {
+      max-width: 720px;
+      margin: 0 auto 48px;
+      display: grid;
+      gap: 10px;
+    }
+
+    .assignment-card {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 16px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      cursor: pointer;
+      transition: border-color 0.15s, background 0.15s;
+    }
+
+    .assignment-card:hover,
+    .assignment-card:focus-visible {
+      border-color: #cfe2b3;
+      background: #fafcf7;
+      outline: none;
+    }
+
+    .assignment-info {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .assignment-name {
+      font-weight: 600;
+      font-size: 15px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .assignment-course {
+      font-size: 13px;
+      color: var(--muted);
+      margin-top: 3px;
+    }
+
+    .assignment-due {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--olive-dark);
+      white-space: nowrap;
+      text-align: right;
+      flex-shrink: 0;
+    }
+
+    .assignment-due.overdue {
+      color: #b94a48;
+    }
+
+    .assignment-due .due-label {
+      font-weight: 400;
+      color: var(--muted);
+      font-size: 12px;
+      display: block;
+      text-align: right;
+    }
+
+    .assignment-chevron {
+      color: var(--muted);
+      flex-shrink: 0;
+      margin-left: 4px;
+    }
+
+    .assignments-empty,
+    .assignments-not-enrolled,
+    .assignments-loading {
+      text-align: center;
+      color: var(--muted);
+      padding: 48px 0;
+      font-size: 15px;
+    }
+
+    .login-prompt {
+      text-align: center;
+      padding: 64px 24px;
+    }
+
+    .login-prompt p {
+      color: var(--muted);
+      margin-bottom: 20px;
+    }
+
+    #assignments-container {
+      min-height: calc(100vh - 420px);
+    }
+
+    /* Resource Modal */
+    .resource-modal-overlay {
+      display: none;
+      position: fixed;
+      z-index: 1000;
+      left: 0; top: 0;
+      width: 100vw; height: 100vh;
+      background: rgba(0,0,0,0.32);
+      justify-content: center;
+      align-items: center;
+    }
+
+    .resource-modal-overlay.active {
+      display: flex;
+    }
+
+    .resource-modal {
+      background: #fff;
+      border-radius: 16px;
+      max-width: 520px;
+      width: 90vw;
+      max-height: 80vh;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.18);
+    }
+
+    .resource-modal-header {
+      padding: 24px 24px 16px;
+      border-bottom: 1px solid var(--line);
+      flex-shrink: 0;
+    }
+
+    .resource-modal-header h2 {
+      margin: 0 0 6px;
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .resource-modal-due {
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    .resource-modal-due.overdue {
+      color: #b94a48;
+      font-weight: 600;
+    }
+
+    .resource-modal-body {
+      padding: 16px 24px 24px;
+      overflow-y: auto;
+      flex: 1;
+    }
+
+    .resource-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .resource-item:last-child {
+      border-bottom: none;
+    }
+
+    .resource-type-tag {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--olive-dark);
+      background: var(--pale);
+      padding: 2px 8px;
+      border-radius: 999px;
+      white-space: nowrap;
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+
+    .resource-link {
+      font-size: 14px;
+      color: var(--olive);
+      text-decoration: none;
+      line-height: 1.4;
+      word-break: break-word;
+    }
+
+    .resource-link:hover {
+      text-decoration: underline;
+    }
+
+    .resource-empty {
+      text-align: center;
+      color: var(--muted);
+      font-size: 14px;
+      padding: 24px 0;
+    }
+
+    .resource-modal-close {
+      display: block;
+      width: 100%;
+      margin-top: 16px;
+      padding: 10px;
+      background: none;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      color: var(--text);
+    }
+
+    .resource-modal-close:hover {
+      background: #f5f5f5;
+    }
+
+    /* Mobile */
+    @media (max-width: 600px) {
+      .assignments-hero {
+        margin: 28px 0 20px;
+      }
+
+      .assignment-card {
+        padding: 14px 16px;
+        flex-wrap: wrap;
+      }
+
+      .assignment-name {
+        white-space: normal;
+        overflow: visible;
+        text-overflow: unset;
+      }
+
+      .assignment-due {
+        text-align: left;
+        white-space: normal;
+      }
+
+      .assignment-due .due-label {
+        text-align: left;
+      }
+
+      .resource-modal-overlay {
+        align-items: flex-end;
+      }
+
+      .resource-modal {
+        width: 100%;
+        max-width: 100%;
+        border-radius: 20px 20px 0 0;
+        max-height: 85vh;
+      }
+    }
+  </style>
+
+  <style id="auth-guard">
+    body>*:not(#auth-loading) {
+      display: none !important;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+
+<body>
+  <div id="auth-loading"
+    style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center; background: white; z-index: 9999;">
+    <div
+      style="width: 40px; height: 40px; margin-bottom: 16px; border: 4px solid #f3f3f3; border-top: 4px solid #3e5f3a; border-radius: 50%; animation: spin 1s linear infinite;">
+    </div>
+    <div style="font-family: system-ui; color: #3e5f3a; font-weight: 600;">Loading AutoRemind...</div>
+  </div>
+
+  <!-- Navigation -->
+  <nav class="nav">
+    <div class="container nav__container">
+      <a class="brand" href="./index.html">
+        <img src="logo.png" alt="AutoRemind Logo">
+        AutoRemind
+      </a>
+      <div class="nav__content">
+        <div class="nav__links">
+          <a href="./about.html" class="nav__link">About Us</a>
+          <a href="./assignments.html" class="nav__link" id="nav-assignments-link" style="display:none; font-weight: 600; text-decoration: underline;">Assignments</a>
+          <a href="mailto:autoremind@berkeley.edu" class="btn btn--primary" style="text-decoration:none;">Contact Us</a>
+          <span id="user-email" style="display:none; font-size:14px; color:var(--text);"></span>
+          <button id="logout-btn" class="btn btn--outline"
+            style="display:none; padding: 8px 14px; font-size: 13px;">Sign Out</button>
+        </div>
+        <button class="nav__toggle" id="nav-toggle" aria-label="Toggle navigation">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <line x1="3" y1="12" x2="21" y2="12"></line>
+            <line x1="3" y1="6" x2="21" y2="6"></line>
+            <line x1="3" y1="18" x2="21" y2="18"></line>
+          </svg>
+        </button>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Hero -->
+  <section class="assignments-hero">
+    <h1>Upcoming Assignments</h1>
+    <p>Tap an assignment to see resources.</p>
+  </section>
+
+  <!-- Content -->
+  <div class="container" id="assignments-container">
+    <div id="login-prompt" class="login-prompt" style="display:none;">
+      <p>Log in to view upcoming assignments.</p>
+      <a href="./login.html" class="btn btn--cta">Log In</a>
+    </div>
+    <div id="assignments-loading" class="assignments-loading" style="display:none;">Loading assignments...</div>
+    <div id="assignments-list" class="assignments-list" style="display:none;"></div>
+    <div id="assignments-empty" class="assignments-empty" style="display:none;">No upcoming assignments found.</div>
+    <div id="assignments-not-enrolled" class="assignments-not-enrolled" style="display:none;">Your email was not found in the course roster.</div>
+  </div>
+
+  <!-- Resource Modal -->
+  <div id="resource-modal" class="resource-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="resource-modal-title">
+    <div class="resource-modal">
+      <div class="resource-modal-header">
+        <h2 id="resource-modal-title"></h2>
+        <div id="resource-modal-due" class="resource-modal-due"></div>
+      </div>
+      <div class="resource-modal-body">
+        <div id="resource-modal-content"></div>
+        <button class="resource-modal-close" id="resource-modal-close">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <div class="arc-bg"></div>
+  <footer class="site-footer container">
+    <small>
+      <span class="thanks">Thanks for trying our tool.</span>
+      <a href="mailto:autoremind@berkeley.edu" class="feedback"> Share your feedback to help us improve.</a><br>
+      <span style="font-size: 13px; color: #999; margin-top: 8px; display: inline-block;">
+        &copy; 2026 AutoRemind. All rights reserved.
+      </span>
+    </small>
+  </footer>
+
+  <script>
+    document.getElementById('nav-toggle').addEventListener('click', () => {
+      document.querySelector('.nav').classList.toggle('nav--open');
+    });
+
+    function formatDate(isoStr) {
+      if (!isoStr) return 'TBD';
+      const d = new Date(isoStr);
+      if (isNaN(d)) return isoStr;
+      return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+    }
+
+    function isOverdue(isoStr) {
+      if (!isoStr) return false;
+      return new Date(isoStr) < new Date();
+    }
+
+    function escapeHtml(str) {
+      return String(str)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    // Resource modal
+    const resourceModal = document.getElementById('resource-modal');
+    const resourceModalTitle = document.getElementById('resource-modal-title');
+    const resourceModalDue = document.getElementById('resource-modal-due');
+    const resourceModalContent = document.getElementById('resource-modal-content');
+
+    document.getElementById('resource-modal-close').addEventListener('click', closeResourceModal);
+    resourceModal.addEventListener('click', (e) => { if (e.target === resourceModal) closeResourceModal(); });
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeResourceModal(); });
+
+    function closeResourceModal() {
+      resourceModal.classList.remove('active');
+    }
+
+    async function openResourceModal(assignmentName, due, courseCode) {
+      resourceModalTitle.textContent = assignmentName;
+      const overdue = isOverdue(due);
+      resourceModalDue.textContent = due ? `Due ${formatDate(due)}` : '';
+      resourceModalDue.className = 'resource-modal-due' + (overdue ? ' overdue' : '');
+      resourceModalContent.innerHTML = '<p style="color:var(--muted);font-size:14px;padding:16px 0">Loading resources...</p>';
+      resourceModal.classList.add('active');
+
+      try {
+        const res = await fetch(`/api/resources?assignment_name=${encodeURIComponent(assignmentName)}`);
+        const json = await res.json();
+        const resources = json.data || [];
+
+        if (resources.length === 0) {
+          resourceModalContent.innerHTML = '<div class="resource-empty">No resources available for this assignment.</div>';
+          return;
+        }
+
+        resourceModalContent.innerHTML = resources.map(r => `
+          <div class="resource-item">
+            <span class="resource-type-tag">${escapeHtml(r.resource_type || 'Resource')}</span>
+            <a class="resource-link" href="${escapeHtml(r.link || '#')}" target="_blank" rel="noopener">
+              ${escapeHtml(r.resource_name || r.link || 'Link')}
+            </a>
+          </div>`).join('');
+      } catch (e) {
+        resourceModalContent.innerHTML = '<div class="resource-empty">Could not load resources.</div>';
+      }
+    }
+
+    async function loadAssignments(email) {
+      const loadingEl = document.getElementById('assignments-loading');
+      const listEl = document.getElementById('assignments-list');
+      const emptyEl = document.getElementById('assignments-empty');
+      const notEnrolledEl = document.getElementById('assignments-not-enrolled');
+
+      loadingEl.style.display = 'block';
+      listEl.style.display = 'none';
+      emptyEl.style.display = 'none';
+      notEnrolledEl.style.display = 'none';
+
+      try {
+        const res = await fetch(`/api/deadlines?user_email=${encodeURIComponent(email)}`);
+        if (!res.ok) throw new Error('Failed to fetch');
+        const json = await res.json();
+        loadingEl.style.display = 'none';
+
+        if (!json.enrolled) {
+          notEnrolledEl.style.display = 'block';
+          return;
+        }
+
+        const deadlines = json.data || [];
+        if (deadlines.length === 0) {
+          emptyEl.style.display = 'block';
+          return;
+        }
+
+        listEl.innerHTML = deadlines.map(d => {
+          const overdue = isOverdue(d.due);
+          return `
+            <div class="assignment-card"
+              tabindex="0"
+              role="button"
+              data-name="${escapeHtml(d.assignment_name || '')}"
+              data-due="${escapeHtml(d.due || '')}"
+              data-course="${escapeHtml(d.course_code || '')}">
+              <div class="assignment-info">
+                <div class="assignment-name">${escapeHtml(d.assignment_name || 'Untitled')}</div>
+                <div class="assignment-course">${escapeHtml(d.course_code || '')}</div>
+              </div>
+              <div class="assignment-due${overdue ? ' overdue' : ''}">
+                <span class="due-label">Due</span>
+                ${escapeHtml(formatDate(d.due))}
+              </div>
+              <svg class="assignment-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><polyline points="9 18 15 12 9 6"></polyline></svg>
+            </div>`;
+        }).join('');
+
+        listEl.querySelectorAll('.assignment-card').forEach(card => {
+          const open = () => openResourceModal(card.dataset.name, card.dataset.due, card.dataset.course);
+          card.addEventListener('click', open);
+          card.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); } });
+        });
+
+        listEl.style.display = 'grid';
+      } catch (e) {
+        loadingEl.style.display = 'none';
+        emptyEl.textContent = 'Error loading assignments. Please try again.';
+        emptyEl.style.display = 'block';
+      }
+    }
+
+    (function () {
+      function waitForAuth(callback) {
+        let attempts = 0;
+        const check = () => {
+          if (window.auth && window.auth._auth) callback(window.auth);
+          else if (attempts++ < 20) setTimeout(check, 100);
+          else {
+            document.getElementById('auth-loading').style.display = 'none';
+            const guard = document.getElementById('auth-guard');
+            if (guard) guard.remove();
+            document.getElementById('login-prompt').style.display = 'block';
+          }
+        };
+        check();
+      }
+
+      waitForAuth((auth) => {
+        auth.onAuthStateChange(async (user, session, loading) => {
+          if (!loading) {
+            const loader = document.getElementById('auth-loading');
+            const guard = document.getElementById('auth-guard');
+            if (loader) loader.style.display = 'none';
+            if (guard) guard.remove();
+          }
+
+          if (user) {
+            document.getElementById('user-email').textContent = user.email;
+            document.getElementById('user-email').style.display = 'inline-block';
+            document.getElementById('logout-btn').style.display = 'inline-block';
+            document.getElementById('nav-assignments-link').style.display = 'inline-block';
+            document.getElementById('login-prompt').style.display = 'none';
+            loadAssignments(user.email);
+          } else {
+            document.getElementById('user-email').style.display = 'none';
+            document.getElementById('logout-btn').style.display = 'none';
+            document.getElementById('nav-assignments-link').style.display = 'none';
+            document.getElementById('assignments-loading').style.display = 'none';
+            document.getElementById('login-prompt').style.display = 'block';
+          }
+        });
+
+        document.getElementById('logout-btn').onclick = async () => {
+          await auth.signOut();
+          window.location.reload();
+        };
+      });
+    })();
+  </script>
+</body>
+
+</html>

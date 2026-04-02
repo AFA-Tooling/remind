@@ -22,7 +22,7 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Invalid request data' });
     }
 
-    const clampedDays = Math.max(0, Math.min(7, Math.round(days_before)));
+    const clampedDays = Math.max(1, Math.min(7, Math.round(days_before)));
     const preferredFirstName = preferred_first_name ? preferred_first_name.trim() : null;
 
     const db = getDb();
