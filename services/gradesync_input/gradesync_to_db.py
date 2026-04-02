@@ -206,7 +206,8 @@ def upsert_submissions_to_firestore(
         else:
             status_value = str(status_value).strip()
 
-        assignment_name = str(row.get('assignment', ''))
+        raw_name = str(row.get('assignment', ''))
+        assignment_name = re.sub(r'(x[0-9a-f]{2})+', lambda m: bytes.fromhex(m.group().replace('x', '')).decode('utf-8', errors='replace'), raw_name)
         # Composite key: assignment_name + name (underscore-joined, url-safe)
         doc_id = f"{assignment_name}__{name_value}".replace('/', '_').replace(' ', '_')
 

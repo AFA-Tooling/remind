@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import argparse
-from codecs import lookup
 import csv
 import os
 import re
@@ -751,6 +750,33 @@ def write_gmail_csv(reminders: List[Dict[str, Any]], output_dir: Path) -> None:
         print(f"✅ Total: Wrote {total_rows} Gmail reminder rows across {len(assignment_rows)} assignment file(s)")
 
 
+def build_submission_lookup(submission_rows: List[Dict[str, Any]]) -> Dict[str, str]:
+    """Build a lookup of (email, assignment_name) -> status from assignment_submissions."""
+    lookup: Dict[str, str] = {}
+    for row in submission_rows:
+        email = (row.get("email") or "").strip().lower()
+        assignment_name = (row.get("assignment_name") or "").strip()
+        status = (row.get("status") or "").strip()
+        if email and assignment_name:
+            lookup[(email, assignment_name)] = status
+    return lookup
+
+
+def is_missing_submission(
+    student_email: str,
+    assignment_name: str,
+    submission_lookup: Dict[str, str],
+) -> bool:
+    """Return True if the student has not submitted the assignment."""
+    key = (student_email.strip().lower(), assignment_name.strip())
+    status = submission_lookup.get(key)
+    # Not in spreadsheet at all — not a student in the class, don't notify
+    if status is None:
+        return False
+    # A timestamp means submitted; "missing" means not submitted
+    return status.strip().lower() == "missing"
+
+
 def gather_reminders(
     db: firestore.Client,
     args: argparse.Namespace,
@@ -767,6 +793,9 @@ def gather_reminders(
         deadlines,
         debug=args.debug,
     )
+
+    submission_rows = fetch_collection_docs(db, "assignment_submissions", debug=args.debug)
+    submission_lookup = build_submission_lookup(submission_rows)
 
     students = fetch_collection_docs(
         db,
@@ -828,6 +857,11 @@ def gather_reminders(
                 debug=args.debug or is_target,  # Always debug for target student
             )
             if payload:
+                assignment_name = payload["assignment_name"]
+                if not is_missing_submission(student_email, assignment_name, submission_lookup):
+                    if is_target or args.debug:
+                        print(f"   ⏭️  Skipping {code}: already submitted")
+                    continue
                 assignments_to_notify.append(payload)
                 if is_target or args.debug:
                     print(f"   ✅ Added assignment to notify: {code}")
