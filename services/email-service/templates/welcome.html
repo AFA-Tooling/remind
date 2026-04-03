@@ -1,0 +1,19 @@
+<h2 style="color: #333333; margin: 0 0 16px; font-size: 22px;">Welcome to AutoRemind, {{student_name}}!</h2>
+<p style="color: #555555; line-height: 1.6; margin: 0 0 16px;">We're excited to help you stay on top of your assignments.</p>
+
+<div style="background: #f9f9f9; border-radius: 8px; padding: 16px; margin: 20px 0;">
+  <h3 style="margin: 0 0 12px; font-size: 14px; color: #666; text-transform: uppercase;">Your Notification Preferences</h3>
+  {{#if channels.email}}<div style="padding: 8px 0; border-bottom: 1px solid #eee;">Email notifications enabled</div>{{/if}}
+  {{#if channels.sms}}<div style="padding: 8px 0; border-bottom: 1px solid #eee;">SMS notifications enabled</div>{{/if}}
+  {{#if channels.discord}}<div style="padding: 8px 0; border-bottom: 1px solid #eee;">Discord notifications enabled</div>{{/if}}
+</div>
+
+<p style="color: #555555; line-height: 1.6; margin: 0 0 16px;"><strong>Timing:</strong> You'll receive reminders {{days_before}} day(s) before each deadline.</p>
+
+<p style="color: #555555; line-height: 1.6; margin: 0 0 16px;">When you have an upcoming assignment, we'll send you a friendly reminder so you never miss a deadline.</p>
+
+<p style="text-align: center; margin: 24px 0;">
+  <a href="{{settings_url}}" style="display: inline-block; background: {{primary_color}}; color: #ffffff; padding: 12px 28px; border-radius: 999px; text-decoration: none; font-weight: 600;">Update Preferences</a>
+</p>
+
+<p style="color: #555555; line-height: 1.6; margin: 0;">Best,<br>The AutoRemind Team</p>

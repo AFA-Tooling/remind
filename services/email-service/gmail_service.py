@@ -8,6 +8,7 @@ import logging
 from pathlib import Path
 from typing import Optional, List, Dict, Any
 from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 from googleapiclient.discovery import build
 from google.oauth2.credentials import Credentials
 from google.oauth2 import service_account
@@ -28,6 +29,7 @@ if str(SERVICES_DIR) not in sys.path:
     sys.path.append(str(SERVICES_DIR))
 
 from shared import settings
+from shared.delivery_logger import log_email_delivery
 
 logger = logging.getLogger(__name__)
 
@@ -318,24 +320,39 @@ def create_gmail_service(
     return service
 
 
-def create_message(sender: str, to: str, subject: str, message_text: str) -> Dict[str, str]:
+def create_message(
+    sender: str,
+    to: str,
+    subject: str,
+    message_text: str,
+    message_html: Optional[str] = None
+) -> Dict[str, str]:
     """
-    Create a Gmail message object.
-    
+    Create a Gmail message object with plain text and optional HTML.
+
     Args:
         sender: Sender email address
         to: Recipient email address
         subject: Email subject
-        message_text: Email body text
-        
+        message_text: Plain text email body (fallback)
+        message_html: HTML email body (optional)
+
     Returns:
         Dictionary with 'raw' key containing base64-encoded message
     """
-    message = MIMEText(message_text)
-    message['to'] = to
-    message['from'] = sender
-    message['subject'] = subject
-    
+    if message_html:
+        message = MIMEMultipart('alternative')
+        message['to'] = to
+        message['from'] = sender
+        message['subject'] = subject
+        message.attach(MIMEText(message_text, 'plain'))
+        message.attach(MIMEText(message_html, 'html'))
+    else:
+        message = MIMEText(message_text)
+        message['to'] = to
+        message['from'] = sender
+        message['subject'] = subject
+
     raw_message = base64.urlsafe_b64encode(message.as_bytes()).decode()
     return {'raw': raw_message}
 
@@ -423,18 +440,38 @@ def send_gmail_reminder(
             userId='me',
             body=message
         ).execute()
-        
+
+        message_id = sent_message.get('id')
         logger.info(
             f"Email sent successfully to {student_email} for {assignment_name}. "
-            f"Message ID: {sent_message.get('id')}"
+            f"Message ID: {message_id}"
         )
-        
+
+        # Log successful delivery
+        log_email_delivery(
+            recipient=student_email,
+            status="sent",
+            message_id=message_id,
+            assignment_name=assignment_name,
+            recipient_name=student_name
+        )
+
         return True
-        
+
     except Exception as e:
         logger.error(
             f"Failed to send email to {student_email} "
             f"for {assignment_name}: {str(e)}"
         )
+
+        # Log failed delivery
+        log_email_delivery(
+            recipient=student_email,
+            status="failed",
+            assignment_name=assignment_name,
+            recipient_name=student_name,
+            error_message=str(e)
+        )
+
         return False
 

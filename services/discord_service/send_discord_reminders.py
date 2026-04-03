@@ -8,6 +8,7 @@ if str(SERVICES_DIR) not in sys.path:
     sys.path.append(str(SERVICES_DIR))
 
 from shared import settings
+from shared.delivery_logger import log_discord_delivery
 
 # Settings module loads .env.local
 TOKEN = settings.DISCORD_BOT_TOKEN
@@ -82,23 +83,35 @@ def open_dm(user_id: str) -> str:
     resp = post(f"{BASE}/users/@me/channels", {"recipient_id": str(user_id)})
     return resp["id"]
 
-def send_dm(channel_id: str, content: str):
+def send_dm(channel_id: str, content: str) -> str:
     """
-    send the dm
+    Send the DM and return the message ID.
     """
-    post(f"{BASE}/channels/{channel_id}/messages", {
+    response = post(f"{BASE}/channels/{channel_id}/messages", {
         "content": content,
         "allowed_mentions": {"parse": []}
     })
+    return response.get("id")
 
 def dm_by_username(guild_id: str, username: str, message: str):
     member = find_member_by_username(guild_id, username)
     if not member:
+        log_discord_delivery(
+            recipient=username,
+            status="failed",
+            error_message=f"User '{username}' not found in guild {guild_id}"
+        )
         raise ValueError(f"User '{username}' not found in guild {guild_id}.")
     user_id = member["user"]["id"]
     ch_id = open_dm(user_id)
-    send_dm(ch_id, message)
-    print(f"DM sent to {username} (id={user_id})")
+    message_id = send_dm(ch_id, message)
+    print(f"DM sent to {username} (id={user_id}), message_id={message_id}")
+    log_discord_delivery(
+        recipient=username,
+        status="sent",
+        discord_message_id=message_id,
+        metadata={"user_id": user_id, "channel_id": ch_id}
+    )
 
 def parse_csv_to_dict(file_path):
     """
@@ -134,10 +147,17 @@ def dm_to_all():
                 continue
             try:
                 dm_by_username(GUILD_ID, username, message)
+            except ValueError:
+                # User not found - already logged in dm_by_username
+                pass
             except Exception as e:
-                # This catches ValueErrors (User not found) 
-                # AND requests.exceptions.HTTPError (Cannot send to user/Blocked bot)
+                # HTTP errors (blocked bot, etc.)
                 print(f"⚠️ Failed to send to '{username}'. Reason: {e}")
+                log_discord_delivery(
+                    recipient=username,
+                    status="failed",
+                    error_message=str(e)
+                )
             time.sleep(0.5)
 
 

@@ -14,6 +14,7 @@ if str(SERVICES_DIR) not in sys.path:
     sys.path.append(str(SERVICES_DIR))
 
 from shared import settings
+from shared.delivery_logger import log_sms_delivery
 
 # load_dotenv()
 
@@ -60,16 +61,33 @@ def send_text_messages():
         mapping = parse_csv_to_dict(csv_path)
         for to, body in mapping.items():
             try:
-                client.messages.create(
+                message = client.messages.create(
                         body=body,
                         to=to,
-                        messaging_service_sid= MESSAGING_SERVICE_SID
+                        messaging_service_sid=MESSAGING_SERVICE_SID
                 )
-                time.sleep(0.25)  # fixed pacing inside the function
+                print(f"SMS sent to {to}, SID: {message.sid}")
+                log_sms_delivery(
+                    recipient=to,
+                    status="sent",
+                    twilio_sid=message.sid
+                )
+                time.sleep(0.25)
             except TwilioRestException as e:
                 print(f"TWILIO ERROR for {to}: {e.status} {e.code} {e.msg}")
+                log_sms_delivery(
+                    recipient=to,
+                    status="failed",
+                    error_message=e.msg,
+                    error_code=str(e.code)
+                )
             except Exception as e:
                 print(f"ERROR for {to}: {e}")
+                log_sms_delivery(
+                    recipient=to,
+                    status="failed",
+                    error_message=str(e)
+                )
 
 if __name__ == "__main__":
     send_text_messages()
