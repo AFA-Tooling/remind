@@ -23,10 +23,12 @@
     .stat-card { background: var(--pale); padding: 16px; border-radius: 12px; text-align: center; }
     .stat-card .stat-value { font-size: 28px; font-weight: 700; color: var(--olive-dark); }
     .stat-card .stat-label { font-size: 12px; color: var(--muted); margin-top: 4px; }
-    .resource-form { background: #f9f9f9; padding: 20px; border-radius: 12px; margin-bottom: 20px; display: none; }
-    .resource-form.visible { display: block; }
-    .resource-form input, .resource-form select { width: 100%; padding: 10px; margin-bottom: 12px; border: 1px solid var(--line); border-radius: 8px; box-sizing: border-box; }
-    .resource-form .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .resource-modal-overlay { display: none; position: fixed; z-index: 1000; inset: 0; background: rgba(0,0,0,0.35); justify-content: center; align-items: center; }
+    .resource-modal-overlay.visible { display: flex; }
+    .resource-modal { background: #fff; border-radius: 16px; padding: 28px; width: 90vw; max-width: 520px; box-shadow: 0 8px 32px rgba(0,0,0,0.18); }
+    .resource-modal h3 { margin: 0 0 20px; font-size: 18px; }
+    .resource-modal input, .resource-modal select { width: 100%; padding: 10px; margin-bottom: 12px; border: 1px solid var(--line); border-radius: 8px; box-sizing: border-box; font-size: 14px; }
+    .resource-modal .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
     .status-badge { padding: 4px 10px; border-radius: 999px; font-size: 11px; font-weight: 600; }
     .status-badge.sent { background: #d4edda; color: #155724; }
     .status-badge.failed { background: #f8d7da; color: #721c24; }
@@ -97,23 +99,6 @@
       <div id="section-resources" class="admin-section">
         <h2>Assignment Resources</h2>
         <button class="btn btn--primary" id="add-resource-btn" style="margin-bottom: 16px;">+ Add Resource</button>
-        <div class="resource-form" id="resource-form">
-          <h3 id="form-title">Add New Resource</h3>
-          <input type="hidden" id="resource-id">
-          <div class="form-row">
-            <input type="text" id="assignment-name" placeholder="Assignment Name (e.g., HW01: Functions)" required>
-            <input type="text" id="course-code" placeholder="Course Code (e.g., CS61A)">
-          </div>
-          <div class="form-row">
-            <input type="text" id="resource-name" placeholder="Resource Name" required>
-            <select id="resource-type"><option value="Reading">Reading</option><option value="Video">Video</option><option value="Slides">Slides</option><option value="Link">Link</option></select>
-          </div>
-          <input type="url" id="resource-link" placeholder="Resource URL" required>
-          <div style="display: flex; gap: 8px;">
-            <button type="button" class="btn btn--primary" id="save-resource-btn">Save</button>
-            <button type="button" class="btn btn--outline" id="cancel-resource-btn">Cancel</button>
-          </div>
-        </div>
         <div id="resources-content" class="loading">Loading resources...</div>
       </div>
 
@@ -126,6 +111,27 @@
         </div>
         <div class="admin-stats" id="delivery-stats"></div>
         <div id="logs-content" class="loading">Loading logs...</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Resource Form Modal -->
+  <div class="resource-modal-overlay" id="resource-modal-overlay">
+    <div class="resource-modal">
+      <h3 id="form-title">Add New Resource</h3>
+      <input type="hidden" id="resource-id">
+      <div class="form-row">
+        <input type="text" id="assignment-name" placeholder="Assignment Name (e.g., HW01: Functions)" required>
+        <input type="text" id="course-code" placeholder="Course Code (e.g., CS61A)">
+      </div>
+      <div class="form-row">
+        <input type="text" id="resource-name" placeholder="Resource Name" required>
+        <select id="resource-type"><option value="Reading">Reading</option><option value="Video">Video</option><option value="Slides">Slides</option><option value="Link">Link</option></select>
+      </div>
+      <input type="url" id="resource-link" placeholder="Resource URL" required>
+      <div style="display: flex; gap: 8px; margin-top: 4px;">
+        <button type="button" class="btn btn--primary" id="save-resource-btn">Save</button>
+        <button type="button" class="btn btn--outline" id="cancel-resource-btn">Cancel</button>
       </div>
     </div>
   </div>
@@ -232,7 +238,7 @@
       document.getElementById('resource-name').value = r.resource_name || '';
       document.getElementById('resource-type').value = r.resource_type || 'Link';
       document.getElementById('resource-link').value = r.link || '';
-      document.getElementById('resource-form').classList.add('visible');
+      document.getElementById('resource-modal-overlay').classList.add('visible');
     }
 
     function showResourceForm() {
@@ -243,11 +249,11 @@
       document.getElementById('resource-name').value = '';
       document.getElementById('resource-type').value = 'Link';
       document.getElementById('resource-link').value = '';
-      document.getElementById('resource-form').classList.add('visible');
+      document.getElementById('resource-modal-overlay').classList.add('visible');
     }
 
     function hideResourceForm() {
-      document.getElementById('resource-form').classList.remove('visible');
+      document.getElementById('resource-modal-overlay').classList.remove('visible');
     }
 
     async function loadDeliveryLogs() {
@@ -313,6 +319,16 @@
       document.getElementById('cancel-resource-btn').onclick = hideResourceForm;
       document.getElementById('save-resource-btn').onclick = saveResource;
       document.getElementById('apply-filters-btn').onclick = loadDeliveryLogs;
+
+      // Close modal when clicking the backdrop
+      document.getElementById('resource-modal-overlay').addEventListener('click', (e) => {
+        if (e.target === document.getElementById('resource-modal-overlay')) hideResourceForm();
+      });
+
+      // Close modal on Escape key
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') hideResourceForm();
+      });
     });
   </script>
 </body>
