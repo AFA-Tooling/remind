@@ -121,8 +121,8 @@
       <h3 id="form-title">Add New Resource</h3>
       <input type="hidden" id="resource-id">
       <div class="form-row">
-        <input type="text" id="assignment-name" placeholder="Assignment Name (e.g., HW01: Functions)" required>
-        <input type="text" id="course-code" placeholder="Course Code (e.g., CS61A)">
+        <select id="course-code"><option value="">-- Select Course --</option></select>
+        <select id="assignment-name"><option value="">-- Select Assignment --</option></select>
       </div>
       <div class="form-row">
         <input type="text" id="resource-name" placeholder="Resource Name" required>
@@ -178,12 +178,34 @@
     async function loadDeadlines() {
       try {
         const { data } = await fetchWithAuth('/api/admin/deadlines');
+        deadlinesData = data;
         const html = `<div class="table-wrap"><table class="admin-table"><thead><tr><th>Assignment</th><th>Course</th><th>Due Date</th></tr></thead><tbody>${data.map(d => `<tr><td>${d.assignment_name || '-'}</td><td>${d.course_code || '-'}</td><td>${d.due ? new Date(d.due).toLocaleDateString() : '-'}</td></tr>`).join('')}</tbody></table></div>`;
         document.getElementById('deadlines-content').innerHTML = html;
         return data.length;
       } catch (e) { document.getElementById('deadlines-content').innerHTML = `<p>Error: ${e.message}</p>`; return 0; }
     }
 
+    function populateCourseDropdown(selectedCourse = '') {
+      const courses = [...new Set(deadlinesData.map(d => d.course_code).filter(Boolean))].sort();
+      const sel = document.getElementById('course-code');
+      sel.innerHTML = '<option value="">-- Select Course --</option>' +
+        courses.map(c => `<option value="${c}" ${c === selectedCourse ? 'selected' : ''}>${c}</option>`).join('');
+      populateAssignmentDropdown(selectedCourse);
+    }
+
+    function populateAssignmentDropdown(courseCode, selectedAssignment = '') {
+      const assignments = deadlinesData
+        .filter(d => !courseCode || d.course_code === courseCode)
+        .map(d => d.assignment_name)
+        .filter(Boolean)
+        .sort();
+      const unique = [...new Set(assignments)];
+      const sel = document.getElementById('assignment-name');
+      sel.innerHTML = '<option value="">-- Select Assignment --</option>' +
+        unique.map(a => `<option value="${a}" ${a === selectedAssignment ? 'selected' : ''}>${a}</option>`).join('');
+    }
+
+    let deadlinesData = [];
     let resourcesData = [];
     async function loadResources() {
       try {
@@ -233,8 +255,8 @@
       if (!r) return;
       document.getElementById('form-title').textContent = 'Edit Resource';
       document.getElementById('resource-id').value = r.id;
-      document.getElementById('assignment-name').value = r.assignment_name || '';
-      document.getElementById('course-code').value = r.course_code || '';
+      populateCourseDropdown(r.course_code || '');
+      populateAssignmentDropdown(r.course_code || '', r.assignment_name || '');
       document.getElementById('resource-name').value = r.resource_name || '';
       document.getElementById('resource-type').value = r.resource_type || 'Link';
       document.getElementById('resource-link').value = r.link || '';
@@ -244,8 +266,7 @@
     function showResourceForm() {
       document.getElementById('form-title').textContent = 'Add New Resource';
       document.getElementById('resource-id').value = '';
-      document.getElementById('assignment-name').value = '';
-      document.getElementById('course-code').value = '';
+      populateCourseDropdown();
       document.getElementById('resource-name').value = '';
       document.getElementById('resource-type').value = 'Link';
       document.getElementById('resource-link').value = '';
@@ -313,6 +334,10 @@
           tab.classList.add('active');
           document.getElementById('section-' + tab.dataset.tab).classList.add('active');
         };
+      });
+
+      document.getElementById('course-code').addEventListener('change', (e) => {
+        populateAssignmentDropdown(e.target.value);
       });
 
       document.getElementById('add-resource-btn').onclick = showResourceForm;
