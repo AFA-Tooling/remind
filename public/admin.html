@@ -189,8 +189,16 @@
     }
 
     function renderResources() {
-      const html = `<div class="table-wrap"><table class="admin-table"><thead><tr><th>Assignment</th><th>Course</th><th>Resource</th><th>Type</th><th>Link</th><th>Actions</th></tr></thead><tbody>${resourcesData.map(r => `<tr><td>${r.assignment_name || '-'}</td><td>${r.course_code || '-'}</td><td>${r.resource_name || '-'}</td><td>${r.resource_type || '-'}</td><td><a href="${r.link}" target="_blank">Open</a></td><td><button class="btn btn-small btn--outline" onclick="editResource('${r.id}')">Edit</button> <button class="btn btn-small btn-danger" onclick="deleteResource('${r.id}')">Delete</button></td></tr>`).join('')}</tbody></table></div>`;
-      document.getElementById('resources-content').innerHTML = html;
+      const html = `<div class="table-wrap"><table class="admin-table"><thead><tr><th>Assignment</th><th>Course</th><th>Resource</th><th>Type</th><th>Link</th><th>Actions</th></tr></thead><tbody>${resourcesData.map(r => `<tr><td>${r.assignment_name || '-'}</td><td>${r.course_code || '-'}</td><td>${r.resource_name || '-'}</td><td>${r.resource_type || '-'}</td><td><a href="${r.link}" target="_blank">Open</a></td><td><button class="btn btn-small btn--outline" data-action="edit" data-id="${r.id}">Edit</button> <button class="btn btn-small btn-danger" data-action="delete" data-id="${r.id}">Delete</button></td></tr>`).join('')}</tbody></table></div>`;
+      const container = document.getElementById('resources-content');
+      container.innerHTML = html;
+
+      container.querySelectorAll('[data-action="edit"]').forEach(btn => {
+        btn.addEventListener('click', () => editResource(btn.dataset.id));
+      });
+      container.querySelectorAll('[data-action="delete"]').forEach(btn => {
+        btn.addEventListener('click', () => deleteResource(btn.dataset.id));
+      });
     }
 
     async function saveResource() {
