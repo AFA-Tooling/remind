@@ -211,24 +211,18 @@
             <span class="minmax">7</span>
           </div>
 
-          <div class="divider" style="margin-top: 28px;"><span class="pill">Canvas Integration</span></div>
+          <div class="divider" style="margin-top: 28px;"><span class="pill">bCourses Integration</span></div>
 
           <!-- Not connected state -->
           <div id="canvas-not-connected">
-            <p class="label">Connect your Canvas account to automatically sync assignments:</p>
-            <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
-              <input id="canvas-domain" type="text" class="channel-field"
-                placeholder="e.g. canvas.berkeley.edu"
-                style="display: block; margin: 0; flex: 1; min-width: 180px;" />
-              <button id="canvas-connect-btn" class="btn btn--primary" style="white-space: nowrap;">Connect Canvas</button>
-            </div>
+            <p class="label">Connect your bCourses account to automatically sync assignments:</p>
+            <button id="canvas-connect-btn" class="btn btn--primary">Connect bCourses</button>
           </div>
 
           <!-- Connected state -->
           <div id="canvas-connected" style="display: none;">
             <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
-              <span style="color: var(--olive); font-weight: 600;">Canvas Connected</span>
-              <span id="canvas-domain-display" style="font-size: 13px; color: var(--muted);"></span>
+              <span style="color: var(--olive); font-weight: 600;">bCourses Connected</span>
             </div>
             <div id="canvas-last-sync" style="font-size: 12px; color: var(--muted); margin-bottom: 10px;"></div>
             <div style="display: flex; gap: 8px; align-items: center;">
@@ -726,13 +720,10 @@
         };
       });
 
-      // --- Canvas Integration Logic ---
-      function updateCanvasUI(connected, domain) {
+      // --- bCourses Integration Logic ---
+      function updateCanvasUI(connected) {
         document.getElementById('canvas-not-connected').style.display = connected ? 'none' : 'block';
         document.getElementById('canvas-connected').style.display = connected ? 'block' : 'none';
-        if (connected && domain) {
-          document.getElementById('canvas-domain-display').textContent = `(${domain})`;
-        }
       }
 
       // Check for canvas=connected URL param (post-OAuth redirect)
@@ -740,14 +731,12 @@
         const params = new URLSearchParams(window.location.search);
         const canvasStatus = params.get('canvas');
         if (canvasStatus === 'connected') {
-          // Clean URL
           window.history.replaceState({}, '', window.location.pathname);
-          // Show brief success message after a short delay
-          setTimeout(() => showMessage('Canvas connected successfully! Your assignments are syncing.', 'Canvas Connected'), 300);
+          setTimeout(() => showMessage('bCourses connected successfully! Your assignments are syncing.', 'bCourses Connected'), 300);
         } else if (canvasStatus === 'error') {
           const reason = params.get('reason') || 'Unknown error';
           window.history.replaceState({}, '', window.location.pathname);
-          setTimeout(() => showMessage(`Canvas connection failed: ${reason}`, 'Canvas Error'), 300);
+          setTimeout(() => showMessage(`bCourses connection failed: ${reason}`, 'bCourses Error'), 300);
         }
       })();
 
@@ -755,9 +744,7 @@
       document.getElementById('canvas-connect-btn').addEventListener('click', () => {
         const email = window.auth?.user?.email;
         if (!email) { window.location.href = './login.html'; return; }
-        const domain = document.getElementById('canvas-domain').value.trim();
-        if (!domain) { showMessage('Please enter your Canvas domain (e.g. canvas.berkeley.edu).', 'Canvas Domain Required'); return; }
-        window.location.href = `/api/canvas/auth?user_email=${encodeURIComponent(email)}&canvas_domain=${encodeURIComponent(domain)}`;
+        window.location.href = `/api/canvas/auth?user_email=${encodeURIComponent(email)}`;
       });
 
       // Sync button
@@ -769,7 +756,7 @@
         btn.disabled = true;
         btn.textContent = 'Syncing...';
         status.style.display = 'block';
-        status.textContent = 'Syncing assignments from Canvas...';
+        status.textContent = 'Syncing assignments from bCourses...';
         status.style.color = 'var(--muted)';
         try {
           const res = await fetch('/api/canvas/sync', {
@@ -798,7 +785,7 @@
 
       // Disconnect button
       document.getElementById('canvas-disconnect-btn').addEventListener('click', async () => {
-        if (!confirm('Disconnect Canvas? This will remove all synced assignments.')) return;
+        if (!confirm('Disconnect bCourses? This will remove all synced assignments.')) return;
         const email = window.auth?.user?.email;
         if (!email) return;
         try {
@@ -807,8 +794,8 @@
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ user_email: email })
           });
-          updateCanvasUI(false, null);
-          showMessage('Canvas has been disconnected.', 'Disconnected');
+          updateCanvasUI(false);
+          showMessage('bCourses has been disconnected.', 'Disconnected');
           if (window.loadAssignmentsPreview) window.loadAssignmentsPreview(email);
         } catch (e) {
           showMessage(`Error disconnecting: ${e.message}`, 'Error');
@@ -864,11 +851,8 @@
           discordField.style.display = 'none';
         }
 
-        // Canvas state
-        updateCanvasUI(!!data.canvas_connected, data.canvas_domain);
-        if (data.canvas_domain) {
-          document.getElementById('canvas-domain').value = data.canvas_domain;
-        }
+        // bCourses state
+        updateCanvasUI(!!data.canvas_connected);
       }
     })();
   </script>

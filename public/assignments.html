@@ -542,7 +542,7 @@
 
         listEl.innerHTML = deadlines.map(d => {
           const overdue = isOverdue(d.due);
-          const sourceBadge = d.source === 'canvas' ? '<span class="source-badge canvas">Canvas</span>' : '';
+          const sourceBadge = d.source === 'canvas' ? '<span class="source-badge canvas">bCourses</span>' : '';
           return `
             <div class="assignment-card"
               tabindex="0"

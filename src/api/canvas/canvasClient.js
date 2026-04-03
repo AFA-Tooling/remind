@@ -3,7 +3,7 @@ import { getDb } from '../firestore.js';
 
 const CANVAS_CLIENT_ID = process.env.CANVAS_CLIENT_ID;
 const CANVAS_CLIENT_SECRET = process.env.CANVAS_CLIENT_SECRET;
-const CANVAS_DEFAULT_DOMAIN = process.env.CANVAS_DEFAULT_DOMAIN || 'canvas.instructure.com';
+const CANVAS_DEFAULT_DOMAIN = process.env.CANVAS_DEFAULT_DOMAIN || 'bcourses.berkeley.edu';
 
 // Token refresh buffer: refresh 5 minutes before expiry
 const REFRESH_BUFFER_MS = 5 * 60 * 1000;

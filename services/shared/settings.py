@@ -45,4 +45,4 @@ DISCORD_PUBLIC_KEY = os.getenv("DISCORD_PUBLIC_KEY")
 # Canvas LMS Configuration
 CANVAS_CLIENT_ID = os.getenv("CANVAS_CLIENT_ID")
 CANVAS_CLIENT_SECRET = os.getenv("CANVAS_CLIENT_SECRET")
-CANVAS_DEFAULT_DOMAIN = os.getenv("CANVAS_DEFAULT_DOMAIN", "canvas.instructure.com")
+CANVAS_DEFAULT_DOMAIN = os.getenv("CANVAS_DEFAULT_DOMAIN", "bcourses.berkeley.edu")
