@@ -14,7 +14,6 @@ export default async function handler(req, res) {
     const db = getDb();
     const snap = await db.collection('canvas_deadlines')
       .where('email', '==', email)
-      .orderBy('due')
       .get();
 
     const deadlines = snap.docs.map(doc => {
@@ -31,6 +30,12 @@ export default async function handler(req, res) {
         is_missing: data.is_missing,
         source: data.source,
       };
+    });
+
+    deadlines.sort((a, b) => {
+      if (!a.due) return 1;
+      if (!b.due) return -1;
+      return new Date(a.due) - new Date(b.due);
     });
 
     return res.status(200).json({ success: true, data: deadlines });
