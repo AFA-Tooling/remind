@@ -186,7 +186,12 @@
     }
 
     function populateCourseDropdown(selectedCourse = '') {
-      const courses = [...new Set(deadlinesData.map(d => d.course_code).filter(Boolean))].sort();
+      // Merge course codes from both deadlines and existing resources
+      const fromDeadlines = deadlinesData.map(d => d.course_code);
+      const fromResources = resourcesData.map(r => r.course_code);
+      const courses = [...new Set([...fromDeadlines, ...fromResources].filter(Boolean))].sort();
+      // Always include the currently-selected value even if not in either source
+      if (selectedCourse && !courses.includes(selectedCourse)) courses.push(selectedCourse);
       const sel = document.getElementById('course-code');
       sel.innerHTML = '<option value="">-- Select Course --</option>' +
         courses.map(c => `<option value="${c}" ${c === selectedCourse ? 'selected' : ''}>${c}</option>`).join('');
@@ -194,12 +199,16 @@
     }
 
     function populateAssignmentDropdown(courseCode, selectedAssignment = '') {
-      const assignments = deadlinesData
+      // Merge assignment names from both deadlines and existing resources
+      const fromDeadlines = deadlinesData
         .filter(d => !courseCode || d.course_code === courseCode)
-        .map(d => d.assignment_name)
-        .filter(Boolean)
-        .sort();
-      const unique = [...new Set(assignments)];
+        .map(d => d.assignment_name);
+      const fromResources = resourcesData
+        .filter(r => !courseCode || r.course_code === courseCode)
+        .map(r => r.assignment_name);
+      const unique = [...new Set([...fromDeadlines, ...fromResources].filter(Boolean))].sort();
+      // Always include the currently-selected value even if not in either source
+      if (selectedAssignment && !unique.includes(selectedAssignment)) unique.push(selectedAssignment);
       const sel = document.getElementById('assignment-name');
       sel.innerHTML = '<option value="">-- Select Assignment --</option>' +
         unique.map(a => `<option value="${a}" ${a === selectedAssignment ? 'selected' : ''}>${a}</option>`).join('');
