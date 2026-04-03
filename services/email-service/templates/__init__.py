@@ -1,0 +1,1 @@
+# HTML email templates package
