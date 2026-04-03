@@ -5,7 +5,9 @@ import { getAuth } from 'firebase-admin/auth';
 import { getApps } from 'firebase-admin/app';
 import { getDb } from '../firestore.js';
 
-const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || '').split(',').map(e => e.trim().toLowerCase()).filter(Boolean);
+function getAdminEmails() {
+  return (process.env.ADMIN_EMAILS || '').split(',').map(e => e.trim().toLowerCase()).filter(Boolean);
+}
 
 export async function verifyAdminAuth(req) {
   const authHeader = req.headers?.authorization || '';
@@ -24,7 +26,10 @@ export async function verifyAdminAuth(req) {
     const decodedToken = await getAuth().verifyIdToken(token);
     const email = decodedToken.email?.toLowerCase();
 
-    if (!email || !ADMIN_EMAILS.includes(email)) {
+    const adminEmails = getAdminEmails();
+    console.log('Admin auth check - Email:', email, 'Allowed:', adminEmails);
+
+    if (!email || !adminEmails.includes(email)) {
       return { authorized: false, error: 'Not an admin user' };
     }
 
