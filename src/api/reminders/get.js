@@ -36,7 +36,9 @@ export default async function handler(req, res) {
                 email_pref: data.email_pref || false,
                 phone_pref: data.phone_pref || false,
                 discord_pref: data.discord_pref || false,
-                email: data.email
+                email: data.email,
+                canvas_connected: data.canvas_connected || false,
+                canvas_domain: data.canvas_domain || null
             }
         });
 

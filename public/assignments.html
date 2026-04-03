@@ -273,6 +273,21 @@
       background: #f5f5f5;
     }
 
+    .source-badge {
+      font-size: 10px;
+      font-weight: 600;
+      padding: 1px 7px;
+      border-radius: 999px;
+      display: inline-block;
+      margin-left: 6px;
+      vertical-align: middle;
+    }
+
+    .source-badge.canvas {
+      background: #e8f0fe;
+      color: #1a73e8;
+    }
+
     /* Mobile */
     @media (max-width: 600px) {
       .assignments-hero {
@@ -484,17 +499,42 @@
       notEnrolledEl.style.display = 'none';
 
       try {
-        const res = await fetch(`/api/deadlines?user_email=${encodeURIComponent(email)}`);
-        if (!res.ok) throw new Error('Failed to fetch');
-        const json = await res.json();
+        // Fetch both Gradesync and Canvas deadlines in parallel
+        const [gradesyncRes, canvasRes] = await Promise.all([
+          fetch(`/api/deadlines?user_email=${encodeURIComponent(email)}`),
+          fetch(`/api/canvas/deadlines?user_email=${encodeURIComponent(email)}`).catch(() => null)
+        ]);
+
         loadingEl.style.display = 'none';
 
-        if (!json.enrolled) {
+        let gradesyncDeadlines = [];
+        let enrolled = false;
+        if (gradesyncRes.ok) {
+          const json = await gradesyncRes.json();
+          enrolled = !!json.enrolled;
+          gradesyncDeadlines = (json.data || []).map(d => ({ ...d, source: 'gradesync' }));
+        }
+
+        let canvasDeadlines = [];
+        if (canvasRes && canvasRes.ok) {
+          const canvasJson = await canvasRes.json();
+          canvasDeadlines = (canvasJson.data || []).map(d => ({ ...d, source: 'canvas' }));
+        }
+
+        const deadlines = [...gradesyncDeadlines, ...canvasDeadlines];
+
+        // Sort by due date
+        deadlines.sort((a, b) => {
+          if (!a.due) return 1;
+          if (!b.due) return -1;
+          return new Date(a.due) - new Date(b.due);
+        });
+
+        if (deadlines.length === 0 && !enrolled && canvasDeadlines.length === 0) {
           notEnrolledEl.style.display = 'block';
           return;
         }
 
-        const deadlines = json.data || [];
         if (deadlines.length === 0) {
           emptyEl.style.display = 'block';
           return;
@@ -502,15 +542,17 @@
 
         listEl.innerHTML = deadlines.map(d => {
           const overdue = isOverdue(d.due);
+          const sourceBadge = d.source === 'canvas' ? '<span class="source-badge canvas">Canvas</span>' : '';
           return `
             <div class="assignment-card"
               tabindex="0"
               role="button"
               data-name="${escapeHtml(d.assignment_name || '')}"
               data-due="${escapeHtml(d.due || '')}"
-              data-course="${escapeHtml(d.course_code || '')}">
+              data-course="${escapeHtml(d.course_code || '')}"
+              data-url="${escapeHtml(d.html_url || '')}">
               <div class="assignment-info">
-                <div class="assignment-name">${escapeHtml(d.assignment_name || 'Untitled')}</div>
+                <div class="assignment-name">${escapeHtml(d.assignment_name || 'Untitled')}${sourceBadge}</div>
                 <div class="assignment-course">${escapeHtml(d.course_code || '')}</div>
               </div>
               <div class="assignment-due${overdue ? ' overdue' : ''}">
@@ -522,7 +564,14 @@
         }).join('');
 
         listEl.querySelectorAll('.assignment-card').forEach(card => {
-          const open = () => openResourceModal(card.dataset.name, card.dataset.due, card.dataset.course);
+          const open = () => {
+            // Canvas assignments with a URL open directly; others show resource modal
+            if (card.dataset.url) {
+              window.open(card.dataset.url, '_blank', 'noopener');
+            } else {
+              openResourceModal(card.dataset.name, card.dataset.due, card.dataset.course);
+            }
+          };
           card.addEventListener('click', open);
           card.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); } });
         });

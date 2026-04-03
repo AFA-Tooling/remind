@@ -17,6 +17,8 @@ def main():
     script_send = project_root / "discord_service" / "send_discord_reminders.py"
     script_send_email = project_root / "email-service" / "main.py"
 
+    script_canvas_sync = project_root / "canvas_sync" / "canvas_sync.py"
+
     # 2. Verify scripts exist
     if not script_fetch.exists():
         print(f"❌ Error: Could not find {script_fetch}")
@@ -27,6 +29,20 @@ def main():
     if not script_send_email.exists():
         print(f"❌ Error: Could not find {script_send_email}")
         return
+
+    # 2.5 Run Step 0: Canvas Sync (optional — skip if script not found)
+    if script_canvas_sync.exists():
+        print("--------------------------------------------------")
+        print("STEP 0: Syncing Canvas Assignments")
+        print("--------------------------------------------------")
+
+        canvas_cmd = [sys.executable, str(script_canvas_sync)]
+        try:
+            subprocess.run(canvas_cmd, check=True)
+        except subprocess.CalledProcessError as e:
+            print(f"\n⚠️  Step 0 Warning: Canvas sync failed (Exit code: {e.returncode}). Continuing...")
+    else:
+        print("ℹ️  Canvas sync script not found, skipping Canvas sync.")
 
     # 3. Run Step 1: db_fetch.py
     print("--------------------------------------------------")

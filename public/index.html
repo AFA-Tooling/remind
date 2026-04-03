@@ -210,6 +210,33 @@
               oninput="document.getElementById('days').value=this.value" />
             <span class="minmax">7</span>
           </div>
+
+          <div class="divider" style="margin-top: 28px;"><span class="pill">Canvas Integration</span></div>
+
+          <!-- Not connected state -->
+          <div id="canvas-not-connected">
+            <p class="label">Connect your Canvas account to automatically sync assignments:</p>
+            <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+              <input id="canvas-domain" type="text" class="channel-field"
+                placeholder="e.g. canvas.berkeley.edu"
+                style="display: block; margin: 0; flex: 1; min-width: 180px;" />
+              <button id="canvas-connect-btn" class="btn btn--primary" style="white-space: nowrap;">Connect Canvas</button>
+            </div>
+          </div>
+
+          <!-- Connected state -->
+          <div id="canvas-connected" style="display: none;">
+            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+              <span style="color: var(--olive); font-weight: 600;">Canvas Connected</span>
+              <span id="canvas-domain-display" style="font-size: 13px; color: var(--muted);"></span>
+            </div>
+            <div id="canvas-last-sync" style="font-size: 12px; color: var(--muted); margin-bottom: 10px;"></div>
+            <div style="display: flex; gap: 8px; align-items: center;">
+              <button id="canvas-sync-btn" class="btn btn--outline" style="font-size: 13px; padding: 6px 14px;">Sync Now</button>
+              <button id="canvas-disconnect-btn" style="background: none; border: none; color: #c0392b; font-size: 13px; cursor: pointer; text-decoration: underline;">Disconnect</button>
+            </div>
+            <div id="canvas-sync-status" style="font-size: 12px; margin-top: 6px; display: none;"></div>
+          </div>
         </div>
       </div>
 
@@ -649,6 +676,7 @@
           }
         });
 
+        window.loadAssignmentsPreview = loadAssignmentsPreview;
         async function loadAssignmentsPreview(email) {
           try {
             const res = await fetch(`/api/deadlines?user_email=${encodeURIComponent(email)}`);
@@ -698,6 +726,95 @@
         };
       });
 
+      // --- Canvas Integration Logic ---
+      function updateCanvasUI(connected, domain) {
+        document.getElementById('canvas-not-connected').style.display = connected ? 'none' : 'block';
+        document.getElementById('canvas-connected').style.display = connected ? 'block' : 'none';
+        if (connected && domain) {
+          document.getElementById('canvas-domain-display').textContent = `(${domain})`;
+        }
+      }
+
+      // Check for canvas=connected URL param (post-OAuth redirect)
+      (function() {
+        const params = new URLSearchParams(window.location.search);
+        const canvasStatus = params.get('canvas');
+        if (canvasStatus === 'connected') {
+          // Clean URL
+          window.history.replaceState({}, '', window.location.pathname);
+          // Show brief success message after a short delay
+          setTimeout(() => showMessage('Canvas connected successfully! Your assignments are syncing.', 'Canvas Connected'), 300);
+        } else if (canvasStatus === 'error') {
+          const reason = params.get('reason') || 'Unknown error';
+          window.history.replaceState({}, '', window.location.pathname);
+          setTimeout(() => showMessage(`Canvas connection failed: ${reason}`, 'Canvas Error'), 300);
+        }
+      })();
+
+      // Connect button
+      document.getElementById('canvas-connect-btn').addEventListener('click', () => {
+        const email = window.auth?.user?.email;
+        if (!email) { window.location.href = './login.html'; return; }
+        const domain = document.getElementById('canvas-domain').value.trim();
+        if (!domain) { showMessage('Please enter your Canvas domain (e.g. canvas.berkeley.edu).', 'Canvas Domain Required'); return; }
+        window.location.href = `/api/canvas/auth?user_email=${encodeURIComponent(email)}&canvas_domain=${encodeURIComponent(domain)}`;
+      });
+
+      // Sync button
+      document.getElementById('canvas-sync-btn').addEventListener('click', async () => {
+        const email = window.auth?.user?.email;
+        if (!email) return;
+        const btn = document.getElementById('canvas-sync-btn');
+        const status = document.getElementById('canvas-sync-status');
+        btn.disabled = true;
+        btn.textContent = 'Syncing...';
+        status.style.display = 'block';
+        status.textContent = 'Syncing assignments from Canvas...';
+        status.style.color = 'var(--muted)';
+        try {
+          const res = await fetch('/api/canvas/sync', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ user_email: email })
+          });
+          const json = await res.json();
+          if (res.ok) {
+            status.textContent = `Synced ${json.synced || 0} assignments.`;
+            status.style.color = 'var(--olive)';
+            document.getElementById('canvas-last-sync').textContent = 'Last synced: just now';
+            if (window.loadAssignmentsPreview) window.loadAssignmentsPreview(email);
+          } else {
+            status.textContent = `Sync failed: ${json.details || json.error}`;
+            status.style.color = '#c0392b';
+          }
+        } catch (e) {
+          status.textContent = `Sync error: ${e.message}`;
+          status.style.color = '#c0392b';
+        } finally {
+          btn.disabled = false;
+          btn.textContent = 'Sync Now';
+        }
+      });
+
+      // Disconnect button
+      document.getElementById('canvas-disconnect-btn').addEventListener('click', async () => {
+        if (!confirm('Disconnect Canvas? This will remove all synced assignments.')) return;
+        const email = window.auth?.user?.email;
+        if (!email) return;
+        try {
+          await fetch('/api/canvas/disconnect', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ user_email: email })
+          });
+          updateCanvasUI(false, null);
+          showMessage('Canvas has been disconnected.', 'Disconnected');
+          if (window.loadAssignmentsPreview) window.loadAssignmentsPreview(email);
+        } catch (e) {
+          showMessage(`Error disconnecting: ${e.message}`, 'Error');
+        }
+      });
+
       function populateForm(data) {
         document.getElementById('main-cta-btn').textContent = 'Save Settings';
         if (data.preferred_first_name) document.getElementById('preferred-name').value = data.preferred_first_name;
@@ -745,6 +862,12 @@
         } else {
           discordCheckbox.checked = false;
           discordField.style.display = 'none';
+        }
+
+        // Canvas state
+        updateCanvasUI(!!data.canvas_connected, data.canvas_domain);
+        if (data.canvas_domain) {
+          document.getElementById('canvas-domain').value = data.canvas_domain;
         }
       }
     })();
