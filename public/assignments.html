@@ -273,6 +273,21 @@
       background: #f5f5f5;
     }
 
+    .source-badge {
+      font-size: 10px;
+      font-weight: 600;
+      padding: 1px 7px;
+      border-radius: 999px;
+      display: inline-block;
+      margin-left: 6px;
+      vertical-align: middle;
+    }
+
+    .source-badge.canvas {
+      background: #e8f0fe;
+      color: #1a73e8;
+    }
+
     /* Mobile */
     @media (max-width: 600px) {
       .assignments-hero {
@@ -374,6 +389,9 @@
       <a href="./login.html" class="btn btn--cta">Log In</a>
     </div>
     <div id="assignments-loading" class="assignments-loading" style="display:none;">Loading assignments...</div>
+    <div id="past-toggle-wrap" style="display:none; max-width:720px; margin:0 auto 12px; text-align:right;">
+      <button id="past-toggle-btn" style="background:none; border:none; font-size:13px; color:var(--muted); cursor:pointer; text-decoration:underline; padding:0;">Show past assignments</button>
+    </div>
     <div id="assignments-list" class="assignments-list" style="display:none;"></div>
     <div id="assignments-empty" class="assignments-empty" style="display:none;">No upcoming assignments found.</div>
     <div id="assignments-not-enrolled" class="assignments-not-enrolled" style="display:none;">Your email was not found in the course roster.</div>
@@ -472,62 +490,131 @@
       }
     }
 
+    function renderDeadlines(deadlines) {
+      const listEl = document.getElementById('assignments-list');
+      listEl.innerHTML = deadlines.map(d => {
+        const overdue = isOverdue(d.due);
+        const sourceBadge = d.source === 'canvas' ? '<span class="source-badge canvas">bCourses</span>' : '';
+        return `
+          <div class="assignment-card"
+            tabindex="0"
+            role="button"
+            data-name="${escapeHtml(d.assignment_name || '')}"
+            data-due="${escapeHtml(d.due || '')}"
+            data-course="${escapeHtml(d.course_code || '')}"
+            data-url="${escapeHtml(d.html_url || '')}">
+            <div class="assignment-info">
+              <div class="assignment-name">${escapeHtml(d.assignment_name || 'Untitled')}${sourceBadge}</div>
+              <div class="assignment-course">${escapeHtml(d.course_code || '')}</div>
+            </div>
+            <div class="assignment-due${overdue ? ' overdue' : ''}">
+              <span class="due-label">Due</span>
+              ${escapeHtml(formatDate(d.due))}
+            </div>
+            <svg class="assignment-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><polyline points="9 18 15 12 9 6"></polyline></svg>
+          </div>`;
+      }).join('');
+
+      listEl.querySelectorAll('.assignment-card').forEach(card => {
+        const open = () => {
+          if (card.dataset.url) {
+            window.open(card.dataset.url, '_blank', 'noopener');
+          } else {
+            openResourceModal(card.dataset.name, card.dataset.due, card.dataset.course);
+          }
+        };
+        card.addEventListener('click', open);
+        card.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); } });
+      });
+
+      listEl.style.display = 'grid';
+    }
+
     async function loadAssignments(email) {
       const loadingEl = document.getElementById('assignments-loading');
       const listEl = document.getElementById('assignments-list');
       const emptyEl = document.getElementById('assignments-empty');
       const notEnrolledEl = document.getElementById('assignments-not-enrolled');
+      const toggleWrap = document.getElementById('past-toggle-wrap');
+      const toggleBtn = document.getElementById('past-toggle-btn');
 
       loadingEl.style.display = 'block';
       listEl.style.display = 'none';
       emptyEl.style.display = 'none';
       notEnrolledEl.style.display = 'none';
+      toggleWrap.style.display = 'none';
 
       try {
-        const res = await fetch(`/api/deadlines?user_email=${encodeURIComponent(email)}`);
-        if (!res.ok) throw new Error('Failed to fetch');
-        const json = await res.json();
+        const [gradesyncRes, canvasRes] = await Promise.all([
+          fetch(`/api/deadlines?user_email=${encodeURIComponent(email)}`),
+          fetch(`/api/canvas/deadlines?user_email=${encodeURIComponent(email)}`).catch(() => null)
+        ]);
+
         loadingEl.style.display = 'none';
 
-        if (!json.enrolled) {
+        let gradesyncDeadlines = [];
+        let enrolled = false;
+        if (gradesyncRes.ok) {
+          const json = await gradesyncRes.json();
+          enrolled = !!json.enrolled;
+          gradesyncDeadlines = (json.data || []).map(d => ({ ...d, source: 'gradesync' }));
+        }
+
+        let canvasDeadlines = [];
+        if (canvasRes && canvasRes.ok) {
+          const canvasJson = await canvasRes.json();
+          canvasDeadlines = (canvasJson.data || []).map(d => ({ ...d, source: 'canvas' }));
+        }
+
+        const allDeadlines = [...gradesyncDeadlines, ...canvasDeadlines];
+        allDeadlines.sort((a, b) => {
+          if (!a.due) return 1;
+          if (!b.due) return -1;
+          return new Date(a.due) - new Date(b.due);
+        });
+
+        if (allDeadlines.length === 0 && !enrolled && canvasDeadlines.length === 0) {
           notEnrolledEl.style.display = 'block';
           return;
         }
 
-        const deadlines = json.data || [];
-        if (deadlines.length === 0) {
+        const now = new Date();
+        const upcoming = allDeadlines.filter(d => !d.due || new Date(d.due) >= now);
+        const hasPast = allDeadlines.length > upcoming.length;
+
+        if (upcoming.length === 0 && allDeadlines.length === 0) {
           emptyEl.style.display = 'block';
           return;
         }
 
-        listEl.innerHTML = deadlines.map(d => {
-          const overdue = isOverdue(d.due);
-          return `
-            <div class="assignment-card"
-              tabindex="0"
-              role="button"
-              data-name="${escapeHtml(d.assignment_name || '')}"
-              data-due="${escapeHtml(d.due || '')}"
-              data-course="${escapeHtml(d.course_code || '')}">
-              <div class="assignment-info">
-                <div class="assignment-name">${escapeHtml(d.assignment_name || 'Untitled')}</div>
-                <div class="assignment-course">${escapeHtml(d.course_code || '')}</div>
-              </div>
-              <div class="assignment-due${overdue ? ' overdue' : ''}">
-                <span class="due-label">Due</span>
-                ${escapeHtml(formatDate(d.due))}
-              </div>
-              <svg class="assignment-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><polyline points="9 18 15 12 9 6"></polyline></svg>
-            </div>`;
-        }).join('');
+        // Show upcoming by default
+        if (upcoming.length === 0) {
+          emptyEl.style.display = 'block';
+        } else {
+          renderDeadlines(upcoming);
+        }
 
-        listEl.querySelectorAll('.assignment-card').forEach(card => {
-          const open = () => openResourceModal(card.dataset.name, card.dataset.due, card.dataset.course);
-          card.addEventListener('click', open);
-          card.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); } });
-        });
-
-        listEl.style.display = 'grid';
+        // Wire up toggle if there are past assignments
+        if (hasPast) {
+          toggleWrap.style.display = 'block';
+          let showingAll = false;
+          toggleBtn.addEventListener('click', () => {
+            showingAll = !showingAll;
+            emptyEl.style.display = 'none';
+            if (showingAll) {
+              renderDeadlines(allDeadlines);
+              toggleBtn.textContent = 'Hide past assignments';
+            } else {
+              if (upcoming.length === 0) {
+                listEl.style.display = 'none';
+                emptyEl.style.display = 'block';
+              } else {
+                renderDeadlines(upcoming);
+              }
+              toggleBtn.textContent = 'Show past assignments';
+            }
+          });
+        }
       } catch (e) {
         loadingEl.style.display = 'none';
         emptyEl.textContent = 'Error loading assignments. Please try again.';

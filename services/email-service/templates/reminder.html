@@ -1,0 +1,22 @@
+<h2 style="color: #333333; margin: 0 0 16px; font-size: 22px;">Hey {{student_name}}!</h2>
+<p style="color: #555555; line-height: 1.6; margin: 0 0 16px;">Just a friendly reminder that <strong>{{assignment_name}}</strong> is due soon!</p>
+
+{{#if resources}}
+<div style="background: #f9f9f9; border-radius: 8px; padding: 16px; margin: 20px 0;">
+  <h3 style="margin: 0 0 12px; font-size: 14px; color: #666; text-transform: uppercase;">Helpful Resources</h3>
+  {{#each resources}}
+  <div style="padding: 8px 0; border-bottom: 1px solid #eee;">
+    <span style="display: inline-block; background: {{secondary_color}}; color: {{primary_color}}; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; margin-right: 8px;">{{resource_type}}</span>
+    <a href="{{link}}" style="color: {{primary_color}}; text-decoration: none;">{{resource_name}}</a>
+  </div>
+  {{/each}}
+</div>
+{{/if}}
+
+<p style="color: #555555; line-height: 1.6; margin: 0 0 16px;">Remember: every expert was once a beginner. You've totally got this!</p>
+
+<p style="text-align: center; margin: 24px 0;">
+  <a href="{{assignments_url}}" style="display: inline-block; background: {{primary_color}}; color: #ffffff; padding: 12px 28px; border-radius: 999px; text-decoration: none; font-weight: 600;">View All Assignments</a>
+</p>
+
+<p style="color: #555555; line-height: 1.6; margin: 0;">Best,<br>The AutoRemind Team</p>

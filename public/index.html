@@ -210,6 +210,38 @@
               oninput="document.getElementById('days').value=this.value" />
             <span class="minmax">7</span>
           </div>
+
+          <div class="divider" style="margin-top: 28px;"><span class="pill">bCourses Integration</span></div>
+
+          <!-- Not connected state -->
+          <div id="canvas-not-connected">
+            <p class="label">Connect your bCourses account to automatically sync assignments:</p>
+            <!-- OAuth mode (default) -->
+            <button id="canvas-connect-btn" class="btn btn--primary">Connect bCourses</button>
+            <!-- PAT mode: shown when CANVAS_CLIENT_ID is not configured (window.CANVAS_PAT_MODE) -->
+            <div id="canvas-pat-form" style="display:none;">
+              <p style="font-size:13px; color:var(--muted); margin-bottom:8px;">
+                Enter your bCourses <a href="https://bcourses.berkeley.edu/profile/settings" target="_blank" rel="noopener" style="color:var(--olive);">personal access token</a>:
+              </p>
+              <input id="canvas-pat-input" type="password" placeholder="Paste your access token"
+                style="width:100%; padding:8px 10px; border:1px solid var(--border); border-radius:6px; font-size:14px; margin-bottom:8px; box-sizing:border-box;" />
+              <button id="canvas-pat-submit-btn" class="btn btn--primary" style="font-size:13px; padding:6px 16px;">Connect</button>
+              <div id="canvas-pat-status" style="font-size:12px; margin-top:6px; display:none;"></div>
+            </div>
+          </div>
+
+          <!-- Connected state -->
+          <div id="canvas-connected" style="display: none;">
+            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+              <span style="color: var(--olive); font-weight: 600;">bCourses Connected</span>
+            </div>
+            <div id="canvas-last-sync" style="font-size: 12px; color: var(--muted); margin-bottom: 10px;"></div>
+            <div style="display: flex; gap: 8px; align-items: center;">
+              <button id="canvas-sync-btn" class="btn btn--outline" style="font-size: 13px; padding: 6px 14px;">Sync Now</button>
+              <button id="canvas-disconnect-btn" style="background: none; border: none; color: #c0392b; font-size: 13px; cursor: pointer; text-decoration: underline;">Disconnect</button>
+            </div>
+            <div id="canvas-sync-status" style="font-size: 12px; margin-top: 6px; display: none;"></div>
+          </div>
         </div>
       </div>
 
@@ -649,27 +681,57 @@
           }
         });
 
+        window.loadAssignmentsPreview = loadAssignmentsPreview;
         async function loadAssignmentsPreview(email) {
           try {
-            const res = await fetch(`/api/deadlines?user_email=${encodeURIComponent(email)}`);
-            if (!res.ok) return;
-            const json = await res.json();
-            if (!json.enrolled || !json.data?.length) {
+            const [gradesyncRes, canvasRes] = await Promise.all([
+              fetch(`/api/deadlines?user_email=${encodeURIComponent(email)}`).catch(() => null),
+              fetch(`/api/canvas/deadlines?user_email=${encodeURIComponent(email)}`).catch(() => null),
+            ]);
+
+            let gradesyncDeadlines = [];
+            let enrolled = false;
+            if (gradesyncRes && gradesyncRes.ok) {
+              const json = await gradesyncRes.json();
+              enrolled = !!json.enrolled;
+              gradesyncDeadlines = (json.data || []);
+            }
+
+            let canvasDeadlines = [];
+            if (canvasRes && canvasRes.ok) {
+              const json = await canvasRes.json();
+              canvasDeadlines = (json.data || []);
+            }
+
+            const now = new Date();
+            const upcoming = [...gradesyncDeadlines, ...canvasDeadlines]
+              .filter(d => !d.due || new Date(d.due) >= now)
+              .sort((a, b) => {
+                if (!a.due) return 1;
+                if (!b.due) return -1;
+                return new Date(a.due) - new Date(b.due);
+              });
+
+            if (!upcoming.length && !enrolled && !canvasDeadlines.length) return;
+
+            if (!upcoming.length) {
               document.getElementById('preview-empty').style.display = 'block';
+              document.getElementById('assignments-section').style.display = 'block';
+              document.getElementById('scroll-arrow').style.display = 'flex';
               return;
             }
-            const top5 = json.data.slice(0, 5);
-            const today = new Date();
+
+            const top5 = upcoming.slice(0, 5);
             document.getElementById('preview-list').innerHTML = top5.map(d => {
               const due = d.due ? new Date(d.due) : null;
-              const overdue = due && due < today;
               const dateStr = due ? due.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'TBD';
+              const isCanvas = !!d.html_url;
               return `<div class="preview-row">
                 <div>
-                  <div class="preview-name">${escHtml(d.assignment_name || 'Untitled')}</div>
+                  <div class="preview-name">${escHtml(d.assignment_name || 'Untitled')}${isCanvas ? '<span class="source-badge canvas" style="font-size:10px;font-weight:600;padding:1px 7px;border-radius:999px;display:inline-block;margin-left:6px;background:#e8f0fe;color:#1a73e8;">bCourses</span>' : ''}</div>
                   <div class="preview-course">${escHtml(d.course_code || '')}</div>
                 </div>
-                <div class="preview-due${overdue ? ' overdue' : ''}">${escHtml(dateStr)}</div>
+                <div class="preview-due">${escHtml(dateStr)}</div>
               </div>`;
             }).join('');
             document.getElementById('assignments-section').style.display = 'block';
@@ -696,6 +758,135 @@
           await auth.signOut();
           window.location.reload();
         };
+      });
+
+      // --- bCourses Integration Logic ---
+      function updateCanvasUI(connected) {
+        document.getElementById('canvas-not-connected').style.display = connected ? 'none' : 'block';
+        document.getElementById('canvas-connected').style.display = connected ? 'block' : 'none';
+      }
+
+      // Check for canvas=connected URL param (post-OAuth redirect)
+      (function() {
+        const params = new URLSearchParams(window.location.search);
+        const canvasStatus = params.get('canvas');
+        if (canvasStatus === 'connected') {
+          window.history.replaceState({}, '', window.location.pathname);
+          setTimeout(() => showMessage('bCourses connected successfully! Your assignments are syncing.', 'bCourses Connected'), 300);
+        } else if (canvasStatus === 'error') {
+          const reason = params.get('reason') || 'Unknown error';
+          window.history.replaceState({}, '', window.location.pathname);
+          setTimeout(() => showMessage(`bCourses connection failed: ${reason}`, 'bCourses Error'), 300);
+        }
+      })();
+
+      // Switch between OAuth button and PAT form based on server-injected flag
+      if (window.CANVAS_PAT_MODE) {
+        document.getElementById('canvas-connect-btn').style.display = 'none';
+        document.getElementById('canvas-pat-form').style.display = 'block';
+      }
+
+      // Connect button (OAuth mode)
+      document.getElementById('canvas-connect-btn').addEventListener('click', () => {
+        const email = window.auth?.user?.email;
+        if (!email) { window.location.href = './login.html'; return; }
+        window.location.href = `/api/canvas/auth?user_email=${encodeURIComponent(email)}`;
+      });
+
+      // PAT form submit
+      document.getElementById('canvas-pat-submit-btn').addEventListener('click', async () => {
+        const email = window.auth?.user?.email;
+        if (!email) { window.location.href = './login.html'; return; }
+        const pat = document.getElementById('canvas-pat-input').value.trim();
+        if (!pat) return;
+
+        const btn = document.getElementById('canvas-pat-submit-btn');
+        const status = document.getElementById('canvas-pat-status');
+        btn.disabled = true;
+        btn.textContent = 'Connecting...';
+        status.style.display = 'block';
+        status.textContent = 'Validating token...';
+        status.style.color = 'var(--muted)';
+
+        try {
+          const res = await fetch('/api/canvas/pat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ user_email: email, pat }),
+          });
+          const json = await res.json();
+          if (res.ok) {
+            document.getElementById('canvas-pat-input').value = '';
+            status.style.display = 'none';
+            updateCanvasUI(true);
+            showMessage(`bCourses connected! Synced ${json.synced || 0} assignments.`, 'bCourses Connected');
+            if (window.loadAssignmentsPreview) window.loadAssignmentsPreview(email);
+          } else {
+            status.textContent = json.error || 'Connection failed';
+            status.style.color = '#c0392b';
+          }
+        } catch (e) {
+          status.textContent = `Error: ${e.message}`;
+          status.style.color = '#c0392b';
+        } finally {
+          btn.disabled = false;
+          btn.textContent = 'Connect';
+        }
+      });
+
+      // Sync button
+      document.getElementById('canvas-sync-btn').addEventListener('click', async () => {
+        const email = window.auth?.user?.email;
+        if (!email) return;
+        const btn = document.getElementById('canvas-sync-btn');
+        const status = document.getElementById('canvas-sync-status');
+        btn.disabled = true;
+        btn.textContent = 'Syncing...';
+        status.style.display = 'block';
+        status.textContent = 'Syncing assignments from bCourses...';
+        status.style.color = 'var(--muted)';
+        try {
+          const res = await fetch('/api/canvas/sync', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ user_email: email })
+          });
+          const json = await res.json();
+          if (res.ok) {
+            status.textContent = `Synced ${json.synced || 0} assignments.`;
+            status.style.color = 'var(--olive)';
+            document.getElementById('canvas-last-sync').textContent = 'Last synced: just now';
+            if (window.loadAssignmentsPreview) window.loadAssignmentsPreview(email);
+          } else {
+            status.textContent = `Sync failed: ${json.details || json.error}`;
+            status.style.color = '#c0392b';
+          }
+        } catch (e) {
+          status.textContent = `Sync error: ${e.message}`;
+          status.style.color = '#c0392b';
+        } finally {
+          btn.disabled = false;
+          btn.textContent = 'Sync Now';
+        }
+      });
+
+      // Disconnect button
+      document.getElementById('canvas-disconnect-btn').addEventListener('click', async () => {
+        if (!confirm('Disconnect bCourses? This will remove all synced assignments.')) return;
+        const email = window.auth?.user?.email;
+        if (!email) return;
+        try {
+          await fetch('/api/canvas/disconnect', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ user_email: email })
+          });
+          updateCanvasUI(false);
+          showMessage('bCourses has been disconnected.', 'Disconnected');
+          if (window.loadAssignmentsPreview) window.loadAssignmentsPreview(email);
+        } catch (e) {
+          showMessage(`Error disconnecting: ${e.message}`, 'Error');
+        }
       });
 
       function populateForm(data) {
@@ -746,6 +937,9 @@
           discordCheckbox.checked = false;
           discordField.style.display = 'none';
         }
+
+        // bCourses state
+        updateCanvasUI(!!data.canvas_connected);
       }
     })();
   </script>

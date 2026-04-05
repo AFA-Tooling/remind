@@ -20,14 +20,28 @@ import registerHandler from './api/reminders/register.js';
 import deadlinesGetHandler from './api/deadlines/get.js';
 import resourcesGetHandler from './api/resources/get.js';
 
+// Canvas integration handlers
+import canvasAuthHandler from './api/canvas/auth.js';
+import canvasCallbackHandler from './api/canvas/callback.js';
+import canvasDisconnectHandler from './api/canvas/disconnect.js';
+import canvasSyncHandler from './api/canvas/sync.js';
+import canvasDeadlinesHandler from './api/canvas/deadlines.js';
+import canvasPatHandler from './api/canvas/pat.js';
+
+// Admin handlers
+import adminStudentsHandler from './api/admin/students.js';
+import adminDeadlinesHandler from './api/admin/deadlines.js';
+import adminResourcesHandler from './api/admin/resources.js';
+import adminDeliveryLogsHandler from './api/admin/delivery-logs.js';
+
 // Use PORT from environment variable (GCP Cloud Run sets this) or default to 3000 for local dev
 const PORT = process.env.PORT || 3000;
 
 const server = http.createServer(async (req, res) => {
   // Enable CORS
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
   if (req.method === 'OPTIONS') {
     res.writeHead(200);
@@ -209,6 +223,69 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // Helper to parse query params
+  const parseQuery = (qs) => {
+    const params = {};
+    if (qs) {
+      qs.split('&').forEach(param => {
+        const [key, value] = param.split('=');
+        if (key && value) params[decodeURIComponent(key)] = decodeURIComponent(value);
+      });
+    }
+    return params;
+  };
+
+  // Helper to create mock response
+  const createMockRes = () => ({
+    status: (code) => { res.statusCode = code; return createMockRes(); },
+    json: (data) => { res.setHeader('Content-Type', 'application/json'); res.end(JSON.stringify(data)); }
+  });
+
+  // Admin API routes
+  if (urlPath.startsWith('/api/admin/')) {
+    const mockRes = createMockRes();
+    const queryParams = parseQuery(queryString);
+
+    // Parse body for POST/PUT/DELETE
+    const parseBody = () => new Promise((resolve) => {
+      let body = '';
+      req.on('data', chunk => body += chunk.toString());
+      req.on('end', () => resolve(body ? JSON.parse(body) : {}));
+    });
+
+    try {
+      if (urlPath === '/api/admin/students' && req.method === 'GET') {
+        const mockReq = { method: req.method, query: queryParams, headers: { authorization: req.headers.authorization } };
+        await adminStudentsHandler(mockReq, mockRes);
+        return;
+      }
+
+      if (urlPath === '/api/admin/deadlines' && req.method === 'GET') {
+        const mockReq = { method: req.method, query: queryParams, headers: { authorization: req.headers.authorization } };
+        await adminDeadlinesHandler(mockReq, mockRes);
+        return;
+      }
+
+      if (urlPath === '/api/admin/resources') {
+        const body = ['POST', 'PUT', 'DELETE'].includes(req.method) ? await parseBody() : {};
+        const mockReq = { method: req.method, query: queryParams, body, headers: { authorization: req.headers.authorization } };
+        await adminResourcesHandler(mockReq, mockRes);
+        return;
+      }
+
+      if (urlPath === '/api/admin/delivery-logs' && req.method === 'GET') {
+        const mockReq = { method: req.method, query: queryParams, headers: { authorization: req.headers.authorization } };
+        await adminDeliveryLogsHandler(mockReq, mockRes);
+        return;
+      }
+    } catch (error) {
+      console.error('Admin API error:', error);
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Internal server error', details: error.message }));
+      return;
+    }
+  }
+
   // Handle /api/reminders/unsubscribe
   if (urlPath === '/api/reminders/unsubscribe' && req.method === 'POST') {
     let body = '';
@@ -248,6 +325,115 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // ---- Canvas Integration Routes ----
+
+  // Helper to build mock req/res with redirect support
+  const mockRes = {
+    status: (code) => { res.statusCode = code; return mockRes; },
+    json: (data) => { res.setHeader('Content-Type', 'application/json'); res.end(JSON.stringify(data)); },
+    redirect: (code, url) => { res.writeHead(code, { Location: url }); res.end(); },
+  };
+
+  // GET /api/canvas/auth - Initiate Canvas OAuth
+  if (urlPath === '/api/canvas/auth' && req.method === 'GET') {
+    const queryParams = {};
+    if (queryString) {
+      queryString.split('&').forEach(param => {
+        const [key, value] = param.split('=');
+        if (key && value) queryParams[decodeURIComponent(key)] = decodeURIComponent(value);
+      });
+    }
+    try {
+      await canvasAuthHandler({ method: req.method, query: queryParams }, mockRes);
+    } catch (error) {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Internal server error', details: error.message }));
+    }
+    return;
+  }
+
+  // GET /api/canvas/callback - Canvas OAuth callback
+  if (urlPath === '/api/canvas/callback' && req.method === 'GET') {
+    const queryParams = {};
+    if (queryString) {
+      queryString.split('&').forEach(param => {
+        const [key, value] = param.split('=');
+        if (key && value) queryParams[decodeURIComponent(key)] = decodeURIComponent(value);
+      });
+    }
+    try {
+      await canvasCallbackHandler({ method: req.method, query: queryParams }, mockRes);
+    } catch (error) {
+      console.error('Canvas callback error:', error);
+      res.writeHead(302, { Location: `/index.html?canvas=error&reason=${encodeURIComponent(error.message)}` });
+      res.end();
+    }
+    return;
+  }
+
+  // POST /api/canvas/disconnect
+  if (urlPath === '/api/canvas/disconnect' && req.method === 'POST') {
+    let body = '';
+    req.on('data', chunk => { body += chunk.toString(); });
+    req.on('end', async () => {
+      try {
+        await canvasDisconnectHandler({ method: req.method, body: body ? JSON.parse(body) : {} }, mockRes);
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Internal server error', details: error.message }));
+      }
+    });
+    return;
+  }
+
+  // POST /api/canvas/sync
+  if (urlPath === '/api/canvas/sync' && req.method === 'POST') {
+    let body = '';
+    req.on('data', chunk => { body += chunk.toString(); });
+    req.on('end', async () => {
+      try {
+        await canvasSyncHandler({ method: req.method, body: body ? JSON.parse(body) : {} }, mockRes);
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Internal server error', details: error.message }));
+      }
+    });
+    return;
+  }
+
+  // POST /api/canvas/pat - Connect via personal access token
+  if (urlPath === '/api/canvas/pat' && req.method === 'POST') {
+    let body = '';
+    req.on('data', chunk => { body += chunk.toString(); });
+    req.on('end', async () => {
+      try {
+        await canvasPatHandler({ method: req.method, body: body ? JSON.parse(body) : {} }, mockRes);
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Internal server error', details: error.message }));
+      }
+    });
+    return;
+  }
+
+  // GET /api/canvas/deadlines
+  if (urlPath === '/api/canvas/deadlines' && req.method === 'GET') {
+    const queryParams = {};
+    if (queryString) {
+      queryString.split('&').forEach(param => {
+        const [key, value] = param.split('=');
+        if (key && value) queryParams[decodeURIComponent(key)] = decodeURIComponent(value);
+      });
+    }
+    try {
+      await canvasDeadlinesHandler({ method: req.method, query: queryParams }, mockRes);
+    } catch (error) {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Internal server error', details: error.message }));
+    }
+    return;
+  }
+
   // Serve static files - use urlPath (without query string) for file path
   // Since server.js is in src/, static files are in ../public/
   let filePath = path.join(__dirname, '../public', urlPath);
@@ -283,6 +469,7 @@ const server = http.createServer(async (req, res) => {
         const firebaseApiKey = process.env.FIREBASE_API_KEY || '';
         const firebaseAuthDomain = process.env.FIREBASE_AUTH_DOMAIN || '';
         const firebaseProjectId = process.env.FIREBASE_PROJECT_ID || '';
+        const canvasPatMode = !process.env.CANVAS_CLIENT_ID;
 
         let htmlContent = content.toString();
 
@@ -294,6 +481,7 @@ const server = http.createServer(async (req, res) => {
         window.FIREBASE_API_KEY = '${firebaseApiKey}';
         window.FIREBASE_AUTH_DOMAIN = '${firebaseAuthDomain}';
         window.FIREBASE_PROJECT_ID = '${firebaseProjectId}';
+        window.CANVAS_PAT_MODE = ${canvasPatMode};
       })();
     </script>`;
 
