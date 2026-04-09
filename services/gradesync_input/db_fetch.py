@@ -596,7 +596,7 @@ def compose_message(student: Dict[str, Any], assignments: List[Dict[str, Any]], 
     for assignment in assignments:
         due_dt = assignment["personal_deadline"]
         days_until = (due_dt.date() - today.date()).days
-        due_date_str = due_dt.strftime("%B %-d")
+        due_date_str = f"{due_dt.strftime('%B')} {due_dt.day}"
         if days_until == 0:
             days_label = "due today"
         elif days_until == 1:
