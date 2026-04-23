@@ -4,7 +4,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <link rel="icon" type="image/png" href="/logo.png" />
+  <link rel="icon" href="/favicon.ico" sizes="any" /><link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
   <title>Upcoming Assignments – AutoRemind</title>
 
   <!-- Firebase JS SDK (compat v9) -->
@@ -65,6 +65,7 @@
       max-width: 720px;
       margin: 0 auto 48px;
       display: grid;
+      grid-template-columns: minmax(0, 1fr);
       gap: 10px;
     }
 
@@ -82,8 +83,8 @@
 
     .assignment-card:hover,
     .assignment-card:focus-visible {
-      border-color: #cfe2b3;
-      background: #fafcf7;
+      border-color: #a8c4e0;
+      background: #f5f8fc;
       outline: none;
     }
 
@@ -284,8 +285,8 @@
     }
 
     .source-badge.canvas {
-      background: #e8f0fe;
-      color: #1a73e8;
+      background: var(--pale);
+      color: #5c3d00;
     }
 
     /* Mobile */
@@ -343,9 +344,9 @@
   <div id="auth-loading"
     style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center; background: white; z-index: 9999;">
     <div
-      style="width: 40px; height: 40px; margin-bottom: 16px; border: 4px solid #f3f3f3; border-top: 4px solid #3e5f3a; border-radius: 50%; animation: spin 1s linear infinite;">
+      style="width: 40px; height: 40px; margin-bottom: 16px; border: 4px solid #f3f3f3; border-top: 4px solid #002676; border-radius: 50%; animation: spin 1s linear infinite;">
     </div>
-    <div style="font-family: system-ui; color: #3e5f3a; font-weight: 600;">Loading AutoRemind...</div>
+    <div style="font-family: system-ui; color: #002676; font-weight: 600;">Loading AutoRemind...</div>
   </div>
 
   <!-- Navigation -->
@@ -358,7 +359,7 @@
       <div class="nav__content">
         <div class="nav__links">
           <a href="./about.html" class="nav__link">About Us</a>
-          <a href="./assignments.html" class="nav__link" id="nav-assignments-link" style="display:none; font-weight: 600; text-decoration: underline;">Assignments</a>
+          <a href="./assignments.html" class="nav__link nav__link--active" id="nav-assignments-link" style="display:none;">Assignments</a>
           <a href="mailto:autoremind@berkeley.edu" class="btn btn--primary" style="text-decoration:none;">Contact Us</a>
           <span id="user-email" style="display:none; font-size:14px; color:var(--text);"></span>
           <button id="logout-btn" class="btn btn--outline"
@@ -417,7 +418,7 @@
     <small>
       <span class="thanks">Thanks for trying our tool.</span>
       <a href="mailto:autoremind@berkeley.edu" class="feedback"> Share your feedback to help us improve.</a><br>
-      <span style="font-size: 13px; color: #999; margin-top: 8px; display: inline-block;">
+      <span style="font-size: 13px; color: rgba(255,255,255,0.55); margin-top: 8px; display: inline-block;">
         &copy; 2026 AutoRemind. All rights reserved.
       </span>
     </small>
@@ -504,7 +505,7 @@
             data-course="${escapeHtml(d.course_code || '')}"
             data-url="${escapeHtml(d.html_url || '')}">
             <div class="assignment-info">
-              <div class="assignment-name">${escapeHtml(d.assignment_name || 'Untitled')}${sourceBadge}</div>
+              <div class="assignment-name" title="${escapeHtml(d.assignment_name || 'Untitled')}">${escapeHtml(d.assignment_name || 'Untitled')}${sourceBadge}</div>
               <div class="assignment-course">${escapeHtml(d.course_code || '')}</div>
             </div>
             <div class="assignment-due${overdue ? ' overdue' : ''}">

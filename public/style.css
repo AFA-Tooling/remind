@@ -1,8 +1,12 @@
-/* AutoRemind Original Theme */
+@import url('https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,600;1,400&display=swap');
+
+/* AutoRemind Berkeley Theme */
 :root {
-    --olive: #3e5f3a;
-    --olive-dark: #2f472c;
-    --pale: #e7efd9;
+    --olive: #002676;
+    --olive-dark: #001a52;
+    --gold: #FDB515;
+    --gold-dark: #C4820A;
+    --pale: #fff3cc;
     --text: #0e0e0e;
     --muted: #6b6b6b;
     --line: #e6e6e6;
@@ -32,6 +36,10 @@ body {
     background: #fff;
 }
 
+h1, h2 {
+    font-family: 'EB Garamond', Georgia, serif;
+}
+
 .container {
     width: min(1100px, 92vw);
     margin: 0 auto;
@@ -42,8 +50,8 @@ body {
     position: sticky;
     top: 0;
     z-index: 100;
-    background: #fff;
-    border-bottom: 1px solid var(--line);
+    background: var(--olive);
+    border-bottom: none;
     padding: 16px 0;
 }
 
@@ -57,7 +65,7 @@ body {
     font-size: 26px;
     font-weight: 700;
     text-decoration: none;
-    color: var(--text);
+    color: #fff;
     letter-spacing: .2px;
     display: flex;
     align-items: center;
@@ -83,7 +91,7 @@ body {
 
 .nav__link {
     text-decoration: none;
-    color: #111;
+    color: rgba(255, 255, 255, 0.88);
     font-size: 15px;
     border: none;
     background: transparent;
@@ -93,6 +101,24 @@ body {
 
 .nav__link:hover {
     text-decoration: underline;
+    text-decoration-color: var(--gold);
+    text-underline-offset: 3px;
+    color: #fff;
+}
+
+.nav__link--active {
+    font-weight: 600;
+    color: #fff;
+    text-decoration: underline;
+    text-decoration-color: var(--gold);
+    text-decoration-thickness: 2px;
+    text-underline-offset: 3px;
+}
+
+/* Nav text elements on blue background */
+.nav #user-email,
+.nav #admin-email {
+    color: rgba(255, 255, 255, 0.85) !important;
 }
 
 /* Nav Buttons */
@@ -108,13 +134,14 @@ body {
 }
 
 .btn--primary {
-    background: var(--olive);
-    color: #fff;
+    background: var(--gold);
+    color: #1a1a1a;
     padding: 12px 20px;
 }
 
 .btn--primary:hover {
-    background: var(--olive-dark);
+    background: #FFCA2B;
+    color: #1a1a1a;
 }
 
 .btn--outline {
@@ -128,6 +155,17 @@ body {
     border-color: #ccc;
 }
 
+.nav .btn--outline {
+    color: rgba(255, 255, 255, 0.88);
+    border-color: rgba(255, 255, 255, 0.35);
+}
+
+.nav .btn--outline:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.65);
+    color: #fff;
+}
+
 /* Responsive Nav Toggle */
 .nav__toggle {
     display: none;
@@ -135,7 +173,7 @@ body {
     border: none;
     cursor: pointer;
     padding: 4px;
-    color: var(--text);
+    color: rgba(255, 255, 255, 0.9);
 }
 
 @media (max-width: 768px) {
@@ -145,12 +183,12 @@ body {
         top: 100%;
         left: 0;
         right: 0;
-        background: #fff;
+        background: var(--olive);
         flex-direction: column;
         align-items: center;
         padding: 24px;
-        border-bottom: 1px solid var(--line);
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
         gap: 20px;
         z-index: 99;
     }
@@ -193,7 +231,7 @@ body {
 }
 
 .lock-overlay .btn--cta {
-    box-shadow: 0 4px 12px rgba(62, 95, 58, 0.3);
+    box-shadow: 0 4px 12px rgba(253, 181, 21, 0.4);
     transform: scale(1.1);
 }
 
@@ -269,7 +307,7 @@ body {
     transform: translate(-50%, -50%);
     top: 50%;
     background: var(--pale);
-    color: #263226;
+    color: #5c3d00;
     font-weight: 600;
     padding: 8px 18px;
     border-radius: 999px;
@@ -408,25 +446,25 @@ body {
     border-radius: 3px;
     display: inline-block;
     background: #fff;
-    border: var(--dot-border) solid #cfe2b3;
+    border: var(--dot-border) solid #a8c4e0;
     transition: all .15s;
     position: relative;
 }
 
 .channels input[type="checkbox"]:focus+.dot {
-    outline: 2px solid #cfe2b3;
+    outline: 2px solid #a8c4e0;
     outline-offset: 2px;
 }
 
 .channels input[type="checkbox"]:checked+.dot {
-    background: var(--olive);
-    border-color: var(--olive);
+    background: var(--gold);
+    border-color: var(--gold);
 }
 
 .channels input[type="checkbox"]:checked+.dot::after {
     content: "✓";
     position: absolute;
-    color: #fff;
+    color: #1a1a1a;
     font-size: 12px;
     top: 50%;
     left: 50%;
@@ -446,8 +484,8 @@ body {
 }
 
 .channel-field:focus {
-    outline: 2px solid #cfe2b3;
-    border-color: #cfe2b3;
+    outline: 2px solid #a8c4e0;
+    border-color: #a8c4e0;
 }
 
 /* --- Sliders & Inputs --- */
@@ -480,8 +518,8 @@ input[type="range"]::-webkit-slider-thumb {
     width: 18px;
     height: 18px;
     border-radius: 50%;
-    background: var(--pale);
-    border: 2px solid var(--olive);
+    background: var(--gold);
+    border: 2px solid var(--gold-dark);
     cursor: pointer;
     margin-top: 0;
 }
@@ -490,8 +528,8 @@ input[type="range"]::-moz-range-thumb {
     width: 18px;
     height: 18px;
     border-radius: 50%;
-    background: var(--pale);
-    border: 2px solid var(--olive);
+    background: var(--gold);
+    border: 2px solid var(--gold-dark);
     cursor: pointer;
 }
 
@@ -513,8 +551,8 @@ input[type="range"]::-moz-range-thumb {
 }
 
 .num-input:focus {
-    outline: 2px solid #cfe2b3;
-    border-color: #cfe2b3;
+    outline: 2px solid #a8c4e0;
+    border-color: #a8c4e0;
 }
 
 /* --- Footer / Background --- */
@@ -525,8 +563,8 @@ input[type="range"]::-moz-range-thumb {
 }
 
 .btn--cta {
-    background: var(--olive);
-    color: #fff;
+    background: var(--gold);
+    color: #1a1a1a;
     padding: 12px 24px;
     border-radius: 999px;
     font-size: 16px;
@@ -536,7 +574,8 @@ input[type="range"]::-moz-range-thumb {
 }
 
 .btn--cta:hover {
-    background: var(--olive-dark);
+    background: #FFCA2B;
+    color: #1a1a1a;
 }
 
 .arc-bg {
@@ -546,7 +585,7 @@ input[type="range"]::-moz-range-thumb {
     width: 130vw;
     height: 160px;
     border-radius: 50% 50% 0 0 / 100% 100% 0 0;
-    background: var(--pale);
+    background: var(--olive);
     margin-top: 40px;
 }
 
@@ -556,16 +595,21 @@ input[type="range"]::-moz-range-thumb {
     padding: 0 0 36px;
     position: relative;
     background: transparent !important;
+    color: rgba(255, 255, 255, 0.8);
 }
 
 .thanks {
-    color: var(--olive-dark);
+    color: var(--gold);
     font-weight: 600;
 }
 
 .feedback {
-    color: var(--olive);
+    color: rgba(255, 255, 255, 0.85);
     text-decoration: none;
+}
+
+.site-footer a {
+    color: rgba(255, 255, 255, 0.85);
 }
 
 /* Link styles */

@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <link rel="icon" type="image/png" href="/logo.png" />
+  <link rel="icon" href="/favicon.ico" sizes="any" /><link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
   <title>Admin Dashboard - AutoRemind</title>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
@@ -11,7 +11,7 @@
   <style>
     .admin-tabs { display: flex; gap: 8px; margin-bottom: 24px; flex-wrap: wrap; }
     .admin-tab { padding: 10px 20px; border: 1px solid var(--line); border-radius: 8px; background: #fff; cursor: pointer; font-weight: 500; }
-    .admin-tab.active { background: var(--olive); color: #fff; border-color: var(--olive); }
+    .admin-tab.active { background: var(--gold); color: #1a1a1a; border-color: var(--gold-dark); }
     .admin-tab:hover:not(.active) { background: #f5f5f5; }
     .admin-section { display: none; }
     .admin-section.active { display: block; }
@@ -39,15 +39,15 @@
     .filter-row select, .filter-row input { padding: 8px 12px; border: 1px solid var(--line); border-radius: 8px; }
     .unauthorized { text-align: center; padding: 64px; }
     .pref-badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; margin-right: 4px; background: #e0e0e0; }
-    .pref-badge.active { background: var(--olive); color: #fff; }
+    .pref-badge.active { background: var(--olive); color: #fff; font-weight: 600; }
     .loading { text-align: center; padding: 40px; color: var(--muted); }
     .table-wrap { overflow-x: auto; }
   </style>
 </head>
 <body>
   <div id="auth-loading" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center; background: white; z-index: 9999;">
-    <div style="width: 40px; height: 40px; margin-bottom: 16px; border: 4px solid #f3f3f3; border-top: 4px solid #3e5f3a; border-radius: 50%; animation: spin 1s linear infinite;"></div>
-    <div style="font-family: system-ui; color: #3e5f3a; font-weight: 600;">Loading Admin Dashboard...</div>
+    <div style="width: 40px; height: 40px; margin-bottom: 16px; border: 4px solid #f3f3f3; border-top: 4px solid #002676; border-radius: 50%; animation: spin 1s linear infinite;"></div>
+    <div style="font-family: system-ui; color: #002676; font-weight: 600;">Loading Admin Dashboard...</div>
   </div>
   <style>@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }</style>
 
@@ -56,8 +56,8 @@
       <a class="brand" href="./index.html"><img src="logo.png" alt="AutoRemind Logo">AutoRemind</a>
       <div class="nav__content">
         <div class="nav__links">
-          <span style="background: var(--olive); color: #fff; padding: 4px 12px; border-radius: 999px; font-size: 12px; font-weight: 600;">ADMIN</span>
-          <span id="admin-email" style="font-size: 14px; color: var(--text);"></span>
+          <span style="background: var(--gold); color: #1a1a1a; padding: 4px 12px; border-radius: 999px; font-size: 12px; font-weight: 600;">ADMIN</span>
+          <span id="admin-email" style="font-size: 14px; color: rgba(255,255,255,0.85);"></span>
           <button id="logout-btn" class="btn btn--outline" style="padding: 8px 14px; font-size: 13px;">Sign Out</button>
         </div>
       </div>

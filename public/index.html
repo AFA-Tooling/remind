@@ -4,7 +4,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <link rel="icon" type="image/png" href="/logo.png" />
+  <link rel="icon" href="/favicon.ico" sizes="any" /><link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
   <title>AutoRemind</title>
 
   <!-- Firebase JS SDK (compat v9) -->
@@ -69,9 +69,9 @@
   <div id="auth-loading"
     style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center; background: white; z-index: 9999;">
     <div
-      style="width: 40px; height: 40px; margin-bottom: 16px; border: 4px solid #f3f3f3; border-top: 4px solid #3e5f3a; border-radius: 50%; animation: spin 1s linear infinite;">
+      style="width: 40px; height: 40px; margin-bottom: 16px; border: 4px solid #f3f3f3; border-top: 4px solid #002676; border-radius: 50%; animation: spin 1s linear infinite;">
     </div>
-    <div style="font-family: system-ui; color: #3e5f3a; font-weight: 600;">Loading AutoRemind...</div>
+    <div style="font-family: system-ui; color: #002676; font-weight: 600;">Loading AutoRemind...</div>
   </div>
 
   <!-- Navigation (Responsive Structure) -->
@@ -224,7 +224,7 @@
                 Enter your bCourses <a href="https://bcourses.berkeley.edu/profile/settings" target="_blank" rel="noopener" style="color:var(--olive);">personal access token</a>:
               </p>
               <input id="canvas-pat-input" type="password" placeholder="Paste your access token"
-                style="width:100%; padding:8px 10px; border:1px solid var(--border); border-radius:6px; font-size:14px; margin-bottom:8px; box-sizing:border-box;" />
+                style="width:100%; padding:8px 10px; border:1px solid var(--line); border-radius:6px; font-size:14px; margin-bottom:8px; box-sizing:border-box;" />
               <button id="canvas-pat-submit-btn" class="btn btn--primary" style="font-size:13px; padding:6px 16px;">Connect</button>
               <div id="canvas-pat-status" style="font-size:12px; margin-top:6px; display:none;"></div>
             </div>
@@ -362,8 +362,8 @@
       <span class="thanks">Thanks for trying our tool.</span>
       <a href="mailto:autoremind@berkeley.edu" class="feedback"> Share your feedback to help us improve.</a><br>
       <a href="#" id="unsubscribe-link"
-        style="text-decoration: underline; color: var(--olive); margin-top: 8px; display: none;">Unsubscribe</a><br>
-      <span style="font-size: 13px; color: #999; margin-top: 8px; display: inline-block;">
+        style="text-decoration: underline; color: rgba(255,255,255,0.75); margin-top: 8px; display: none;">Unsubscribe</a><br>
+      <span style="font-size: 13px; color: rgba(255,255,255,0.55); margin-top: 8px; display: inline-block;">
         &copy; 2026 AutoRemind. All rights reserved.
       </span>
     </small>
