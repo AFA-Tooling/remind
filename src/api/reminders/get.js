@@ -1,19 +1,18 @@
 import { getDb } from '../firestore.js';
+import { verifyUserAuth } from '../auth/verifyUser.js';
 
 export default async function handler(req, res) {
     if (req.method !== 'GET') {
         return res.status(405).json({ error: 'Method not allowed' });
     }
 
+    const authResult = await verifyUserAuth(req);
+    if (!authResult.authorized) {
+        return res.status(401).json({ error: authResult.error });
+    }
+
     try {
-        // Get user_email from query parameters
-        const userEmail = req.query.user_email;
-
-        if (!userEmail || typeof userEmail !== 'string') {
-            return res.status(400).json({ error: 'user_email query parameter is required' });
-        }
-
-        const loginEmail = userEmail.trim().toLowerCase();
+        const loginEmail = authResult.email;
 
         const db = getDb();
         // Documents in 'students' collection are keyed by email

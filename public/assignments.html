@@ -546,9 +546,11 @@
       toggleWrap.style.display = 'none';
 
       try {
+        const token = await window.auth?.getToken();
+        const authHeader = token ? { 'Authorization': `Bearer ${token}` } : {};
         const [gradesyncRes, canvasRes] = await Promise.all([
-          fetch(`/api/deadlines?user_email=${encodeURIComponent(email)}`),
-          fetch(`/api/canvas/deadlines?user_email=${encodeURIComponent(email)}`).catch(() => null)
+          fetch(`/api/deadlines?user_email=${encodeURIComponent(email)}`, { headers: authHeader }),
+          fetch(`/api/canvas/deadlines?user_email=${encodeURIComponent(email)}`, { headers: authHeader }).catch(() => null)
         ]);
 
         loadingEl.style.display = 'none';

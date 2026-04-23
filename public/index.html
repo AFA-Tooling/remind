@@ -527,9 +527,10 @@
         if (!email) throw new Error('No user email');
         payload.user_email = email;
 
+        const token = await window.auth?.getToken();
         const response = await fetch('/api/reminders/settings', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
           body: JSON.stringify(payload)
         });
         if (!response.ok) throw new Error('Failed to save');
@@ -592,16 +593,12 @@
         const email = window.auth?.user?.email;
         if (!email) throw new Error('No user email');
 
-        // Simple loop retries if network blip
-        const payload = {
-          platforms: selected,
-          user_email: email,
-          email: email // Send both keys just in case
-        };
+        const token = await window.auth?.getToken();
+        const payload = { platforms: selected };
 
         const response = await fetch('/api/reminders/unsubscribe', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
           body: JSON.stringify(payload)
         });
 
@@ -684,9 +681,11 @@
         window.loadAssignmentsPreview = loadAssignmentsPreview;
         async function loadAssignmentsPreview(email) {
           try {
+            const token = await window.auth?.getToken();
+            const authHeader = token ? { 'Authorization': `Bearer ${token}` } : {};
             const [gradesyncRes, canvasRes] = await Promise.all([
-              fetch(`/api/deadlines?user_email=${encodeURIComponent(email)}`).catch(() => null),
-              fetch(`/api/canvas/deadlines?user_email=${encodeURIComponent(email)}`).catch(() => null),
+              fetch(`/api/deadlines?user_email=${encodeURIComponent(email)}`, { headers: authHeader }).catch(() => null),
+              fetch(`/api/canvas/deadlines?user_email=${encodeURIComponent(email)}`, { headers: authHeader }).catch(() => null),
             ]);
 
             let gradesyncDeadlines = [];
@@ -746,7 +745,10 @@
         // Make available globally for unsubscribe to call
         window.fetchSettings = async (email) => {
           try {
-            const res = await fetch(`/api/reminders/get?user_email=${encodeURIComponent(email)}`);
+            const token = await window.auth?.getToken();
+            const res = await fetch(`/api/reminders/get?user_email=${encodeURIComponent(email)}`, {
+              headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+            });
             if (res.ok) {
               const json = await res.json();
               if (json.data) populateForm(json.data);

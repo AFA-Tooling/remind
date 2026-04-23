@@ -94,7 +94,8 @@ const server = http.createServer(async (req, res) => {
     // Create mock req/res objects for the handler
     const mockReq = {
       method: req.method,
-      query: queryParams
+      query: queryParams,
+      headers: { authorization: req.headers.authorization }
     };
 
     const mockRes = {
@@ -124,7 +125,7 @@ const server = http.createServer(async (req, res) => {
     req.on('data', chunk => { body += chunk.toString(); });
     req.on('end', async () => {
       try {
-        const mockReq = { method: req.method, body: body ? JSON.parse(body) : {} };
+        const mockReq = { method: req.method, body: body ? JSON.parse(body) : {}, headers: { authorization: req.headers.authorization } };
         const mockRes = {
           status: (code) => { res.statusCode = code; return mockRes; },
           json: (data) => { res.setHeader('Content-Type', 'application/json'); res.end(JSON.stringify(data)); }
@@ -149,10 +150,11 @@ const server = http.createServer(async (req, res) => {
         // Parse JSON body
         const parsedBody = body ? JSON.parse(body) : {};
 
-        // Create mock req/res objects for the handler - 
+        // Create mock req/res objects for the handler -
         const mockReq = {
           method: req.method,
-          body: parsedBody
+          body: parsedBody,
+          headers: { authorization: req.headers.authorization }
         };
 
         const mockRes = {
@@ -186,7 +188,7 @@ const server = http.createServer(async (req, res) => {
         if (key && value) queryParams[decodeURIComponent(key)] = decodeURIComponent(value);
       });
     }
-    const mockReq = { method: req.method, query: queryParams };
+    const mockReq = { method: req.method, query: queryParams, headers: { authorization: req.headers.authorization } };
     const mockRes = {
       status: (code) => { res.statusCode = code; return mockRes; },
       json: (data) => { res.setHeader('Content-Type', 'application/json'); res.end(JSON.stringify(data)); }
@@ -301,7 +303,8 @@ const server = http.createServer(async (req, res) => {
 
         const mockReq = {
           method: req.method,
-          body: parsedBody
+          body: parsedBody,
+          headers: { authorization: req.headers.authorization }
         };
 
         const mockRes = {

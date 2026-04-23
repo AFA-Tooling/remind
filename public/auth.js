@@ -41,16 +41,22 @@ class FirebaseAuth {
         }
     }
 
+    async getToken() {
+        if (!this.user) return null;
+        return this.user.getIdToken();
+    }
+
     init() {
         this._auth.onAuthStateChanged(async (user) => {
             this.user = user;
             this.session = user ? { user } : null;
             if (user) {
                 try {
+                    const token = await user.getIdToken();
                     await fetch('/api/reminders/register', {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ user_email: user.email, display_name: user.displayName || '' }),
+                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                        body: JSON.stringify({ display_name: user.displayName || '' }),
                     });
                 } catch (e) {
                     console.warn('Could not register user in Firestore:', e);
