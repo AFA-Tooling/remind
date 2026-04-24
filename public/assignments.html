@@ -4,7 +4,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <link rel="icon" type="image/png" href="/logo.png" />
+  <link rel="icon" href="/favicon.ico" sizes="any" /><link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
   <title>Upcoming Assignments – AutoRemind</title>
 
   <!-- Firebase JS SDK (compat v9) -->
@@ -65,6 +65,7 @@
       max-width: 720px;
       margin: 0 auto 48px;
       display: grid;
+      grid-template-columns: minmax(0, 1fr);
       gap: 10px;
     }
 
@@ -82,8 +83,8 @@
 
     .assignment-card:hover,
     .assignment-card:focus-visible {
-      border-color: #cfe2b3;
-      background: #fafcf7;
+      border-color: #a8c4e0;
+      background: #f5f8fc;
       outline: none;
     }
 
@@ -273,6 +274,21 @@
       background: #f5f5f5;
     }
 
+    .source-badge {
+      font-size: 10px;
+      font-weight: 600;
+      padding: 1px 7px;
+      border-radius: 999px;
+      display: inline-block;
+      margin-left: 6px;
+      vertical-align: middle;
+    }
+
+    .source-badge.canvas {
+      background: var(--pale);
+      color: #5c3d00;
+    }
+
     /* Mobile */
     @media (max-width: 600px) {
       .assignments-hero {
@@ -328,9 +344,9 @@
   <div id="auth-loading"
     style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center; background: white; z-index: 9999;">
     <div
-      style="width: 40px; height: 40px; margin-bottom: 16px; border: 4px solid #f3f3f3; border-top: 4px solid #3e5f3a; border-radius: 50%; animation: spin 1s linear infinite;">
+      style="width: 40px; height: 40px; margin-bottom: 16px; border: 4px solid #f3f3f3; border-top: 4px solid #002676; border-radius: 50%; animation: spin 1s linear infinite;">
     </div>
-    <div style="font-family: system-ui; color: #3e5f3a; font-weight: 600;">Loading AutoRemind...</div>
+    <div style="font-family: system-ui; color: #002676; font-weight: 600;">Loading AutoRemind...</div>
   </div>
 
   <!-- Navigation -->
@@ -343,7 +359,7 @@
       <div class="nav__content">
         <div class="nav__links">
           <a href="./about.html" class="nav__link">About Us</a>
-          <a href="./assignments.html" class="nav__link" id="nav-assignments-link" style="display:none; font-weight: 600; text-decoration: underline;">Assignments</a>
+          <a href="./assignments.html" class="nav__link nav__link--active" id="nav-assignments-link" style="display:none;">Assignments</a>
           <a href="mailto:autoremind@berkeley.edu" class="btn btn--primary" style="text-decoration:none;">Contact Us</a>
           <span id="user-email" style="display:none; font-size:14px; color:var(--text);"></span>
           <button id="logout-btn" class="btn btn--outline"
@@ -374,6 +390,9 @@
       <a href="./login.html" class="btn btn--cta">Log In</a>
     </div>
     <div id="assignments-loading" class="assignments-loading" style="display:none;">Loading assignments...</div>
+    <div id="past-toggle-wrap" style="display:none; max-width:720px; margin:0 auto 12px; text-align:right;">
+      <button id="past-toggle-btn" style="background:none; border:none; font-size:13px; color:var(--muted); cursor:pointer; text-decoration:underline; padding:0;">Show past assignments</button>
+    </div>
     <div id="assignments-list" class="assignments-list" style="display:none;"></div>
     <div id="assignments-empty" class="assignments-empty" style="display:none;">No upcoming assignments found.</div>
     <div id="assignments-not-enrolled" class="assignments-not-enrolled" style="display:none;">Your email was not found in the course roster.</div>
@@ -399,7 +418,7 @@
     <small>
       <span class="thanks">Thanks for trying our tool.</span>
       <a href="mailto:autoremind@berkeley.edu" class="feedback"> Share your feedback to help us improve.</a><br>
-      <span style="font-size: 13px; color: #999; margin-top: 8px; display: inline-block;">
+      <span style="font-size: 13px; color: rgba(255,255,255,0.55); margin-top: 8px; display: inline-block;">
         &copy; 2026 AutoRemind. All rights reserved.
       </span>
     </small>
@@ -472,62 +491,133 @@
       }
     }
 
+    function renderDeadlines(deadlines) {
+      const listEl = document.getElementById('assignments-list');
+      listEl.innerHTML = deadlines.map(d => {
+        const overdue = isOverdue(d.due);
+        const sourceBadge = d.source === 'canvas' ? '<span class="source-badge canvas">bCourses</span>' : '';
+        return `
+          <div class="assignment-card"
+            tabindex="0"
+            role="button"
+            data-name="${escapeHtml(d.assignment_name || '')}"
+            data-due="${escapeHtml(d.due || '')}"
+            data-course="${escapeHtml(d.course_code || '')}"
+            data-url="${escapeHtml(d.html_url || '')}">
+            <div class="assignment-info">
+              <div class="assignment-name" title="${escapeHtml(d.assignment_name || 'Untitled')}">${escapeHtml(d.assignment_name || 'Untitled')}${sourceBadge}</div>
+              <div class="assignment-course">${escapeHtml(d.course_code || '')}</div>
+            </div>
+            <div class="assignment-due${overdue ? ' overdue' : ''}">
+              <span class="due-label">Due</span>
+              ${escapeHtml(formatDate(d.due))}
+            </div>
+            <svg class="assignment-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><polyline points="9 18 15 12 9 6"></polyline></svg>
+          </div>`;
+      }).join('');
+
+      listEl.querySelectorAll('.assignment-card').forEach(card => {
+        const open = () => {
+          if (card.dataset.url) {
+            window.open(card.dataset.url, '_blank', 'noopener');
+          } else {
+            openResourceModal(card.dataset.name, card.dataset.due, card.dataset.course);
+          }
+        };
+        card.addEventListener('click', open);
+        card.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); } });
+      });
+
+      listEl.style.display = 'grid';
+    }
+
     async function loadAssignments(email) {
       const loadingEl = document.getElementById('assignments-loading');
       const listEl = document.getElementById('assignments-list');
       const emptyEl = document.getElementById('assignments-empty');
       const notEnrolledEl = document.getElementById('assignments-not-enrolled');
+      const toggleWrap = document.getElementById('past-toggle-wrap');
+      const toggleBtn = document.getElementById('past-toggle-btn');
 
       loadingEl.style.display = 'block';
       listEl.style.display = 'none';
       emptyEl.style.display = 'none';
       notEnrolledEl.style.display = 'none';
+      toggleWrap.style.display = 'none';
 
       try {
-        const res = await fetch(`/api/deadlines?user_email=${encodeURIComponent(email)}`);
-        if (!res.ok) throw new Error('Failed to fetch');
-        const json = await res.json();
+        const token = await window.auth?.getToken();
+        const authHeader = token ? { 'Authorization': `Bearer ${token}` } : {};
+        const [gradesyncRes, canvasRes] = await Promise.all([
+          fetch(`/api/deadlines?user_email=${encodeURIComponent(email)}`, { headers: authHeader }),
+          fetch(`/api/canvas/deadlines?user_email=${encodeURIComponent(email)}`, { headers: authHeader }).catch(() => null)
+        ]);
+
         loadingEl.style.display = 'none';
 
-        if (!json.enrolled) {
+        let gradesyncDeadlines = [];
+        let enrolled = false;
+        if (gradesyncRes.ok) {
+          const json = await gradesyncRes.json();
+          enrolled = !!json.enrolled;
+          gradesyncDeadlines = (json.data || []).map(d => ({ ...d, source: 'gradesync' }));
+        }
+
+        let canvasDeadlines = [];
+        if (canvasRes && canvasRes.ok) {
+          const canvasJson = await canvasRes.json();
+          canvasDeadlines = (canvasJson.data || []).map(d => ({ ...d, source: 'canvas' }));
+        }
+
+        const allDeadlines = [...gradesyncDeadlines, ...canvasDeadlines];
+        allDeadlines.sort((a, b) => {
+          if (!a.due) return 1;
+          if (!b.due) return -1;
+          return new Date(a.due) - new Date(b.due);
+        });
+
+        if (allDeadlines.length === 0 && !enrolled && canvasDeadlines.length === 0) {
           notEnrolledEl.style.display = 'block';
           return;
         }
 
-        const deadlines = json.data || [];
-        if (deadlines.length === 0) {
+        const now = new Date();
+        const upcoming = allDeadlines.filter(d => !d.due || new Date(d.due) >= now);
+        const hasPast = allDeadlines.length > upcoming.length;
+
+        if (upcoming.length === 0 && allDeadlines.length === 0) {
           emptyEl.style.display = 'block';
           return;
         }
 
-        listEl.innerHTML = deadlines.map(d => {
-          const overdue = isOverdue(d.due);
-          return `
-            <div class="assignment-card"
-              tabindex="0"
-              role="button"
-              data-name="${escapeHtml(d.assignment_name || '')}"
-              data-due="${escapeHtml(d.due || '')}"
-              data-course="${escapeHtml(d.course_code || '')}">
-              <div class="assignment-info">
-                <div class="assignment-name">${escapeHtml(d.assignment_name || 'Untitled')}</div>
-                <div class="assignment-course">${escapeHtml(d.course_code || '')}</div>
-              </div>
-              <div class="assignment-due${overdue ? ' overdue' : ''}">
-                <span class="due-label">Due</span>
-                ${escapeHtml(formatDate(d.due))}
-              </div>
-              <svg class="assignment-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><polyline points="9 18 15 12 9 6"></polyline></svg>
-            </div>`;
-        }).join('');
+        // Show upcoming by default
+        if (upcoming.length === 0) {
+          emptyEl.style.display = 'block';
+        } else {
+          renderDeadlines(upcoming);
+        }
 
-        listEl.querySelectorAll('.assignment-card').forEach(card => {
-          const open = () => openResourceModal(card.dataset.name, card.dataset.due, card.dataset.course);
-          card.addEventListener('click', open);
-          card.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); } });
-        });
-
-        listEl.style.display = 'grid';
+        // Wire up toggle if there are past assignments
+        if (hasPast) {
+          toggleWrap.style.display = 'block';
+          let showingAll = false;
+          toggleBtn.addEventListener('click', () => {
+            showingAll = !showingAll;
+            emptyEl.style.display = 'none';
+            if (showingAll) {
+              renderDeadlines(allDeadlines);
+              toggleBtn.textContent = 'Hide past assignments';
+            } else {
+              if (upcoming.length === 0) {
+                listEl.style.display = 'none';
+                emptyEl.style.display = 'block';
+              } else {
+                renderDeadlines(upcoming);
+              }
+              toggleBtn.textContent = 'Show past assignments';
+            }
+          });
+        }
       } catch (e) {
         loadingEl.style.display = 'none';
         emptyEl.textContent = 'Error loading assignments. Please try again.';

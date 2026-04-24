@@ -1,0 +1,369 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="icon" href="/favicon.ico" sizes="any" /><link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
+  <title>Admin Dashboard - AutoRemind</title>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    .admin-tabs { display: flex; gap: 8px; margin-bottom: 24px; flex-wrap: wrap; }
+    .admin-tab { padding: 10px 20px; border: 1px solid var(--line); border-radius: 8px; background: #fff; cursor: pointer; font-weight: 500; }
+    .admin-tab.active { background: var(--gold); color: #1a1a1a; border-color: var(--gold-dark); }
+    .admin-tab:hover:not(.active) { background: #f5f5f5; }
+    .admin-section { display: none; }
+    .admin-section.active { display: block; }
+    .admin-table { width: 100%; border-collapse: collapse; margin-top: 16px; font-size: 14px; }
+    .admin-table th, .admin-table td { padding: 12px 8px; text-align: left; border-bottom: 1px solid var(--line); }
+    .admin-table th { background: #f9f9f9; font-weight: 600; }
+    .admin-table tr:hover { background: #fafafa; }
+    .admin-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 16px; margin-bottom: 24px; }
+    .stat-card { background: var(--pale); padding: 16px; border-radius: 12px; text-align: center; }
+    .stat-card .stat-value { font-size: 28px; font-weight: 700; color: var(--olive-dark); }
+    .stat-card .stat-label { font-size: 12px; color: var(--muted); margin-top: 4px; }
+    .resource-modal-overlay { display: none; position: fixed; z-index: 1000; inset: 0; background: rgba(0,0,0,0.35); justify-content: center; align-items: center; }
+    .resource-modal-overlay.visible { display: flex; }
+    .resource-modal { background: #fff; border-radius: 16px; padding: 28px; width: 90vw; max-width: 520px; box-shadow: 0 8px 32px rgba(0,0,0,0.18); }
+    .resource-modal h3 { margin: 0 0 20px; font-size: 18px; }
+    .resource-modal input, .resource-modal select { width: 100%; padding: 10px; margin-bottom: 12px; border: 1px solid var(--line); border-radius: 8px; box-sizing: border-box; font-size: 14px; }
+    .resource-modal .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .status-badge { padding: 4px 10px; border-radius: 999px; font-size: 11px; font-weight: 600; }
+    .status-badge.sent { background: #d4edda; color: #155724; }
+    .status-badge.failed { background: #f8d7da; color: #721c24; }
+    .btn-small { padding: 6px 12px; font-size: 13px; }
+    .btn-danger { background: #dc3545; color: #fff; border: none; }
+    .btn-danger:hover { background: #c82333; }
+    .filter-row { display: flex; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; align-items: center; }
+    .filter-row select, .filter-row input { padding: 8px 12px; border: 1px solid var(--line); border-radius: 8px; }
+    .unauthorized { text-align: center; padding: 64px; }
+    .pref-badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; margin-right: 4px; background: #e0e0e0; }
+    .pref-badge.active { background: var(--olive); color: #fff; font-weight: 600; }
+    .loading { text-align: center; padding: 40px; color: var(--muted); }
+    .table-wrap { overflow-x: auto; }
+  </style>
+</head>
+<body>
+  <div id="auth-loading" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center; background: white; z-index: 9999;">
+    <div style="width: 40px; height: 40px; margin-bottom: 16px; border: 4px solid #f3f3f3; border-top: 4px solid #002676; border-radius: 50%; animation: spin 1s linear infinite;"></div>
+    <div style="font-family: system-ui; color: #002676; font-weight: 600;">Loading Admin Dashboard...</div>
+  </div>
+  <style>@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }</style>
+
+  <nav class="nav">
+    <div class="container nav__container">
+      <a class="brand" href="./index.html"><img src="logo.png" alt="AutoRemind Logo">AutoRemind</a>
+      <div class="nav__content">
+        <div class="nav__links">
+          <span style="background: var(--gold); color: #1a1a1a; padding: 4px 12px; border-radius: 999px; font-size: 12px; font-weight: 600;">ADMIN</span>
+          <span id="admin-email" style="font-size: 14px; color: rgba(255,255,255,0.85);"></span>
+          <button id="logout-btn" class="btn btn--outline" style="padding: 8px 14px; font-size: 13px;">Sign Out</button>
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container" style="padding: 32px 0;">
+    <div id="unauthorized" class="unauthorized" style="display: none;">
+      <h2>Access Denied</h2>
+      <p>You do not have admin privileges.</p>
+      <a href="./index.html" class="btn btn--primary" style="margin-top: 16px;">Return Home</a>
+    </div>
+
+    <div id="admin-content" style="display: none;">
+      <h1 style="margin-bottom: 24px;">Admin Dashboard</h1>
+
+      <div class="admin-tabs">
+        <button class="admin-tab active" data-tab="overview">Overview</button>
+        <button class="admin-tab" data-tab="students">Students</button>
+        <button class="admin-tab" data-tab="deadlines">Deadlines</button>
+        <button class="admin-tab" data-tab="resources">Resources</button>
+        <button class="admin-tab" data-tab="delivery-logs">Delivery Logs</button>
+      </div>
+
+      <div id="section-overview" class="admin-section active">
+        <div class="admin-stats" id="overview-stats"></div>
+      </div>
+
+      <div id="section-students" class="admin-section">
+        <h2>Registered Students</h2>
+        <div id="students-content" class="loading">Loading students...</div>
+      </div>
+
+      <div id="section-deadlines" class="admin-section">
+        <h2>Assignment Deadlines</h2>
+        <div id="deadlines-content" class="loading">Loading deadlines...</div>
+      </div>
+
+      <div id="section-resources" class="admin-section">
+        <h2>Assignment Resources</h2>
+        <button class="btn btn--primary" id="add-resource-btn" style="margin-bottom: 16px;">+ Add Resource</button>
+        <div id="resources-content" class="loading">Loading resources...</div>
+      </div>
+
+      <div id="section-delivery-logs" class="admin-section">
+        <h2>Message Delivery Logs</h2>
+        <div class="filter-row">
+          <select id="filter-channel"><option value="">All Channels</option><option value="email">Email</option><option value="sms">SMS</option><option value="discord">Discord</option></select>
+          <select id="filter-status"><option value="">All Status</option><option value="sent">Sent</option><option value="failed">Failed</option></select>
+          <button class="btn btn--outline btn-small" id="apply-filters-btn">Apply</button>
+        </div>
+        <div class="admin-stats" id="delivery-stats"></div>
+        <div id="logs-content" class="loading">Loading logs...</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Resource Form Modal -->
+  <div class="resource-modal-overlay" id="resource-modal-overlay">
+    <div class="resource-modal">
+      <h3 id="form-title">Add New Resource</h3>
+      <input type="hidden" id="resource-id">
+      <div class="form-row">
+        <select id="course-code"><option value="">-- Select Course --</option></select>
+        <select id="assignment-name"><option value="">-- Select Assignment --</option></select>
+      </div>
+      <div class="form-row">
+        <input type="text" id="resource-name" placeholder="Resource Name" required>
+        <select id="resource-type"><option value="Reading">Reading</option><option value="Video">Video</option><option value="Slides">Slides</option><option value="Link">Link</option></select>
+      </div>
+      <input type="url" id="resource-link" placeholder="Resource URL" required>
+      <div style="display: flex; gap: 8px; margin-top: 4px;">
+        <button type="button" class="btn btn--primary" id="save-resource-btn">Save</button>
+        <button type="button" class="btn btn--outline" id="cancel-resource-btn">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let authToken = null;
+    let currentUser = null;
+
+    async function initFirebase() {
+      await new Promise(r => setTimeout(r, 100));
+      if (!window.FIREBASE_API_KEY) {
+        const res = await fetch('/api/config');
+        const config = await res.json();
+        window.FIREBASE_API_KEY = config.FIREBASE_API_KEY;
+        window.FIREBASE_AUTH_DOMAIN = config.FIREBASE_AUTH_DOMAIN;
+        window.FIREBASE_PROJECT_ID = config.FIREBASE_PROJECT_ID;
+      }
+      firebase.initializeApp({
+        apiKey: window.FIREBASE_API_KEY,
+        authDomain: window.FIREBASE_AUTH_DOMAIN,
+        projectId: window.FIREBASE_PROJECT_ID
+      });
+    }
+
+    async function fetchWithAuth(url, options = {}) {
+      if (!authToken) throw new Error('Not authenticated');
+      const res = await fetch(url, {
+        ...options,
+        headers: { ...options.headers, 'Authorization': `Bearer ${authToken}`, 'Content-Type': 'application/json' }
+      });
+      if (res.status === 403) throw new Error('Unauthorized');
+      return res.json();
+    }
+
+    async function loadStudents() {
+      try {
+        const { data } = await fetchWithAuth('/api/admin/students');
+        const html = `<div class="table-wrap"><table class="admin-table"><thead><tr><th>Email</th><th>Name</th><th>Phone</th><th>Discord</th><th>Days</th><th>Channels</th></tr></thead><tbody>${data.map(s => `<tr><td>${s.email || s.id}</td><td>${s.preferred_first_name || '-'}</td><td>${s.phone_number || '-'}</td><td>${s.discord_id || '-'}</td><td>${s.days_before_deadline ?? '-'}</td><td><span class="pref-badge ${s.email_pref ? 'active' : ''}">Email</span><span class="pref-badge ${s.phone_pref ? 'active' : ''}">SMS</span><span class="pref-badge ${s.discord_pref ? 'active' : ''}">Discord</span></td></tr>`).join('')}</tbody></table></div>`;
+        document.getElementById('students-content').innerHTML = html;
+        return data.length;
+      } catch (e) { document.getElementById('students-content').innerHTML = `<p>Error: ${e.message}</p>`; return 0; }
+    }
+
+    async function loadDeadlines() {
+      try {
+        const { data } = await fetchWithAuth('/api/admin/deadlines');
+        deadlinesData = data;
+        const html = `<div class="table-wrap"><table class="admin-table"><thead><tr><th>Assignment</th><th>Course</th><th>Due Date</th></tr></thead><tbody>${data.map(d => `<tr><td>${d.assignment_name || '-'}</td><td>${d.course_code || '-'}</td><td>${d.due ? new Date(d.due).toLocaleDateString() : '-'}</td></tr>`).join('')}</tbody></table></div>`;
+        document.getElementById('deadlines-content').innerHTML = html;
+        return data.length;
+      } catch (e) { document.getElementById('deadlines-content').innerHTML = `<p>Error: ${e.message}</p>`; return 0; }
+    }
+
+    function populateCourseDropdown(selectedCourse = '') {
+      // Merge course codes from both deadlines and existing resources
+      const fromDeadlines = deadlinesData.map(d => d.course_code);
+      const fromResources = resourcesData.map(r => r.course_code);
+      const courses = [...new Set([...fromDeadlines, ...fromResources].filter(Boolean))].sort();
+      // Always include the currently-selected value even if not in either source
+      if (selectedCourse && !courses.includes(selectedCourse)) courses.push(selectedCourse);
+      const sel = document.getElementById('course-code');
+      sel.innerHTML = '<option value="">-- Select Course --</option>' +
+        courses.map(c => `<option value="${c}" ${c === selectedCourse ? 'selected' : ''}>${c}</option>`).join('');
+      populateAssignmentDropdown(selectedCourse);
+    }
+
+    function populateAssignmentDropdown(courseCode, selectedAssignment = '') {
+      // Merge assignment names from both deadlines and existing resources
+      const fromDeadlines = deadlinesData
+        .filter(d => !courseCode || d.course_code === courseCode)
+        .map(d => d.assignment_name);
+      const fromResources = resourcesData
+        .filter(r => !courseCode || r.course_code === courseCode)
+        .map(r => r.assignment_name);
+      const unique = [...new Set([...fromDeadlines, ...fromResources].filter(Boolean))].sort();
+      // Always include the currently-selected value even if not in either source
+      if (selectedAssignment && !unique.includes(selectedAssignment)) unique.push(selectedAssignment);
+      const sel = document.getElementById('assignment-name');
+      sel.innerHTML = '<option value="">-- Select Assignment --</option>' +
+        unique.map(a => `<option value="${a}" ${a === selectedAssignment ? 'selected' : ''}>${a}</option>`).join('');
+    }
+
+    let deadlinesData = [];
+    let resourcesData = [];
+    async function loadResources() {
+      try {
+        const { data } = await fetchWithAuth('/api/admin/resources');
+        resourcesData = data;
+        renderResources();
+        return data.length;
+      } catch (e) { document.getElementById('resources-content').innerHTML = `<p>Error: ${e.message}</p>`; return 0; }
+    }
+
+    function renderResources() {
+      const html = `<div class="table-wrap"><table class="admin-table"><thead><tr><th>Assignment</th><th>Course</th><th>Resource</th><th>Type</th><th>Link</th><th>Actions</th></tr></thead><tbody>${resourcesData.map(r => `<tr><td>${r.assignment_name || '-'}</td><td>${r.course_code || '-'}</td><td>${r.resource_name || '-'}</td><td>${r.resource_type || '-'}</td><td><a href="${r.link}" target="_blank">Open</a></td><td><button class="btn btn-small btn--outline" data-action="edit" data-id="${r.id}">Edit</button> <button class="btn btn-small btn-danger" data-action="delete" data-id="${r.id}">Delete</button></td></tr>`).join('')}</tbody></table></div>`;
+      const container = document.getElementById('resources-content');
+      container.innerHTML = html;
+
+      container.querySelectorAll('[data-action="edit"]').forEach(btn => {
+        btn.addEventListener('click', () => editResource(btn.dataset.id));
+      });
+      container.querySelectorAll('[data-action="delete"]').forEach(btn => {
+        btn.addEventListener('click', () => deleteResource(btn.dataset.id));
+      });
+    }
+
+    async function saveResource() {
+      const id = document.getElementById('resource-id').value;
+      const data = {
+        assignment_name: document.getElementById('assignment-name').value,
+        course_code: document.getElementById('course-code').value,
+        resource_name: document.getElementById('resource-name').value,
+        resource_type: document.getElementById('resource-type').value,
+        link: document.getElementById('resource-link').value
+      };
+      if (id) data.id = id;
+      await fetchWithAuth('/api/admin/resources', { method: id ? 'PUT' : 'POST', body: JSON.stringify(data) });
+      hideResourceForm();
+      loadResources();
+    }
+
+    async function deleteResource(id) {
+      if (!confirm('Delete this resource?')) return;
+      await fetchWithAuth('/api/admin/resources', { method: 'DELETE', body: JSON.stringify({ id }) });
+      loadResources();
+    }
+
+    function editResource(id) {
+      const r = resourcesData.find(x => x.id === id);
+      if (!r) return;
+      document.getElementById('form-title').textContent = 'Edit Resource';
+      document.getElementById('resource-id').value = r.id;
+      populateCourseDropdown(r.course_code || '');
+      populateAssignmentDropdown(r.course_code || '', r.assignment_name || '');
+      document.getElementById('resource-name').value = r.resource_name || '';
+      document.getElementById('resource-type').value = r.resource_type || 'Link';
+      document.getElementById('resource-link').value = r.link || '';
+      document.getElementById('resource-modal-overlay').classList.add('visible');
+    }
+
+    function showResourceForm() {
+      document.getElementById('form-title').textContent = 'Add New Resource';
+      document.getElementById('resource-id').value = '';
+      populateCourseDropdown();
+      document.getElementById('resource-name').value = '';
+      document.getElementById('resource-type').value = 'Link';
+      document.getElementById('resource-link').value = '';
+      document.getElementById('resource-modal-overlay').classList.add('visible');
+    }
+
+    function hideResourceForm() {
+      document.getElementById('resource-modal-overlay').classList.remove('visible');
+    }
+
+    async function loadDeliveryLogs() {
+      try {
+        const channel = document.getElementById('filter-channel').value;
+        const status = document.getElementById('filter-status').value;
+        let url = '/api/admin/delivery-logs?limit=200';
+        if (channel) url += `&channel=${channel}`;
+        if (status) url += `&status=${status}`;
+        const { data, stats } = await fetchWithAuth(url);
+        document.getElementById('delivery-stats').innerHTML = `<div class="stat-card"><div class="stat-value">${stats.total}</div><div class="stat-label">Total</div></div><div class="stat-card"><div class="stat-value">${stats.sent}</div><div class="stat-label">Sent</div></div><div class="stat-card"><div class="stat-value">${stats.failed}</div><div class="stat-label">Failed</div></div><div class="stat-card"><div class="stat-value">${stats.by_channel.email}</div><div class="stat-label">Email</div></div><div class="stat-card"><div class="stat-value">${stats.by_channel.sms}</div><div class="stat-label">SMS</div></div><div class="stat-card"><div class="stat-value">${stats.by_channel.discord}</div><div class="stat-label">Discord</div></div>`;
+        const html = `<div class="table-wrap"><table class="admin-table"><thead><tr><th>Timestamp</th><th>Channel</th><th>Recipient</th><th>Status</th><th>Message ID</th><th>Error</th></tr></thead><tbody>${data.map(l => `<tr><td>${l.timestamp ? new Date(l.timestamp).toLocaleString() : '-'}</td><td>${l.channel || '-'}</td><td>${l.recipient || '-'}</td><td><span class="status-badge ${l.status}">${l.status}</span></td><td style="font-size:11px;">${l.provider_message_id || '-'}</td><td style="font-size:11px;color:#c00;">${l.error_message || '-'}</td></tr>`).join('')}</tbody></table></div>`;
+        document.getElementById('logs-content').innerHTML = html || '<p>No logs found.</p>';
+        return stats;
+      } catch (e) { document.getElementById('logs-content').innerHTML = `<p>Error: ${e.message}</p>`; return null; }
+    }
+
+    async function loadOverview() {
+      const [studentCount, deadlineCount, resourceCount, logStats] = await Promise.all([
+        loadStudents().then(n => n).catch(() => 0),
+        loadDeadlines().then(n => n).catch(() => 0),
+        loadResources().then(n => n).catch(() => 0),
+        loadDeliveryLogs().then(s => s).catch(() => null)
+      ]);
+      const successRate = logStats && logStats.total > 0 ? Math.round((logStats.sent / logStats.total) * 100) : 0;
+      document.getElementById('overview-stats').innerHTML = `<div class="stat-card"><div class="stat-value">${studentCount}</div><div class="stat-label">Students</div></div><div class="stat-card"><div class="stat-value">${deadlineCount}</div><div class="stat-label">Deadlines</div></div><div class="stat-card"><div class="stat-value">${resourceCount}</div><div class="stat-label">Resources</div></div><div class="stat-card"><div class="stat-value">${successRate}%</div><div class="stat-label">Delivery Rate</div></div>`;
+    }
+
+    document.addEventListener('DOMContentLoaded', async () => {
+      await initFirebase();
+
+      firebase.auth().onAuthStateChanged(async (user) => {
+        document.getElementById('auth-loading').style.display = 'none';
+        if (!user) { window.location.href = './login.html'; return; }
+
+        currentUser = user;
+        authToken = await user.getIdToken();
+        document.getElementById('admin-email').textContent = user.email;
+
+        // Test admin access
+        try {
+          await fetchWithAuth('/api/admin/students');
+          document.getElementById('admin-content').style.display = 'block';
+          loadOverview();
+        } catch (e) {
+          document.getElementById('unauthorized').style.display = 'block';
+        }
+      });
+
+      document.getElementById('logout-btn').onclick = () => firebase.auth().signOut().then(() => window.location.href = './login.html');
+
+      // Tab switching
+      document.querySelectorAll('.admin-tab').forEach(tab => {
+        tab.onclick = () => {
+          document.querySelectorAll('.admin-tab').forEach(t => t.classList.remove('active'));
+          document.querySelectorAll('.admin-section').forEach(s => s.classList.remove('active'));
+          tab.classList.add('active');
+          document.getElementById('section-' + tab.dataset.tab).classList.add('active');
+        };
+      });
+
+      document.getElementById('course-code').addEventListener('change', (e) => {
+        populateAssignmentDropdown(e.target.value);
+      });
+
+      document.getElementById('add-resource-btn').onclick = showResourceForm;
+      document.getElementById('cancel-resource-btn').onclick = hideResourceForm;
+      document.getElementById('save-resource-btn').onclick = saveResource;
+      document.getElementById('apply-filters-btn').onclick = loadDeliveryLogs;
+
+      // Close modal when clicking the backdrop
+      document.getElementById('resource-modal-overlay').addEventListener('click', (e) => {
+        if (e.target === document.getElementById('resource-modal-overlay')) hideResourceForm();
+      });
+
+      // Close modal on Escape key
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') hideResourceForm();
+      });
+    });
+  </script>
+</body>
+</html>

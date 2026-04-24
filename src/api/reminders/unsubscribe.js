@@ -1,8 +1,14 @@
 import { getDb } from '../firestore.js';
+import { verifyUserAuth } from '../auth/verifyUser.js';
 
 export default async function handler(req, res) {
     if (req.method !== 'POST') {
         return res.status(405).json({ error: 'Method not allowed' });
+    }
+
+    const authResult = await verifyUserAuth(req);
+    if (!authResult.authorized) {
+        return res.status(401).json({ error: authResult.error });
     }
 
     try {
@@ -15,13 +21,8 @@ export default async function handler(req, res) {
             }
         }
 
-        const { platforms = [], user_email, email } = body;
-        // Prefer user_email, fallback to email
-        const targetEmail = (user_email || email);
-
-        if (!targetEmail || typeof targetEmail !== 'string') {
-            return res.status(400).json({ error: 'Missing user email in request' });
-        }
+        const { platforms = [] } = body;
+        const targetEmail = authResult.email;
 
         const updates = {};
         const platformList = Array.isArray(platforms) ? platforms : [platforms];

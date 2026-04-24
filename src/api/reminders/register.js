@@ -1,4 +1,5 @@
 import { getDb } from '../firestore.js';
+import { verifyUserAuth } from '../auth/verifyUser.js';
 
 // Creates a minimal student document on first login (idempotent — no-op if already exists).
 export default async function handler(req, res) {
@@ -6,11 +7,16 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
+  const authResult = await verifyUserAuth(req);
+  if (!authResult.authorized) {
+    return res.status(401).json({ error: authResult.error });
+  }
+
   try {
     let body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
-    const { user_email, display_name } = body || {};
+    const { display_name } = body || {};
 
-    const loginEmail = typeof user_email === 'string' ? user_email.trim().toLowerCase() : null;
+    const loginEmail = authResult.email;
     if (!loginEmail) {
       return res.status(400).json({ error: 'user_email is required' });
     }

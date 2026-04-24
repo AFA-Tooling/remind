@@ -915,6 +915,118 @@ def gather_reminders(
     return reminders
 
 
+def gather_canvas_reminders(
+    db: firestore.Client,
+    args: argparse.Namespace,
+) -> List[Dict[str, Any]]:
+    """Gather reminders from Canvas-sourced deadlines for connected students."""
+
+    # Get all students with Canvas connected
+    students = fetch_collection_docs(db, DEFAULT_STUDENTS_TABLE, limit=args.limit, debug=args.debug)
+    canvas_students = [s for s in students if s.get("canvas_connected")]
+
+    if not canvas_students:
+        debug_print(args.debug, "No Canvas-connected students found.")
+        return []
+
+    today = datetime.now()
+    reminders: List[Dict[str, Any]] = []
+
+    for student in canvas_students:
+        student_email = (student.get("email") or "").strip().lower()
+        if not student_email:
+            continue
+
+        # Fetch this student's Canvas deadlines
+        canvas_docs = db.collection("canvas_deadlines").where(
+            "email", "==", student_email
+        ).stream()
+        canvas_deadlines = [doc.to_dict() for doc in canvas_docs]
+
+        if not canvas_deadlines:
+            debug_print(args.debug, f"No Canvas deadlines for {student_email}")
+            continue
+
+        freq_days = 0
+        freq_value = student.get(DEFAULT_FREQ_FIELD)
+        if freq_value is not None:
+            try:
+                freq_days = max(int(freq_value), 0)
+            except (TypeError, ValueError):
+                freq_days = 0
+
+        assignments_to_notify: List[Dict[str, Any]] = []
+
+        for dl in canvas_deadlines:
+            # Skip already submitted assignments
+            submission_state = dl.get("submission_state", "unsubmitted")
+            if submission_state in ("submitted", "graded"):
+                continue
+
+            due_str = dl.get("due")
+            if not due_str:
+                continue
+
+            due_date = parse_deadline(due_str)
+            if not due_date:
+                continue
+
+            delta_days = (due_date.date() - today.date()).days
+
+            # Skip past due
+            if delta_days < 0:
+                continue
+
+            # Exact match on notification frequency
+            if delta_days != freq_days:
+                debug_print(
+                    args.debug,
+                    f"Canvas skip {dl.get('assignment_name')}: delta {delta_days} != freq {freq_days}",
+                )
+                continue
+
+            assignments_to_notify.append({
+                "assignment_code": dl.get("course_code", ""),
+                "assignment_name": dl.get("assignment_name", ""),
+                "base_deadline": due_date,
+                "personal_deadline": due_date,
+                "offset_days": 0,
+                "notification_window_days": freq_days,
+                "resources": [],
+                "html_url": dl.get("html_url", ""),
+                "source": "canvas",
+            })
+
+        if not assignments_to_notify:
+            continue
+
+        channels = determine_channels(student)
+        if not channels:
+            continue
+
+        message = compose_message(student, assignments_to_notify, today=today)
+
+        reminders.append({
+            "student": {
+                "id": student.get("id"),
+                "name": f"{student.get('first_name', '')} {student.get('last_name', '')}".strip(),
+                "preferred_first_name": student.get("preferred_first_name"),
+                "email": student_email,
+                "sid": student.get("sid"),
+            },
+            "channels": channels,
+            "assignments": assignments_to_notify,
+            "message": message,
+        })
+
+    if reminders:
+        print(f"Canvas: {len(reminders)} students ready for reminders.")
+    else:
+        print("Canvas: No students currently fall within their notification windows.")
+
+    return reminders
+
+
 def run_raw_mode(db: firestore.Client, args: argparse.Namespace) -> None:
     print(f"Fetching data from collection '{args.table}'")
     rows = fetch_collection_docs(
@@ -930,6 +1042,10 @@ def run_raw_mode(db: firestore.Client, args: argparse.Namespace) -> None:
 
 def run_reminder_mode(db: firestore.Client, args: argparse.Namespace) -> None:
     reminders = gather_reminders(db, args)
+
+    # Merge Canvas reminders
+    canvas_reminders = gather_canvas_reminders(db, args)
+    reminders.extend(canvas_reminders)
 
     if not reminders:
         print("✅ No students currently fall within their notification windows.")

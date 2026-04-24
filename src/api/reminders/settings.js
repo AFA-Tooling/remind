@@ -1,18 +1,23 @@
 import { getDb } from '../firestore.js';
 import { sendWelcomeEmail } from '../../services/welcomeEmail.js';
+import { verifyUserAuth } from '../auth/verifyUser.js';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
+  const authResult = await verifyUserAuth(req);
+  if (!authResult.authorized) {
+    return res.status(401).json({ error: authResult.error });
+  }
+
   try {
     let body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
 
-    const { channels = {}, days_before, user_email, preferred_first_name } = body;
+    const { channels = {}, days_before, preferred_first_name } = body;
 
-    // 🔑 canonical email is always the login email from authenticated session
-    const loginEmail = typeof user_email === 'string' ? user_email.trim().toLowerCase() : null;
+    const loginEmail = authResult.email;
 
     const phoneNumber = channels.sms || null;
     const discordId = channels.discord || null;
