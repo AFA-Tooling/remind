@@ -962,8 +962,6 @@ def gather_canvas_reminders(
             submission_state = dl.get("submission_state", "unsubmitted")
             if submission_state in ("submitted", "graded"):
                 continue
-            if not dl.get("is_missing", True):
-                continue
 
             due_str = dl.get("due")
             if not due_str:
