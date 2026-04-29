@@ -1,0 +1,57 @@
+<nav class="nav">
+  <div class="container nav__container">
+    <a class="brand" href="/">
+      <img src="logo.png" alt="AutoRemind Logo">
+      AutoRemind
+    </a>
+    <div class="nav__content">
+      <div class="nav__links">
+        <a href="/#features" class="nav__link" id="nav-features-link" data-nav="features">Features</a>
+        <a href="/#how-it-works" class="nav__link" id="nav-howitworks-link" data-nav="how-it-works">How it works</a>
+        <a href="./about.html" class="nav__link" id="nav-about-link" data-nav="about">About</a>
+        <a href="./assignments.html" class="nav__link" id="nav-assignments-link" data-nav="assignments" style="display:none;">Assignments</a>
+        <a href="./login.html" id="nav-login-link" class="btn btn--outline" style="text-decoration:none; padding: 8px 16px; font-size: 14px;">Log in</a>
+        <a href="mailto:autoremind@berkeley.edu" class="btn btn--primary" style="text-decoration:none;">Contact Us</a>
+        <span id="user-email" style="display:none; font-size:14px; color:var(--text);"></span>
+        <button id="logout-btn" class="btn btn--outline" style="display:none; padding: 8px 14px; font-size: 13px;">Sign Out</button>
+      </div>
+      <button class="nav__toggle" id="nav-toggle" aria-label="Toggle navigation">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+          stroke-linecap="round" stroke-linejoin="round">
+          <line x1="3" y1="12" x2="21" y2="12"></line>
+          <line x1="3" y1="6" x2="21" y2="6"></line>
+          <line x1="3" y1="18" x2="21" y2="18"></line>
+        </svg>
+      </button>
+    </div>
+  </div>
+</nav>
+<script>
+  (function () {
+    var toggle = document.getElementById('nav-toggle');
+    if (toggle) {
+      toggle.addEventListener('click', function () {
+        document.querySelector('.nav').classList.toggle('nav--open');
+      });
+    }
+
+    var page = (document.body && document.body.getAttribute('data-page')) || '';
+
+    // Highlight active link
+    var activeLink = document.querySelector('.nav__link[data-nav="' + page + '"]');
+    if (activeLink) activeLink.classList.add('nav__link--active');
+
+    // Default visibility per page type. Per-page auth scripts continue to toggle these
+    // when auth state changes; this only sets the initial render.
+    var hide = function (id) { var el = document.getElementById(id); if (el) el.style.display = 'none'; };
+    if (page === 'index' || page === 'assignments') {
+      // Authed-only pages: marketing links and Log in are not relevant
+      hide('nav-features-link');
+      hide('nav-howitworks-link');
+      hide('nav-login-link');
+    } else if (page === 'login') {
+      // Already on the login page — the Log in button would be a no-op.
+      hide('nav-login-link');
+    }
+  })();
+</script>

@@ -37,6 +37,19 @@ import adminDeliveryLogsHandler from './api/admin/delivery-logs.js';
 // Use PORT from environment variable (GCP Cloud Run sets this) or default to 3000 for local dev
 const PORT = process.env.PORT || 3000;
 
+// Load shared header/footer partials once at startup. Pages opt in via
+// <!-- HEADER --> and <!-- FOOTER --> markers in their HTML.
+const PUBLIC_DIR = path.join(__dirname, '../public');
+const readPartial = (name) => {
+  try {
+    return fs.readFileSync(path.join(PUBLIC_DIR, name), 'utf-8');
+  } catch {
+    return '';
+  }
+};
+const HEADER_PARTIAL = readPartial('_header.html');
+const FOOTER_PARTIAL = readPartial('_footer.html');
+
 const server = http.createServer(async (req, res) => {
   // Enable CORS
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -437,13 +450,24 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // Block direct access to partials (files prefixed with _).
+  const lastSegment = urlPath.split('/').pop() || '';
+  if (lastSegment.startsWith('_') && lastSegment.endsWith('.html')) {
+    res.writeHead(404, { 'Content-Type': 'text/html' });
+    res.end('404 - Not Found', 'utf-8');
+    return;
+  }
+
   // Serve static files - use urlPath (without query string) for file path
   // Since server.js is in src/, static files are in ../public/
   let filePath = path.join(__dirname, '../public', urlPath);
 
-  // Handle root - default to index.html (Landing Page)
-  if (urlPath === '/' || urlPath === '/index.html') {
-    if (urlPath === '/') filePath = path.join(__dirname, '../public/index.html');
+  // Handle root - default to landing.html (marketing page).
+  // index.html (the dashboard) is gated by client-side auth and redirects
+  // unauthenticated users to login.html. The landing page itself redirects
+  // already-authenticated users to /index.html.
+  if (urlPath === '/') {
+    filePath = path.join(__dirname, '../public/landing.html');
   }
 
   const extname = String(path.extname(filePath)).toLowerCase();
@@ -475,6 +499,10 @@ const server = http.createServer(async (req, res) => {
         const canvasPatMode = !process.env.CANVAS_CLIENT_ID;
 
         let htmlContent = content.toString();
+
+        // Swap shared header/footer partials in for any page that opted in.
+        htmlContent = htmlContent.replace('<!-- HEADER -->', HEADER_PARTIAL);
+        htmlContent = htmlContent.replace('<!-- FOOTER -->', FOOTER_PARTIAL);
 
         // Inject credentials as the FIRST script in <head> to ensure it runs first
         const credentialsScript = `

@@ -28,7 +28,7 @@ steps:
       - --port=8080
       - --set-env-vars=FIREBASE_SERVICE_ACCOUNT_PATH=/app/services/config/firebase_service_account.json
       - >-
-        --set-secrets=FIREBASE_PROJECT_ID=FIREBASE_PROJECT_ID:latest,FIREBASE_API_KEY=FIREBASE_API_KEY:latest,FIREBASE_AUTH_DOMAIN=FIREBASE_AUTH_DOMAIN:latest,FIREBASE_SERVICE_ACCOUNT_JSON=FIREBASE_SERVICE_ACCOUNT_JSON:latest,/secrets/oauth/oauth_client_secret.json=oauth_client_secret:latest,/secrets/firebase_sa/firebase_service_account.json=firebase_service_account:latest,/secrets/gmail/token.json=gmail_token:latest
+        --set-secrets=FIREBASE_PROJECT_ID=FIREBASE_PROJECT_ID:latest,FIREBASE_API_KEY=FIREBASE_API_KEY:latest,FIREBASE_AUTH_DOMAIN=FIREBASE_AUTH_DOMAIN:latest,FIREBASE_SERVICE_ACCOUNT_JSON=FIREBASE_SERVICE_ACCOUNT_JSON:latest,ADMIN_EMAILS=ADMIN_EMAILS:latest,/secrets/oauth/oauth_client_secret.json=oauth_client_secret:latest,/secrets/firebase_sa/firebase_service_account.json=firebase_service_account:latest,/secrets/gmail/token.json=gmail_token:latest
       - --project=$PROJECT_ID
       - --quiet
 

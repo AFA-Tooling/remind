@@ -161,11 +161,15 @@ class FirebaseAuth {
             this.notifyListeners();
             return { data: result, error: null };
         } catch (error) {
-            console.error('Google sign in error:', error);
-            this.error = error;
+            const benignCodes = ['auth/popup-closed-by-user', 'auth/cancelled-popup-request', 'auth/popup-blocked'];
+            const isBenign = benignCodes.includes(error.code);
+            if (!isBenign) {
+                console.error('Google sign in error:', error);
+                this.error = error;
+            }
             this.loading = false;
             this.notifyListeners();
-            return { data: null, error };
+            return { data: null, error: isBenign ? null : error };
         }
     }
 
