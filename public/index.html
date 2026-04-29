@@ -551,7 +551,7 @@
         }
       } catch (e) {
         console.error('Unsubscribe error:', e);
-        showMessage(`Error unsubscribing: ${e.message}`, 'Error');
+        showMessage('Something went wrong. Please try again.', 'Error');
       }
     });
 
@@ -754,7 +754,8 @@
             status.style.color = '#c0392b';
           }
         } catch (e) {
-          status.textContent = `Error: ${e.message}`;
+          console.error('bCourses connect error:', e);
+          status.textContent = 'Something went wrong. Please try again.';
           status.style.color = '#c0392b';
         } finally {
           btn.disabled = false;
@@ -790,7 +791,8 @@
             status.style.color = '#c0392b';
           }
         } catch (e) {
-          status.textContent = `Sync error: ${e.message}`;
+          console.error('bCourses sync error:', e);
+          status.textContent = 'Something went wrong. Please try again.';
           status.style.color = '#c0392b';
         } finally {
           btn.disabled = false;
@@ -813,7 +815,8 @@
           showMessage('bCourses has been disconnected.', 'Disconnected');
           if (window.loadAssignmentsPreview) window.loadAssignmentsPreview(email);
         } catch (e) {
-          showMessage(`Error disconnecting: ${e.message}`, 'Error');
+          console.error('bCourses disconnect error:', e);
+          showMessage('Something went wrong. Please try again.', 'Error');
         }
       });
 

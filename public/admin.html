@@ -172,7 +172,7 @@
         const html = `<div class="table-wrap"><table class="admin-table"><thead><tr><th>Email</th><th>Name</th><th>Phone</th><th>Discord</th><th>Days</th><th>Channels</th></tr></thead><tbody>${data.map(s => `<tr><td>${s.email || s.id}</td><td>${s.preferred_first_name || '-'}</td><td>${s.phone_number || '-'}</td><td>${s.discord_id || '-'}</td><td>${s.days_before_deadline ?? '-'}</td><td><span class="pref-badge ${s.email_pref ? 'active' : ''}">Email</span><span class="pref-badge ${s.phone_pref ? 'active' : ''}">SMS</span><span class="pref-badge ${s.discord_pref ? 'active' : ''}">Discord</span></td></tr>`).join('')}</tbody></table></div>`;
         document.getElementById('students-content').innerHTML = html;
         return data.length;
-      } catch (e) { document.getElementById('students-content').innerHTML = `<p>Error: ${e.message}</p>`; return 0; }
+      } catch (e) { console.error('Load students error:', e); document.getElementById('students-content').innerHTML = '<p>Something went wrong. Please try again.</p>'; return 0; }
     }
 
     async function loadDeadlines() {
@@ -182,7 +182,7 @@
         const html = `<div class="table-wrap"><table class="admin-table"><thead><tr><th>Assignment</th><th>Course</th><th>Due Date</th></tr></thead><tbody>${data.map(d => `<tr><td>${d.assignment_name || '-'}</td><td>${d.course_code || '-'}</td><td>${d.due ? new Date(d.due).toLocaleDateString() : '-'}</td></tr>`).join('')}</tbody></table></div>`;
         document.getElementById('deadlines-content').innerHTML = html;
         return data.length;
-      } catch (e) { document.getElementById('deadlines-content').innerHTML = `<p>Error: ${e.message}</p>`; return 0; }
+      } catch (e) { console.error('Load deadlines error:', e); document.getElementById('deadlines-content').innerHTML = '<p>Something went wrong. Please try again.</p>'; return 0; }
     }
 
     function populateCourseDropdown(selectedCourse = '') {
@@ -222,7 +222,7 @@
         resourcesData = data;
         renderResources();
         return data.length;
-      } catch (e) { document.getElementById('resources-content').innerHTML = `<p>Error: ${e.message}</p>`; return 0; }
+      } catch (e) { console.error('Load resources error:', e); document.getElementById('resources-content').innerHTML = '<p>Something went wrong. Please try again.</p>'; return 0; }
     }
 
     function renderResources() {
@@ -298,7 +298,7 @@
         const html = `<div class="table-wrap"><table class="admin-table"><thead><tr><th>Timestamp</th><th>Channel</th><th>Recipient</th><th>Status</th><th>Message ID</th><th>Error</th></tr></thead><tbody>${data.map(l => `<tr><td>${l.timestamp ? new Date(l.timestamp).toLocaleString() : '-'}</td><td>${l.channel || '-'}</td><td>${l.recipient || '-'}</td><td><span class="status-badge ${l.status}">${l.status}</span></td><td style="font-size:11px;">${l.provider_message_id || '-'}</td><td style="font-size:11px;color:#c00;">${l.error_message || '-'}</td></tr>`).join('')}</tbody></table></div>`;
         document.getElementById('logs-content').innerHTML = html || '<p>No logs found.</p>';
         return stats;
-      } catch (e) { document.getElementById('logs-content').innerHTML = `<p>Error: ${e.message}</p>`; return null; }
+      } catch (e) { console.error('Load delivery logs error:', e); document.getElementById('logs-content').innerHTML = '<p>Something went wrong. Please try again.</p>'; return null; }
     }
 
     async function loadOverview() {

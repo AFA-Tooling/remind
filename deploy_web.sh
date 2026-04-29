@@ -132,6 +132,7 @@ _env_get() { grep "^${1}=" .env.local | head -1 | cut -d= -f2-; }
 FIREBASE_PROJECT_ID="$(_env_get FIREBASE_PROJECT_ID)"
 FIREBASE_API_KEY="$(_env_get FIREBASE_API_KEY)"
 FIREBASE_AUTH_DOMAIN="$(_env_get FIREBASE_AUTH_DOMAIN)"
+ADMIN_EMAILS="$(_env_get ADMIN_EMAILS)"
 
 # FIREBASE_SERVICE_ACCOUNT_JSON is the full JSON file content as a string
 FIREBASE_SERVICE_ACCOUNT_JSON=$(cat services/config/firebase_service_account.json)
@@ -141,6 +142,7 @@ create_or_update_secret_from_value "FIREBASE_PROJECT_ID"           "$FIREBASE_PR
 create_or_update_secret_from_value "FIREBASE_API_KEY"              "$FIREBASE_API_KEY"
 create_or_update_secret_from_value "FIREBASE_AUTH_DOMAIN"          "$FIREBASE_AUTH_DOMAIN"
 create_or_update_secret_from_value "FIREBASE_SERVICE_ACCOUNT_JSON" "$FIREBASE_SERVICE_ACCOUNT_JSON"
+create_or_update_secret_from_value "ADMIN_EMAILS"                  "$ADMIN_EMAILS"
 
 # File-mounted secrets (for Python email service)
 create_or_update_secret_from_file "oauth_client_secret"     "services/config/oauth_client_secret.json"
@@ -159,6 +161,7 @@ SECRETS=(
     FIREBASE_API_KEY
     FIREBASE_AUTH_DOMAIN
     FIREBASE_SERVICE_ACCOUNT_JSON
+    ADMIN_EMAILS
     oauth_client_secret
     firebase_service_account
     gmail_token
@@ -196,6 +199,7 @@ FIREBASE_PROJECT_ID=FIREBASE_PROJECT_ID:latest,\
 FIREBASE_API_KEY=FIREBASE_API_KEY:latest,\
 FIREBASE_AUTH_DOMAIN=FIREBASE_AUTH_DOMAIN:latest,\
 FIREBASE_SERVICE_ACCOUNT_JSON=FIREBASE_SERVICE_ACCOUNT_JSON:latest,\
+ADMIN_EMAILS=ADMIN_EMAILS:latest,\
 /secrets/oauth/oauth_client_secret.json=oauth_client_secret:latest,\
 /secrets/firebase_sa/firebase_service_account.json=firebase_service_account:latest,\
 /secrets/gmail/token.json=gmail_token:latest" \

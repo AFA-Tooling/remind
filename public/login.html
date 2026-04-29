@@ -147,8 +147,9 @@
           if (error) throw error;
         } catch (e) {
           console.error(e);
-          err.textContent = e.message;
+          err.textContent = 'Something went wrong. Please try again.';
           err.style.display = 'block';
+        } finally {
           btn.disabled = false;
           btn.style.opacity = '1';
           btn.innerHTML = 'Sign In with Google';
