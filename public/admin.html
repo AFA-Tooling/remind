@@ -333,7 +333,7 @@
         }
       });
 
-      document.getElementById('logout-btn').onclick = () => firebase.auth().signOut().then(() => window.location.href = './login.html');
+      document.getElementById('logout-btn').onclick = () => firebase.auth().signOut().then(() => window.location.href = '/');
 
       // Tab switching
       document.querySelectorAll('.admin-tab').forEach(tab => {

@@ -44,15 +44,17 @@
   <!-- Navigation -->
   <nav class="nav">
     <div class="container nav__container">
-      <a class="brand" href="./index.html">
+      <a class="brand" href="/">
         <img src="logo.png" alt="AutoRemind Logo">
         AutoRemind
       </a>
       <div class="nav__content">
         <div class="nav__links">
-          <a href="./about.html" class="nav__link nav__link--active">About Us</a>
+          <a href="/#features" class="nav__link" id="nav-features-link">Features</a>
+          <a href="/#how-it-works" class="nav__link" id="nav-howitworks-link">How it works</a>
+          <a href="./about.html" class="nav__link nav__link--active" id="nav-about-link">About</a>
           <a href="./assignments.html" class="nav__link" id="nav-assignments-link" style="display:none;">Assignments</a>
-          <!-- Contact Us -->
+          <a href="./login.html" id="nav-login-link" class="btn btn--outline" style="text-decoration:none; padding: 8px 16px; font-size: 14px;">Log in</a>
           <a href="mailto:autoremind@berkeley.edu" class="btn btn--primary" style="text-decoration:none;">Contact Us</a>
 
           <span id="user-email" style="display:none; font-size:14px; color:var(--text);"></span>
@@ -182,21 +184,33 @@
       waitForAuth((auth) => {
         const userEmail = document.getElementById('user-email');
         const logoutBtn = document.getElementById('logout-btn');
+        const loginLink = document.getElementById('nav-login-link');
+        const featuresLink = document.getElementById('nav-features-link');
+        const howItWorksLink = document.getElementById('nav-howitworks-link');
+        const aboutLink = document.getElementById('nav-about-link');
         auth.onAuthStateChange((user) => {
           if (user) {
             userEmail.textContent = user.email;
             userEmail.style.display = 'inline-block';
             logoutBtn.style.display = 'inline-block';
             document.getElementById('nav-assignments-link').style.display = 'inline-block';
+            if (loginLink) loginLink.style.display = 'none';
+            if (featuresLink) featuresLink.style.display = 'none';
+            if (howItWorksLink) howItWorksLink.style.display = 'none';
+            if (aboutLink) aboutLink.textContent = 'About Us';
           } else {
             userEmail.style.display = 'none';
             logoutBtn.style.display = 'none';
             document.getElementById('nav-assignments-link').style.display = 'none';
+            if (loginLink) loginLink.style.display = 'inline-block';
+            if (featuresLink) featuresLink.style.display = 'inline-block';
+            if (howItWorksLink) howItWorksLink.style.display = 'inline-block';
+            if (aboutLink) aboutLink.textContent = 'About';
           }
         });
         logoutBtn.onclick = async () => {
           await auth.signOut();
-          window.location.reload();
+          window.location.href = '/';
         };
       });
     })();

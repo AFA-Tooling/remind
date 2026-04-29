@@ -668,7 +668,7 @@
 
         document.getElementById('logout-btn').onclick = async () => {
           await auth.signOut();
-          window.location.reload();
+          window.location.href = '/';
         };
       });
     })();

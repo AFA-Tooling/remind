@@ -663,18 +663,9 @@
             // Fetch Settings
             fetchSettings(user.email);
             loadAssignmentsPreview(user.email);
-          } else {
-            // Not logged in
-            userEmail.style.display = 'none';
-            logoutBtn.style.display = 'none';
-            unsubLink.style.display = 'none';
-            document.querySelector('.cta-wrap').style.display = 'none';
-            document.getElementById('nav-assignments-link').style.display = 'none';
-            document.getElementById('assignments-section').style.display = 'none';
-            document.getElementById('scroll-arrow').style.display = 'none';
-
-            // Lock UI
-            appContainer.classList.add('is-locked');
+          } else if (!loading) {
+            // Auth resolved with no user — bounce to landing
+            window.location.replace('/');
           }
         });
 
@@ -758,7 +749,7 @@
 
         logoutBtn.onclick = async () => {
           await auth.signOut();
-          window.location.reload();
+          window.location.href = '/';
         };
       });
 

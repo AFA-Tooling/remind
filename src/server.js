@@ -441,9 +441,12 @@ const server = http.createServer(async (req, res) => {
   // Since server.js is in src/, static files are in ../public/
   let filePath = path.join(__dirname, '../public', urlPath);
 
-  // Handle root - default to index.html (Landing Page)
-  if (urlPath === '/' || urlPath === '/index.html') {
-    if (urlPath === '/') filePath = path.join(__dirname, '../public/index.html');
+  // Handle root - default to landing.html (marketing page).
+  // index.html (the dashboard) is gated by client-side auth and redirects
+  // unauthenticated users to login.html. The landing page itself redirects
+  // already-authenticated users to /index.html.
+  if (urlPath === '/') {
+    filePath = path.join(__dirname, '../public/landing.html');
   }
 
   const extname = String(path.extname(filePath)).toLowerCase();
