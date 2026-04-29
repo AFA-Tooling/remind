@@ -6,10 +6,11 @@ import argparse
 import csv
 import os
 import re
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date as date_type
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 from unicodedata import lookup
+from zoneinfo import ZoneInfo
 
 import firebase_admin
 from firebase_admin import credentials, firestore
@@ -22,6 +23,22 @@ if str(SERVICES_DIR) not in sys.path:
     sys.path.append(str(SERVICES_DIR))
 
 from shared import settings
+
+
+# Berkeley-local time. Naive datetimes (manually-uploaded CSV deadlines) are
+# interpreted as already being in this zone; tz-aware ones (Canvas, Z-UTC) are
+# converted to it before any date comparison.
+PROJECT_TZ = ZoneInfo("America/Los_Angeles")
+
+
+def local_today() -> date_type:
+    return datetime.now(PROJECT_TZ).date()
+
+
+def local_date(dt: datetime) -> date_type:
+    if dt.tzinfo is not None:
+        dt = dt.astimezone(PROJECT_TZ)
+    return dt.date()
 
 
 DEFAULT_STUDENTS_TABLE = "students"
@@ -151,6 +168,7 @@ def parse_deadline(value: str) -> Optional[datetime]:
     try:
         return datetime.fromisoformat(value)
     except ValueError:
+        print(f"⚠️  parse_deadline: unparseable value {value!r}, skipping")
         return None
 
 
@@ -535,13 +553,15 @@ def build_assignment_payload(
         return None
 
     freq_days = get_notification_frequency(student, code)
-    delta_days = (personal_deadline.date() - today.date()).days
-    
+    deadline_local = local_date(personal_deadline)
+    today_local = today.date() if today.tzinfo is None else today.astimezone(PROJECT_TZ).date()
+    delta_days = (deadline_local - today_local).days
+
     if is_target_student or debug:
         print(f"   Notification frequency (days_before_deadline): {freq_days} days")
         print(f"   Days until deadline (delta_days): {delta_days} days")
-        print(f"   Personal deadline date: {personal_deadline.date()}")
-        print(f"   Today date: {today.date()}")
+        print(f"   Personal deadline date (local): {deadline_local}")
+        print(f"   Today date (local): {today_local}")
     
     debug_print(
         debug,
@@ -581,7 +601,8 @@ def build_assignment_payload(
 
 def compose_message(student: Dict[str, Any], assignments: List[Dict[str, Any]], today: Optional[datetime] = None) -> str:
     if today is None:
-        today = datetime.now()
+        today = datetime.now(PROJECT_TZ)
+    today_local = today.date() if today.tzinfo is None else today.astimezone(PROJECT_TZ).date()
     preferred_name = (
         student.get("preferred_first_name")
         or student.get("first_name")
@@ -594,8 +615,11 @@ def compose_message(student: Dict[str, Any], assignments: List[Dict[str, Any]], 
     ]
 
     for assignment in assignments:
-        due_dt = assignment["personal_deadline"]
-        days_until = (due_dt.date() - today.date()).days
+        due_dt = assignment.get("personal_deadline")
+        if not due_dt:
+            continue
+        deadline_local = local_date(due_dt)
+        days_until = (deadline_local - today_local).days
         due_date_str = f"{due_dt.strftime('%B')} {due_dt.day}"
         if days_until == 0:
             days_label = "due today"
@@ -665,10 +689,10 @@ def write_discord_csv(reminders: List[Dict[str, Any]], output_path: Path) -> Non
 
 def _safe_filename_basic(name: str) -> str:
     """
-    Return a Windows-safe filename by replacing ':' and runs of '*' with ' - ', etc
+    Return a filename safe across Windows/POSIX by replacing reserved characters
+    (including path separators '/' and '\\') with ' - '.
     """
-    cleaned = name.replace(":", " - ")
-    cleaned = re.sub(r'\*+', ' - ', cleaned)
+    cleaned = re.sub(r'[\\/:*?"<>|]+', ' - ', name)
     cleaned = re.sub(r'\s+', ' ', cleaned).strip().rstrip(' .')
     return cleaned
 
@@ -813,7 +837,7 @@ def gather_reminders(
         limit=args.limit,
         debug=args.debug,
     )
-    today = datetime.now()
+    today = datetime.now(PROJECT_TZ)
 
     # Debug: Check if target student is in the list
     target_email = "autoremindberkeley@gmail.com"
@@ -841,78 +865,94 @@ def gather_reminders(
 
     reminders: List[Dict[str, Any]] = []
     for student in students:
-        student_email = student.get("email", "")
-        is_target = target_email.lower() in str(student_email).lower()
-        
-        if is_target or args.debug:
-            print(f"\n{'='*80}")
-            print(f"📋 Processing student: {student_email}")
-            print(f"   email_pref: {student.get('email_pref')}")
-            print(f"   days_before_deadline: {student.get('days_before_deadline')}")
-            print(f"   Note: All students in table are considered opted-in")
-
-        assignments_to_notify: List[Dict[str, Any]] = []
-        #assignment_codes = collect_assignment_codes(student)
-        assignment_codes = collect_assignment_codes(student, assignment_lookup)
-        
-        if is_target or args.debug:
-            print(f"   Assignment codes found: {assignment_codes}")
-        
-        for code in assignment_codes:
-            payload = build_assignment_payload(
-                student,
-                code,
-                assignment_lookup,
-                today,
-                debug=args.debug or is_target,  # Always debug for target student
+        try:
+            reminder = _build_reminder_for_student(
+                student, assignment_lookup, submission_lookup, today, target_email, args
             )
-            if payload:
-                assignment_name = payload["assignment_name"]
-                if not is_missing_submission(student_email, assignment_name, submission_lookup):
-                    if is_target or args.debug:
-                        print(f"   ⏭️  Skipping {code}: already submitted")
-                    continue
-                assignments_to_notify.append(payload)
-                if is_target or args.debug:
-                    print(f"   ✅ Added assignment to notify: {code}")
-
-        if not assignments_to_notify:
-            if is_target or args.debug:
-                print(f"   ❌ No assignments matched notification window criteria")
+        except Exception as exc:
+            print(f"⚠️  Skipping student {student.get('email', student.get('id', 'unknown'))}: {exc!r}")
             continue
-
-        channels = determine_channels(student)
-        if is_target or args.debug:
-            print(f"   Channels determined: {channels}")
-        
-        if not channels:
-            channels = [{"type": "none", "target": "(no opted-in channels)"}]
-            if is_target or args.debug:
-                print(f"   ⚠️  WARNING: No channels found! Student won't receive reminders.")
-
-        message = compose_message(student, assignments_to_notify, today=today)
-
-        reminders.append(
-            {
-                "student": {
-                    "id": student.get("id"),
-                    "name": f"{student.get('first_name', '')} {student.get('last_name', '')}".strip(),
-                    "preferred_first_name": student.get("preferred_first_name"),
-                    "email": student.get("email"),
-                    "sid": student.get("sid"),
-                },
-                "channels": channels,
-                "assignments": assignments_to_notify,
-                "message": message,
-            }
-        )
-        
-        if is_target:
-            print(f"   ✅ REMINDER CREATED for {student_email}")
-            print(f"   Assignments: {[a['assignment_name'] for a in assignments_to_notify]}")
-            print(f"   Channels: {[c['type'] for c in channels]}")
+        if reminder:
+            reminders.append(reminder)
 
     return reminders
+
+
+def _build_reminder_for_student(
+    student: Dict[str, Any],
+    assignment_lookup: Dict[str, Dict[str, Dict[str, Any]]],
+    submission_lookup: Dict[Any, str],
+    today: datetime,
+    target_email: str,
+    args: argparse.Namespace,
+) -> Optional[Dict[str, Any]]:
+    student_email = student.get("email", "")
+    is_target = target_email.lower() in str(student_email).lower()
+
+    if is_target or args.debug:
+        print(f"\n{'='*80}")
+        print(f"📋 Processing student: {student_email}")
+        print(f"   email_pref: {student.get('email_pref')}")
+        print(f"   days_before_deadline: {student.get('days_before_deadline')}")
+        print(f"   Note: All students in table are considered opted-in")
+
+    assignments_to_notify: List[Dict[str, Any]] = []
+    assignment_codes = collect_assignment_codes(student, assignment_lookup)
+
+    if is_target or args.debug:
+        print(f"   Assignment codes found: {assignment_codes}")
+
+    for code in assignment_codes:
+        payload = build_assignment_payload(
+            student,
+            code,
+            assignment_lookup,
+            today,
+            debug=args.debug or is_target,
+        )
+        if payload:
+            assignment_name = payload["assignment_name"]
+            if not is_missing_submission(student_email, assignment_name, submission_lookup):
+                if is_target or args.debug:
+                    print(f"   ⏭️  Skipping {code}: already submitted")
+                continue
+            assignments_to_notify.append(payload)
+            if is_target or args.debug:
+                print(f"   ✅ Added assignment to notify: {code}")
+
+    if not assignments_to_notify:
+        if is_target or args.debug:
+            print(f"   ❌ No assignments matched notification window criteria")
+        return None
+
+    channels = determine_channels(student)
+    if is_target or args.debug:
+        print(f"   Channels determined: {channels}")
+
+    if not channels:
+        channels = [{"type": "none", "target": "(no opted-in channels)"}]
+        if is_target or args.debug:
+            print(f"   ⚠️  WARNING: No channels found! Student won't receive reminders.")
+
+    message = compose_message(student, assignments_to_notify, today=today)
+
+    if is_target:
+        print(f"   ✅ REMINDER CREATED for {student_email}")
+        print(f"   Assignments: {[a['assignment_name'] for a in assignments_to_notify]}")
+        print(f"   Channels: {[c['type'] for c in channels]}")
+
+    return {
+        "student": {
+            "id": student.get("id"),
+            "name": f"{student.get('first_name', '')} {student.get('last_name', '')}".strip(),
+            "preferred_first_name": student.get("preferred_first_name"),
+            "email": student.get("email"),
+            "sid": student.get("sid"),
+        },
+        "channels": channels,
+        "assignments": assignments_to_notify,
+        "message": message,
+    }
 
 
 def gather_canvas_reminders(
@@ -929,95 +969,18 @@ def gather_canvas_reminders(
         debug_print(args.debug, "No Canvas-connected students found.")
         return []
 
-    today = datetime.now()
+    today = datetime.now(PROJECT_TZ)
+    today_local = today.date()
     reminders: List[Dict[str, Any]] = []
 
     for student in canvas_students:
-        student_email = (student.get("email") or "").strip().lower()
-        if not student_email:
+        try:
+            reminder = _build_canvas_reminder_for_student(db, student, today, today_local, args)
+        except Exception as exc:
+            print(f"⚠️  Canvas: skipping student {student.get('email', student.get('id', 'unknown'))}: {exc!r}")
             continue
-
-        # Fetch this student's Canvas deadlines
-        canvas_docs = db.collection("canvas_deadlines").where(
-            "email", "==", student_email
-        ).stream()
-        canvas_deadlines = [doc.to_dict() for doc in canvas_docs]
-
-        if not canvas_deadlines:
-            debug_print(args.debug, f"No Canvas deadlines for {student_email}")
-            continue
-
-        freq_days = 0
-        freq_value = student.get(DEFAULT_FREQ_FIELD)
-        if freq_value is not None:
-            try:
-                freq_days = max(int(freq_value), 0)
-            except (TypeError, ValueError):
-                freq_days = 0
-
-        assignments_to_notify: List[Dict[str, Any]] = []
-
-        for dl in canvas_deadlines:
-            # Skip already submitted assignments
-            submission_state = dl.get("submission_state", "unsubmitted")
-            if submission_state in ("submitted", "graded"):
-                continue
-
-            due_str = dl.get("due")
-            if not due_str:
-                continue
-
-            due_date = parse_deadline(due_str)
-            if not due_date:
-                continue
-
-            delta_days = (due_date.date() - today.date()).days
-
-            # Skip past due
-            if delta_days < 0:
-                continue
-
-            # Exact match on notification frequency
-            if delta_days != freq_days:
-                debug_print(
-                    args.debug,
-                    f"Canvas skip {dl.get('assignment_name')}: delta {delta_days} != freq {freq_days}",
-                )
-                continue
-
-            assignments_to_notify.append({
-                "assignment_code": dl.get("course_code", ""),
-                "assignment_name": dl.get("assignment_name", ""),
-                "base_deadline": due_date,
-                "personal_deadline": due_date,
-                "offset_days": 0,
-                "notification_window_days": freq_days,
-                "resources": [],
-                "html_url": dl.get("html_url", ""),
-                "source": "canvas",
-            })
-
-        if not assignments_to_notify:
-            continue
-
-        channels = determine_channels(student)
-        if not channels:
-            continue
-
-        message = compose_message(student, assignments_to_notify, today=today)
-
-        reminders.append({
-            "student": {
-                "id": student.get("id"),
-                "name": f"{student.get('first_name', '')} {student.get('last_name', '')}".strip(),
-                "preferred_first_name": student.get("preferred_first_name"),
-                "email": student_email,
-                "sid": student.get("sid"),
-            },
-            "channels": channels,
-            "assignments": assignments_to_notify,
-            "message": message,
-        })
+        if reminder:
+            reminders.append(reminder)
 
     if reminders:
         print(f"Canvas: {len(reminders)} students ready for reminders.")
@@ -1025,6 +988,96 @@ def gather_canvas_reminders(
         print("Canvas: No students currently fall within their notification windows.")
 
     return reminders
+
+
+def _build_canvas_reminder_for_student(
+    db: firestore.Client,
+    student: Dict[str, Any],
+    today: datetime,
+    today_local: date_type,
+    args: argparse.Namespace,
+) -> Optional[Dict[str, Any]]:
+    student_email = (student.get("email") or "").strip().lower()
+    if not student_email:
+        return None
+
+    canvas_docs = db.collection("canvas_deadlines").where(
+        "email", "==", student_email
+    ).stream()
+    canvas_deadlines = [doc.to_dict() for doc in canvas_docs]
+
+    if not canvas_deadlines:
+        debug_print(args.debug, f"No Canvas deadlines for {student_email}")
+        return None
+
+    freq_days = 0
+    freq_value = student.get(DEFAULT_FREQ_FIELD)
+    if freq_value is not None:
+        try:
+            freq_days = max(int(freq_value), 0)
+        except (TypeError, ValueError):
+            freq_days = 0
+
+    assignments_to_notify: List[Dict[str, Any]] = []
+
+    for dl in canvas_deadlines:
+        submission_state = dl.get("submission_state", "unsubmitted")
+        if submission_state in ("submitted", "graded"):
+            continue
+
+        due_str = dl.get("due")
+        if not due_str:
+            continue
+
+        due_date = parse_deadline(due_str)
+        if not due_date:
+            continue
+
+        delta_days = (local_date(due_date) - today_local).days
+
+        if delta_days < 0:
+            continue
+
+        if delta_days != freq_days:
+            debug_print(
+                args.debug,
+                f"Canvas skip {dl.get('assignment_name')}: delta {delta_days} != freq {freq_days}",
+            )
+            continue
+
+        assignments_to_notify.append({
+            "assignment_code": dl.get("course_code", ""),
+            "assignment_name": dl.get("assignment_name", ""),
+            "base_deadline": due_date,
+            "personal_deadline": due_date,
+            "offset_days": 0,
+            "notification_window_days": freq_days,
+            "resources": [],
+            "html_url": dl.get("html_url", ""),
+            "source": "canvas",
+        })
+
+    if not assignments_to_notify:
+        return None
+
+    channels = determine_channels(student)
+    if not channels:
+        return None
+
+    message = compose_message(student, assignments_to_notify, today=today)
+
+    return {
+        "student": {
+            "id": student.get("id"),
+            "name": f"{student.get('first_name', '')} {student.get('last_name', '')}".strip(),
+            "preferred_first_name": student.get("preferred_first_name"),
+            "email": student_email,
+            "sid": student.get("sid"),
+        },
+        "channels": channels,
+        "assignments": assignments_to_notify,
+        "message": message,
+    }
 
 
 def run_raw_mode(db: firestore.Client, args: argparse.Namespace) -> None:

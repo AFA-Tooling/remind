@@ -21,7 +21,7 @@ if str(SERVICES_DIR) not in sys.path:
     sys.path.append(str(SERVICES_DIR))
 
 from shared import settings
-from canvas_sync.canvas_client import canvas_fetch, refresh_access_token
+from canvas_client import canvas_fetch, refresh_access_token
 
 # Refresh tokens 5 minutes before expiry
 REFRESH_BUFFER_SECONDS = 5 * 60
