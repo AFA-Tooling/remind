@@ -378,34 +378,8 @@
   </style>
 </head>
 
-<body>
-  <!-- Navigation (matches about.html) -->
-  <nav class="nav">
-    <div class="container nav__container">
-      <a class="brand" href="./landing.html">
-        <img src="logo.png" alt="AutoRemind Logo">
-        AutoRemind
-      </a>
-      <div class="nav__content">
-        <div class="nav__links">
-          <a href="#features" class="nav__link">Features</a>
-          <a href="#how-it-works" class="nav__link">How it works</a>
-          <a href="./about.html" class="nav__link">About</a>
-          <a href="./login.html" class="btn btn--outline" style="text-decoration:none; padding: 8px 16px; font-size: 14px;">Log in</a>
-          <a href="mailto:autoremind@berkeley.edu" class="btn btn--primary" style="text-decoration:none;">Contact Us</a>
-        </div>
-
-        <button class="nav__toggle" id="nav-toggle" aria-label="Toggle navigation">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-            stroke-linecap="round" stroke-linejoin="round">
-            <line x1="3" y1="12" x2="21" y2="12"></line>
-            <line x1="3" y1="6" x2="21" y2="6"></line>
-            <line x1="3" y1="18" x2="21" y2="18"></line>
-          </svg>
-        </button>
-      </div>
-    </div>
-  </nav>
+<body data-page="landing">
+  <!-- HEADER -->
 
   <main class="container">
     <!-- Hero -->
@@ -590,24 +564,9 @@
     </section>
   </main>
 
-  <!-- Footer (matches about.html) -->
-  <div class="arc-bg"></div>
-  <footer class="site-footer container">
-    <small>
-      <span class="thanks">Thanks for using AutoRemind.</span>
-      <span class="feedback"> Part of the AFA-Tooling ecosystem.</span><br>
-      <span style="font-size: 13px; color: rgba(255,255,255,0.55); margin-top: 8px; display: inline-block;">
-        &copy; 2026 AutoRemind. All rights reserved.
-      </span>
-    </small>
-  </footer>
+  <!-- FOOTER -->
 
   <script>
-    // Responsive nav toggle
-    document.getElementById('nav-toggle').addEventListener('click', () => {
-      document.querySelector('.nav').classList.toggle('nav--open');
-    });
-
     // Auth: surface sign-out for already-logged-in visitors
     (function () {
       function waitForAuth(cb) {

@@ -340,7 +340,7 @@
   </style>
 </head>
 
-<body>
+<body data-page="assignments">
   <div id="auth-loading"
     style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center; background: white; z-index: 9999;">
     <div
@@ -349,33 +349,7 @@
     <div style="font-family: system-ui; color: #002676; font-weight: 600;">Loading AutoRemind...</div>
   </div>
 
-  <!-- Navigation -->
-  <nav class="nav">
-    <div class="container nav__container">
-      <a class="brand" href="./index.html">
-        <img src="logo.png" alt="AutoRemind Logo">
-        AutoRemind
-      </a>
-      <div class="nav__content">
-        <div class="nav__links">
-          <a href="./about.html" class="nav__link">About Us</a>
-          <a href="./assignments.html" class="nav__link nav__link--active" id="nav-assignments-link" style="display:none;">Assignments</a>
-          <a href="mailto:autoremind@berkeley.edu" class="btn btn--primary" style="text-decoration:none;">Contact Us</a>
-          <span id="user-email" style="display:none; font-size:14px; color:var(--text);"></span>
-          <button id="logout-btn" class="btn btn--outline"
-            style="display:none; padding: 8px 14px; font-size: 13px;">Sign Out</button>
-        </div>
-        <button class="nav__toggle" id="nav-toggle" aria-label="Toggle navigation">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-            stroke-linecap="round" stroke-linejoin="round">
-            <line x1="3" y1="12" x2="21" y2="12"></line>
-            <line x1="3" y1="6" x2="21" y2="6"></line>
-            <line x1="3" y1="18" x2="21" y2="18"></line>
-          </svg>
-        </button>
-      </div>
-    </div>
-  </nav>
+  <!-- HEADER -->
 
   <!-- Hero -->
   <section class="assignments-hero">
@@ -412,23 +386,9 @@
     </div>
   </div>
 
-  <!-- Footer -->
-  <div class="arc-bg"></div>
-  <footer class="site-footer container">
-    <small>
-      <span class="thanks">Thanks for trying our tool.</span>
-      <a href="mailto:autoremind@berkeley.edu" class="feedback"> Share your feedback to help us improve.</a><br>
-      <span style="font-size: 13px; color: rgba(255,255,255,0.55); margin-top: 8px; display: inline-block;">
-        &copy; 2026 AutoRemind. All rights reserved.
-      </span>
-    </small>
-  </footer>
+  <!-- FOOTER -->
 
   <script>
-    document.getElementById('nav-toggle').addEventListener('click', () => {
-      document.querySelector('.nav').classList.toggle('nav--open');
-    });
-
     function formatDate(isoStr) {
       if (!isoStr) return 'TBD';
       const d = new Date(isoStr);

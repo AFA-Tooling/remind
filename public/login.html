@@ -90,30 +90,8 @@
   </style>
 </head>
 
-<body>
-  <!-- Navigation -->
-  <nav class="nav">
-    <div class="container nav__container">
-      <a class="brand" href="./index.html">
-        <img src="logo.png" alt="AutoRemind Logo">
-        AutoRemind
-      </a>
-      <div class="nav__content">
-        <div class="nav__links">
-          <a href="./about.html" class="nav__link">About Us</a>
-          <a href="mailto:autoremind@berkeley.edu" class="btn btn--primary" style="text-decoration:none;">Contact Us</a>
-        </div>
-        <button class="nav__toggle" id="nav-toggle" aria-label="Toggle navigation">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-            stroke-linecap="round" stroke-linejoin="round">
-            <line x1="3" y1="12" x2="21" y2="12"></line>
-            <line x1="3" y1="6" x2="21" y2="6"></line>
-            <line x1="3" y1="18" x2="21" y2="18"></line>
-          </svg>
-        </button>
-      </div>
-    </div>
-  </nav>
+<body data-page="login">
+  <!-- HEADER -->
 
   <!-- Login Hero -->
   <section class="hero">
@@ -138,16 +116,9 @@
     <div id="error-message" class="error-message"></div>
   </section>
 
-  <div class="arc-bg"></div>
-  <footer class="site-footer container">
-    <small>© 2026 AutoRemind. All rights reserved.</small>
-  </footer>
+  <!-- FOOTER -->
 
   <script>
-    document.getElementById('nav-toggle').addEventListener('click', () => {
-      document.querySelector('.nav').classList.toggle('nav--open');
-    });
-
     // Wait for auth
     function waitForAuth(callback) {
       let attempts = 0;

@@ -65,7 +65,7 @@
   </style>
 </head>
 
-<body>
+<body data-page="index">
   <div id="auth-loading"
     style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center; background: white; z-index: 9999;">
     <div
@@ -74,37 +74,7 @@
     <div style="font-family: system-ui; color: #002676; font-weight: 600;">Loading AutoRemind...</div>
   </div>
 
-  <!-- Navigation (Responsive Structure) -->
-  <nav class="nav">
-    <div class="container nav__container">
-      <a class="brand" href="./index.html">
-        <img src="logo.png" alt="AutoRemind Logo">
-        AutoRemind
-      </a>
-
-      <div class="nav__content">
-        <div class="nav__links">
-          <a href="./about.html" class="nav__link">About Us</a>
-          <a href="./assignments.html" class="nav__link" id="nav-assignments-link" style="display:none;">Assignments</a>
-          <!-- Contact Us is hidden on mobile often, but we keep it in links -->
-          <a href="mailto:autoremind@berkeley.edu" class="btn btn--primary" style="text-decoration:none;">Contact Us</a>
-
-          <span id="user-email" style="display:none; font-size:14px; color:var(--text);"></span>
-          <button id="logout-btn" class="btn btn--outline"
-            style="display:none; padding: 8px 14px; font-size: 13px;">Sign Out</button>
-        </div>
-
-        <button class="nav__toggle" id="nav-toggle" aria-label="Toggle navigation">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-            stroke-linecap="round" stroke-linejoin="round">
-            <line x1="3" y1="12" x2="21" y2="12"></line>
-            <line x1="3" y1="6" x2="21" y2="6"></line>
-            <line x1="3" y1="18" x2="21" y2="18"></line>
-          </svg>
-        </button>
-      </div>
-    </div>
-  </nav>
+  <!-- HEADER -->
 
   <!-- First Screen (hero + form, fits viewport) -->
   <div class="first-screen">
@@ -175,7 +145,8 @@
               <!-- revealed on check -->
               <input id="sms-field" class="channel-field expansion-field" type="tel" name="sms_number"
                 placeholder="(555) 123-4567" inputmode="tel" />
-              <div style="font-size: 12px; color: var(--muted); margin: 4px 0 0 4px;">Standard messaging rates apply.
+              <div id="sms-consent" class="expansion-field" style="font-size: 12px; color: var(--muted); margin: 6px 0 0 4px; line-height: 1.5;">
+                By enabling SMS, you agree to receive recurring assignment reminder text messages from AutoRemind, a student deadline reminder project from Professor Dan Garcia's Berkeley CS Education research group. SMS is optional and not required to use AutoRemind &mdash; you can use email or Discord instead. Message frequency varies based on your reminder settings. Message and data rates may apply. Reply STOP to opt out, or use the unsubscribe link below at any time.
               </div>
             </li>
             <li>
@@ -278,18 +249,6 @@
     </div>
   </section>
 
-  <!-- Agreement Popup Modal -->
-  <div id="agreement-modal" class="modal-overlay">
-    <div class="modal-content">
-      <h2 style="margin-top:0;">Agreement Required</h2>
-      <p style="font-size:16px;">Do you consent to receive informational messages & alerts from AutoRemind?</p>
-      <p style="font-size:13px; color:#555; margin-bottom:24px;">Message frequency varies. <br> Message & data rates may
-        apply. <br> <br> Note: You can cancel any time by clicking "Unsubscribe" below.</p>
-      <button id="agree-btn" class="btn btn--primary" style="margin-right:10px;">I Agree</button>
-      <button id="cancel-btn" class="btn btn--outline">Cancel</button>
-    </div>
-  </div>
-
   <!-- Success Popup Modal -->
   <div id="success-modal" class="modal-overlay">
     <div class="modal-content">
@@ -355,27 +314,10 @@
     </div>
   </div>
 
-  <!-- Footer -->
-  <div class="arc-bg"></div>
-  <footer class="site-footer container">
-    <small>
-      <span class="thanks">Thanks for trying our tool.</span>
-      <a href="mailto:autoremind@berkeley.edu" class="feedback"> Share your feedback to help us improve.</a><br>
-      <a href="#" id="unsubscribe-link"
-        style="text-decoration: underline; color: rgba(255,255,255,0.75); margin-top: 8px; display: none;">Unsubscribe</a><br>
-      <span style="font-size: 13px; color: rgba(255,255,255,0.55); margin-top: 8px; display: inline-block;">
-        &copy; 2026 AutoRemind. All rights reserved.
-      </span>
-    </small>
-  </footer>
+  <!-- FOOTER -->
 
   <!-- Logic Scripts -->
   <script>
-    // --- Responsive Nav ---
-    document.getElementById('nav-toggle').addEventListener('click', () => {
-      document.querySelector('.nav').classList.toggle('nav--open');
-    });
-
     // --- Slider Sync ---
     const num = document.getElementById('days');
     const rng = document.getElementById('days-range');
@@ -385,13 +327,15 @@
     });
 
     // --- Toggle Fields ---
-    function bindToggle(checkboxId, fieldId) {
+    function bindToggle(checkboxId, fieldId, extraIds = []) {
       const cb = document.getElementById(checkboxId);
       const field = document.getElementById(fieldId);
+      const extras = extraIds.map(id => document.getElementById(id)).filter(Boolean);
       const update = () => {
         const enabled = cb.checked;
         field.style.display = enabled ? 'block' : 'none';
         field.disabled = !enabled;
+        extras.forEach(el => { el.style.display = enabled ? 'block' : 'none'; });
         if (enabled) field.focus();
       };
       cb.addEventListener('change', update);
@@ -401,6 +345,7 @@
       {
         checkboxId: 'ch-sms',
         fieldId: 'sms-field',
+        extraIds: ['sms-consent'],
         key: 'sms',
         validate: value => /^\+?[0-9\s().-]{7,}$/.test(value.trim()),
         errorMessage: 'Please enter a valid phone number for SMS.'
@@ -413,7 +358,7 @@
         errorMessage: 'Please enter a Discord username.'
       }
     ];
-    channelConfigs.forEach(({ checkboxId, fieldId }) => bindToggle(checkboxId, fieldId));
+    channelConfigs.forEach(({ checkboxId, fieldId, extraIds }) => bindToggle(checkboxId, fieldId, extraIds));
 
     // --- Phone Formatting ---
     const smsInput = document.getElementById('sms-field');
@@ -423,7 +368,6 @@
     });
 
     // --- Modals & API ---
-    const agreementModal = document.getElementById('agreement-modal');
     const mainCtaBtn = document.getElementById('main-cta-btn');
     const loginStartBtn = document.getElementById('login-start-btn');
 
@@ -445,19 +389,6 @@
 
     loginStartBtn.addEventListener('click', () => {
       window.location.href = './login.html';
-    });
-
-    mainCtaBtn.addEventListener('click', function (e) {
-      e.preventDefault();
-      if (!window.auth || !window.auth.user) {
-        window.location.href = './login.html';
-        return;
-      }
-      agreementModal.style.display = 'flex';
-    });
-
-    document.getElementById('cancel-btn').addEventListener('click', function () {
-      agreementModal.style.display = 'none';
     });
 
     async function collectSettingsPayload() {
@@ -510,17 +441,22 @@
       return payload;
     }
 
-    document.getElementById('agree-btn').addEventListener('click', async function () {
-      const agreeBtn = document.getElementById('agree-btn');
-      if (agreeBtn.disabled) return;
+    mainCtaBtn.addEventListener('click', async function (e) {
+      e.preventDefault();
+      if (!window.auth || !window.auth.user) {
+        window.location.href = './login.html';
+        return;
+      }
+      if (mainCtaBtn.disabled) return;
 
       let payload;
       try {
         payload = await collectSettingsPayload();
       } catch (e) { return; }
 
-      agreeBtn.disabled = true;
-      agreeBtn.textContent = 'Saving...';
+      const originalLabel = mainCtaBtn.textContent;
+      mainCtaBtn.disabled = true;
+      mainCtaBtn.textContent = 'Saving...';
 
       try {
         const email = window.auth?.user?.email;
@@ -535,14 +471,13 @@
         });
         if (!response.ok) throw new Error('Failed to save');
 
-        agreementModal.style.display = 'none';
         document.getElementById('success-modal').style.display = 'flex';
       } catch (err) {
         console.error(err);
         showMessage('Error saving settings. Please try again.', 'Error');
       } finally {
-        agreeBtn.disabled = false;
-        agreeBtn.textContent = 'I Agree';
+        mainCtaBtn.disabled = false;
+        mainCtaBtn.textContent = originalLabel;
       }
     });
 
@@ -653,7 +588,7 @@
             userEmail.textContent = user.email;
             userEmail.style.display = 'inline-block';
             logoutBtn.style.display = 'inline-block';
-            unsubLink.style.display = 'inline-block';
+            unsubLink.style.display = 'block';
             document.querySelector('.cta-wrap').style.display = 'flex';
             document.getElementById('nav-assignments-link').style.display = 'inline-block';
 
