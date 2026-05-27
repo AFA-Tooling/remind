@@ -15,7 +15,7 @@ export default async function handler(req, res) {
   try {
     let body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
 
-    const { channels = {}, days_before, preferred_first_name } = body;
+    const { channels = {}, days_before, preferred_first_name, category_prefs } = body;
 
     const loginEmail = authResult.email;
 
@@ -49,6 +49,15 @@ export default async function handler(req, res) {
       preferred_first_name: preferredFirstName || null,
       updated_at: new Date().toISOString(),
     };
+
+    if (category_prefs && typeof category_prefs === 'object') {
+      studentData.category_prefs = {
+        lab: !!category_prefs.lab,
+        homework: !!category_prefs.homework,
+        midterm: !!category_prefs.midterm,
+        project: !!category_prefs.project,
+      };
+    }
 
     // Document ID = email — set(merge:true) acts as upsert
     await docRef.set(studentData, { merge: true });

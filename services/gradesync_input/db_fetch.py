@@ -182,6 +182,27 @@ def base_assignment_code(code: Optional[str]) -> Optional[str]:
     if match:
         return match.group(1)
     return None
+
+
+def derive_assignment_category(*candidates: Optional[str]) -> str:
+    """
+    Map an assignment label to one of: Lab, Homework, Midterm, Project.
+
+    Tries each candidate string (assignment name first, then code) and returns
+    the first prefix match. Falls back to Project so non-matching CS61A
+    assignments still get a defined category.
+    """
+    for raw in candidates:
+        if not raw:
+            continue
+        name = str(raw).strip().lower()
+        if name.startswith("lab"):
+            return "Lab"
+        if name.startswith("homework") or name.startswith("hw"):
+            return "Homework"
+        if name.startswith("midterm"):
+            return "Midterm"
+    return "Project"
     
 
 def load_deadlines_from_rows(
@@ -516,6 +537,18 @@ def build_assignment_payload(
     if is_target_student or debug:
         print(f"   ✅ Found assignment entry: {entry.get('assignment_name', code)}")
         print(f"   Base deadline from entry: {entry.get('deadline')}")
+
+    # Category gate — roster-enrolled students can opt out of categories.
+    # Students without category_prefs (non-roster) get legacy behavior (all on).
+    category_prefs = student.get("category_prefs")
+    if isinstance(category_prefs, dict):
+        category = derive_assignment_category(entry.get("assignment_name"), code)
+        if not category_prefs.get(category.lower(), True):
+            msg = f"Skipping {code}: category '{category}' disabled in student prefs"
+            if is_target_student or debug:
+                print(f"   ❌ {msg}")
+            debug_print(debug, msg)
+            return None
 
     offset_raw = student.get(code, 0) or 0
     try:

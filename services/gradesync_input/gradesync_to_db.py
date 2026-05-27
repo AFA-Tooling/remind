@@ -37,7 +37,7 @@ from shared import settings
 # OLD test sheet:
 #google_sheet_id = '11H0hRtJOHCy59jaxbdRSp7JhDtkaiOibvexZ4Shj4wE'
 # Replacing with CS10 Autoreminder ID:
-google_sheet_id = '1jQLrBjhSDbzARCHCQCVinnFqJxmT0OmenjdhcnxIm2s'
+google_sheet_id = '1tDmN2HREa6SWwcRLzfqdtt_JJxwNPdjLHQevcHl04gQ'
 # google_sheet_credentials = 'credentials.json'
 # config_folder = os.path.join(os.path.dirname(__file__), 'config')
 # credentials_path = os.path.join(config_folder, google_sheet_credentials)
@@ -49,6 +49,23 @@ if not os.path.exists(credentials_path):
 
 # Firestore configuration
 DEFAULT_FIRESTORE_COLLECTION = "assignment_submissions"
+ROSTER_COLLECTION = "class_roster"
+ROSTER_COURSE_CODE = "CS61A"
+
+# Tabs that are never assignments
+NON_ASSIGNMENT_TABS = {"Sheet1", "Roster"}
+
+
+def categorize_tab(tab_name: str) -> str:
+    """Map a sheet tab name to an assignment category."""
+    name = (tab_name or "").strip().lower()
+    if name.startswith("lab"):
+        return "Lab"
+    if name.startswith("homework") or name.startswith("hw"):
+        return "Homework"
+    if name.startswith("midterm"):
+        return "Midterm"
+    return "Project"
 
 def safe_filename_for_windows(name: str) -> str:
     """
@@ -124,18 +141,23 @@ def preprocess_df(df, tab_name):
     Returns:
         pd.DataFrame: Cleaned and formatted DataFrame
     """
-    #required_columns = ["b'First Name", 'Last Name', 'SID', 'Email', 'Status', 'Submission Time', 'Lateness (H:M:S)']
-    required_columns = ["b'Name", 'SID', 'Email', 'Status', 'Submission Time', 'Lateness (H:M:S)']
+    # The Name column is sometimes exported with a stray bytes-literal prefix ("b'Name").
+    # Accept either form so sheets from different sources work.
+    name_col = "b'Name" if "b'Name" in df.columns else ("Name" if "Name" in df.columns else None)
+    if name_col is None:
+        raise ValueError("Missing required name column: expected 'Name' or \"b'Name\"")
+
+    required_columns = [name_col, 'SID', 'Email', 'Status', 'Submission Time', 'Lateness (H:M:S)']
     missing = [col for col in required_columns if col not in df.columns]
     if missing:
         raise ValueError(f"Missing columns in input DataFrame: {missing}")
-    
+
     # Filter and format
     filtered_df = df[required_columns].copy()
     filtered_df['Assignment'] = tab_name
-    filtered_df = filtered_df[['Assignment'] + required_columns]
-    #filtered_df.rename(columns={"b'First Name": 'First Name'}, inplace=True)
-    filtered_df.rename(columns={"b'Name": 'Name'}, inplace=True)
+    filtered_df['Category'] = categorize_tab(tab_name)
+    filtered_df = filtered_df[['Assignment', 'Category'] + required_columns]
+    filtered_df.rename(columns={name_col: 'Name'}, inplace=True)
     filtered_df.columns = filtered_df.columns.str.lower().str.strip()
 
     return filtered_df
@@ -211,8 +233,15 @@ def upsert_submissions_to_firestore(
         # Composite key: assignment_name + name (underscore-joined, url-safe)
         doc_id = f"{assignment_name}__{name_value}".replace('/', '_').replace(' ', '_')
 
+        category_value = row.get('category', '')
+        if pd.isna(category_value) or (isinstance(category_value, str) and category_value.strip() == ''):
+            category_value = categorize_tab(assignment_name)
+        else:
+            category_value = str(category_value).strip()
+
         record = {
             'assignment_name': assignment_name,
+            'category': category_value,
             'sid': sid_value,
             'name': name_value,
             'email': email_value,
@@ -234,7 +263,86 @@ def upsert_submissions_to_firestore(
     if batch_size > 0:
         batch.commit()
 
-    print(f"✅ Successfully upserted {total_written} records to '{collection_name}'")  
+    print(f"✅ Successfully upserted {total_written} records to '{collection_name}'")
+
+
+def sync_roster_to_firestore(
+    raw_data: List[List[str]],
+    db: firestore.Client,
+    course_code: str = ROSTER_COURSE_CODE,
+    collection_name: str = ROSTER_COLLECTION,
+) -> None:
+    """
+    Sync the Roster tab to a Firestore collection of enrolled students.
+
+    Roster tab columns: Name, SID, Email, Role. Only Name + Email are used.
+    Documents are keyed by lowercased email. Prior roster docs for this
+    course_code that are no longer in the sheet are deleted so dropped
+    students don't keep getting category-gated reminders.
+    """
+    if not raw_data or len(raw_data) < 2:
+        print("⚠️  Roster tab is empty or missing — skipping roster sync")
+        return
+
+    headers = [str(h).strip().lower() for h in raw_data[0]]
+    try:
+        name_idx = headers.index("name")
+        email_idx = headers.index("email")
+    except ValueError:
+        print(f"❌ Roster tab missing 'Name' or 'Email' column (got {headers}). Skipping.")
+        return
+
+    current_emails: set = set()
+    batch = db.batch()
+    batch_size = 0
+    total_written = 0
+
+    for row in raw_data[1:]:
+        if len(row) <= max(name_idx, email_idx):
+            continue
+        name = str(row[name_idx]).strip()
+        email_raw = str(row[email_idx]).strip()
+        if not email_raw:
+            continue
+        email_lower = email_raw.lower()
+        current_emails.add(email_lower)
+
+        doc_ref = db.collection(collection_name).document(email_lower)
+        batch.set(doc_ref, {
+            "name": name,
+            "email": email_raw,
+            "course_code": course_code,
+            "updated_at": datetime.now().isoformat(),
+        }, merge=True)
+        batch_size += 1
+        total_written += 1
+
+        if batch_size >= 499:
+            batch.commit()
+            batch = db.batch()
+            batch_size = 0
+
+    if batch_size > 0:
+        batch.commit()
+
+    # Prune stale roster entries for this course
+    existing_docs = db.collection(collection_name).where("course_code", "==", course_code).stream()
+    prune_batch = db.batch()
+    prune_size = 0
+    pruned = 0
+    for doc in existing_docs:
+        if doc.id not in current_emails:
+            prune_batch.delete(doc.reference)
+            prune_size += 1
+            pruned += 1
+            if prune_size >= 499:
+                prune_batch.commit()
+                prune_batch = db.batch()
+                prune_size = 0
+    if prune_size > 0:
+        prune_batch.commit()
+
+    print(f"✅ Roster synced: {total_written} enrolled, {pruned} pruned (course={course_code})")
 
 
 if __name__ == "__main__":
@@ -293,17 +401,25 @@ if __name__ == "__main__":
     processed_count = 0
     
     for tab in tab_names:
-        # Skip the summary tabs
-        if tab in ['Roster', 'Labs', 'Discussions', 'Projects', 'Lecture Quizzes', 'Midterms', 'Postterms']:
-            print(f"Skipping {tab} (summary tab)")
-            continue
-        
-        # Only process tabs that start with "Project" (case-insensitive)
-        if not tab.lower().startswith('project'):
-            print(f"Skipping {tab} (not a Project)")
+        if tab == "Roster":
+            if args.firestore and db_client:
+                print(f"\n Parsing tab: {tab} (roster sync)")
+                roster_data = get_google_sheet_data(google_sheet_id, tab, creds)
+                try:
+                    sync_roster_to_firestore(roster_data, db_client)
+                except Exception as e:
+                    logging.error(f"Error syncing roster: {e}")
+                    print(f"❌ Failed to sync roster. Continuing.")
+            else:
+                print(f"Skipping {tab} (firestore disabled)")
             continue
 
-        print(f"\n Parsing tab: {tab}")
+        if tab in NON_ASSIGNMENT_TABS:
+            print(f"Skipping {tab} (non-assignment tab)")
+            continue
+
+        category = categorize_tab(tab)
+        print(f"\n Parsing tab: {tab} (category={category})")
         range_str = f"{tab}"
         raw_data = get_google_sheet_data(google_sheet_id, range_str, creds)
 

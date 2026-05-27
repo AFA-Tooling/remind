@@ -182,6 +182,42 @@
             <span class="minmax">7</span>
           </div>
 
+          <!-- CS61A Assignment Types (revealed for students on the roster) -->
+          <div id="cs61a-section" style="display: none; margin-top: 28px;">
+            <div class="divider"><span class="pill">CS61A Assignment Types</span></div>
+            <p class="label">Send reminders for:</p>
+            <ul class="channels">
+              <li>
+                <label for="cat-lab">
+                  <input id="cat-lab" type="checkbox" name="cat_lab" checked />
+                  <span class="dot" aria-hidden="true"></span>
+                  <span>Labs</span>
+                </label>
+              </li>
+              <li>
+                <label for="cat-homework">
+                  <input id="cat-homework" type="checkbox" name="cat_homework" checked />
+                  <span class="dot" aria-hidden="true"></span>
+                  <span>Homework</span>
+                </label>
+              </li>
+              <li>
+                <label for="cat-midterm">
+                  <input id="cat-midterm" type="checkbox" name="cat_midterm" checked />
+                  <span class="dot" aria-hidden="true"></span>
+                  <span>Midterms</span>
+                </label>
+              </li>
+              <li>
+                <label for="cat-project">
+                  <input id="cat-project" type="checkbox" name="cat_project" checked />
+                  <span class="dot" aria-hidden="true"></span>
+                  <span>Projects</span>
+                </label>
+              </li>
+            </ul>
+          </div>
+
           <div class="divider" style="margin-top: 28px;"><span class="pill">bCourses Integration</span></div>
 
           <!-- Not connected state -->
@@ -438,6 +474,18 @@
         showMessage('Select at least one reminder channel.', 'No Channels Selected');
         throw new Error('validation');
       }
+
+      // CS61A category prefs — only sent when the section is visible (i.e., student is on roster)
+      const cs61aSection = document.getElementById('cs61a-section');
+      if (cs61aSection && cs61aSection.style.display !== 'none') {
+        payload.category_prefs = {
+          lab: document.getElementById('cat-lab').checked,
+          homework: document.getElementById('cat-homework').checked,
+          midterm: document.getElementById('cat-midterm').checked,
+          project: document.getElementById('cat-project').checked,
+        };
+      }
+
       return payload;
     }
 
@@ -871,6 +919,19 @@
 
         // bCourses state
         updateCanvasUI(!!data.canvas_connected);
+
+        // CS61A category prefs — only visible if student is on the roster
+        const cs61aSection = document.getElementById('cs61a-section');
+        if (data.on_roster) {
+          cs61aSection.style.display = 'block';
+          const prefs = data.category_prefs || { lab: true, homework: true, midterm: true, project: true };
+          document.getElementById('cat-lab').checked = prefs.lab !== false;
+          document.getElementById('cat-homework').checked = prefs.homework !== false;
+          document.getElementById('cat-midterm').checked = prefs.midterm !== false;
+          document.getElementById('cat-project').checked = prefs.project !== false;
+        } else {
+          cs61aSection.style.display = 'none';
+        }
       }
     })();
   </script>

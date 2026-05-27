@@ -24,6 +24,12 @@ export default async function handler(req, res) {
 
         const data = docSnap.data();
 
+        // Roster lookup keys on lowercased email
+        const rosterSnap = await db.collection('class_roster').doc(loginEmail.toLowerCase()).get();
+        const onRoster = rosterSnap.exists;
+
+        const categoryPrefs = data.category_prefs || { lab: true, homework: true, midterm: true, project: true };
+
         // Return user data
         return res.status(200).json({
             success: true,
@@ -37,7 +43,14 @@ export default async function handler(req, res) {
                 discord_pref: data.discord_pref || false,
                 email: data.email,
                 canvas_connected: data.canvas_connected || false,
-                canvas_domain: data.canvas_domain || null
+                canvas_domain: data.canvas_domain || null,
+                on_roster: onRoster,
+                category_prefs: {
+                    lab: categoryPrefs.lab !== false,
+                    homework: categoryPrefs.homework !== false,
+                    midterm: categoryPrefs.midterm !== false,
+                    project: categoryPrefs.project !== false,
+                }
             }
         });
 
