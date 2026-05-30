@@ -93,6 +93,15 @@
 
       <div id="section-deadlines" class="admin-section">
         <h2>Assignment Deadlines</h2>
+        <button class="btn btn--primary" id="add-deadline-btn" style="margin-bottom: 20px;">+ Add Deadline</button>
+
+        <div id="unmatched-wrap" style="display:none; margin-bottom: 28px;">
+          <div style="background:#fffbeb; border: 1px solid #f59e0b; border-radius: 10px; padding: 16px 20px;">
+            <div style="font-weight:600; margin-bottom: 12px; color:#92400e;">⚠ Assignments without a deadline (<span id="unmatched-count">0</span>)</div>
+            <div id="unmatched-content"></div>
+          </div>
+        </div>
+
         <div id="deadlines-content" class="loading">Loading deadlines...</div>
       </div>
 
@@ -132,6 +141,24 @@
       <div style="display: flex; gap: 8px; margin-top: 4px;">
         <button type="button" class="btn btn--primary" id="save-resource-btn">Save</button>
         <button type="button" class="btn btn--outline" id="cancel-resource-btn">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Deadline Form Modal -->
+  <div class="resource-modal-overlay" id="deadline-modal-overlay">
+    <div class="resource-modal">
+      <h3 id="deadline-form-title">Add Deadline</h3>
+      <input type="hidden" id="deadline-id">
+      <div class="form-row">
+        <input type="text" id="deadline-course-code" placeholder="Course Code (e.g. CS61A)">
+        <input type="text" id="deadline-assignment-code" placeholder="Assignment Code (optional)">
+      </div>
+      <input type="text" id="deadline-assignment-name" placeholder="Assignment Name" required>
+      <input type="datetime-local" id="deadline-due" required>
+      <div style="display: flex; gap: 8px; margin-top: 4px;">
+        <button type="button" class="btn btn--primary" id="save-deadline-btn">Save</button>
+        <button type="button" class="btn btn--outline" id="cancel-deadline-btn">Cancel</button>
       </div>
     </div>
   </div>
@@ -177,12 +204,126 @@
 
     async function loadDeadlines() {
       try {
-        const { data } = await fetchWithAuth('/api/admin/deadlines');
+        const [{ data }, { data: unmatched }] = await Promise.all([
+          fetchWithAuth('/api/admin/deadlines'),
+          fetchWithAuth('/api/admin/deadlines?view=unmatched'),
+        ]);
         deadlinesData = data;
-        const html = `<div class="table-wrap"><table class="admin-table"><thead><tr><th>Assignment</th><th>Course</th><th>Due Date</th></tr></thead><tbody>${data.map(d => `<tr><td>${d.assignment_name || '-'}</td><td>${d.course_code || '-'}</td><td>${d.due ? new Date(d.due).toLocaleDateString() : '-'}</td></tr>`).join('')}</tbody></table></div>`;
-        document.getElementById('deadlines-content').innerHTML = html;
+        renderDeadlinesTable(data);
+        renderUnmatched(unmatched);
         return data.length;
-      } catch (e) { console.error('Load deadlines error:', e); document.getElementById('deadlines-content').innerHTML = '<p>Something went wrong. Please try again.</p>'; return 0; }
+      } catch (e) {
+        console.error('Load deadlines error:', e);
+        document.getElementById('deadlines-content').innerHTML = '<p>Something went wrong. Please try again.</p>';
+        return 0;
+      }
+    }
+
+    function renderDeadlinesTable(data) {
+      const now = new Date();
+      const html = data.length === 0 ? '<p style="color:var(--muted)">No deadlines found.</p>' :
+        `<div class="table-wrap"><table class="admin-table">
+          <thead><tr><th>Assignment</th><th>Course</th><th>Code</th><th>Due Date</th><th>Actions</th></tr></thead>
+          <tbody>${data.map(d => {
+            const due = d.due ? new Date(d.due) : null;
+            const isPast = due && due < now;
+            return `<tr>
+              <td>${escHtml(d.assignment_name || '-')}</td>
+              <td>${escHtml(d.course_code || '-')}</td>
+              <td style="font-size:12px;color:var(--muted)">${escHtml(d.assignment_code || '-')}</td>
+              <td style="${isPast ? 'color:#999' : ''}">${due ? due.toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }) : '-'}${isPast ? ' <span style="font-size:11px;color:#999">(past)</span>' : ''}</td>
+              <td>
+                <button class="btn btn-small btn--outline" data-dl-action="edit" data-dl-id="${escHtml(d.id)}">Edit</button>
+                <button class="btn btn-small btn-danger" data-dl-action="delete" data-dl-id="${escHtml(d.id)}" style="margin-left:4px">Delete</button>
+              </td>
+            </tr>`;
+          }).join('')}</tbody>
+        </table></div>`;
+      const container = document.getElementById('deadlines-content');
+      container.innerHTML = html;
+      container.querySelectorAll('[data-dl-action="edit"]').forEach(btn =>
+        btn.addEventListener('click', () => openDeadlineForm(btn.dataset.dlId))
+      );
+      container.querySelectorAll('[data-dl-action="delete"]').forEach(btn =>
+        btn.addEventListener('click', () => deleteDeadline(btn.dataset.dlId))
+      );
+    }
+
+    function renderUnmatched(data) {
+      const wrap = document.getElementById('unmatched-wrap');
+      if (!data || data.length === 0) { wrap.style.display = 'none'; return; }
+      wrap.style.display = 'block';
+      document.getElementById('unmatched-count').textContent = data.length;
+      const rows = data.map(a => `<tr>
+        <td>${escHtml(a.assignment_name)}</td>
+        <td style="text-transform:capitalize">${escHtml(a.category || '-')}</td>
+        <td style="color:var(--muted)">${a.count}</td>
+        <td><button class="btn btn-small btn--outline" data-um-name="${escHtml(a.assignment_name)}" data-um-cat="${escHtml(a.category || '')}">Set Deadline</button></td>
+      </tr>`).join('');
+      document.getElementById('unmatched-content').innerHTML =
+        `<div class="table-wrap"><table class="admin-table">
+          <thead><tr><th>Assignment</th><th>Category</th><th>Students</th><th></th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table></div>`;
+      document.getElementById('unmatched-content').querySelectorAll('[data-um-name]').forEach(btn =>
+        btn.addEventListener('click', () => openDeadlineForm(null, btn.dataset.umName, btn.dataset.umCat))
+      );
+    }
+
+    function openDeadlineForm(id = null, prefillName = '', prefillCategory = '') {
+      const isEdit = !!id;
+      document.getElementById('deadline-form-title').textContent = isEdit ? 'Edit Deadline' : 'Add Deadline';
+      document.getElementById('deadline-id').value = id || '';
+      if (isEdit) {
+        const d = deadlinesData.find(x => x.id === id);
+        if (d) {
+          document.getElementById('deadline-course-code').value = d.course_code || '';
+          document.getElementById('deadline-assignment-code').value = d.assignment_code || '';
+          document.getElementById('deadline-assignment-name').value = d.assignment_name || '';
+          document.getElementById('deadline-due').value = d.due ? d.due.slice(0, 16) : '';
+        }
+      } else {
+        document.getElementById('deadline-course-code').value = '';
+        document.getElementById('deadline-assignment-code').value = '';
+        document.getElementById('deadline-assignment-name').value = prefillName;
+        document.getElementById('deadline-due').value = '';
+      }
+      document.getElementById('deadline-modal-overlay').classList.add('visible');
+    }
+
+    function hideDeadlineForm() {
+      document.getElementById('deadline-modal-overlay').classList.remove('visible');
+    }
+
+    async function saveDeadline() {
+      const id = document.getElementById('deadline-id').value;
+      const assignment_name = document.getElementById('deadline-assignment-name').value.trim();
+      const due = document.getElementById('deadline-due').value;
+      if (!assignment_name || !due) { alert('Assignment name and due date are required.'); return; }
+      const body = {
+        course_code: document.getElementById('deadline-course-code').value.trim(),
+        assignment_code: document.getElementById('deadline-assignment-code').value.trim(),
+        assignment_name,
+        due,
+      };
+      if (id) body.id = id;
+      try {
+        await fetchWithAuth('/api/admin/deadlines', { method: id ? 'PUT' : 'POST', body: JSON.stringify(body) });
+        hideDeadlineForm();
+        loadDeadlines();
+      } catch (e) { alert('Failed to save deadline. Please try again.'); }
+    }
+
+    async function deleteDeadline(id) {
+      if (!confirm('Delete this deadline?')) return;
+      try {
+        await fetchWithAuth('/api/admin/deadlines', { method: 'DELETE', body: JSON.stringify({ id }) });
+        loadDeadlines();
+      } catch (e) { alert('Failed to delete deadline. Please try again.'); }
+    }
+
+    function escHtml(str) {
+      return String(str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     }
 
     function populateCourseDropdown(selectedCourse = '') {
@@ -354,14 +495,21 @@
       document.getElementById('save-resource-btn').onclick = saveResource;
       document.getElementById('apply-filters-btn').onclick = loadDeliveryLogs;
 
-      // Close modal when clicking the backdrop
+      document.getElementById('add-deadline-btn').onclick = () => openDeadlineForm();
+      document.getElementById('cancel-deadline-btn').onclick = hideDeadlineForm;
+      document.getElementById('save-deadline-btn').onclick = saveDeadline;
+
+      // Close modals when clicking the backdrop
       document.getElementById('resource-modal-overlay').addEventListener('click', (e) => {
         if (e.target === document.getElementById('resource-modal-overlay')) hideResourceForm();
+      });
+      document.getElementById('deadline-modal-overlay').addEventListener('click', (e) => {
+        if (e.target === document.getElementById('deadline-modal-overlay')) hideDeadlineForm();
       });
 
       // Close modal on Escape key
       document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape') hideResourceForm();
+        if (e.key === 'Escape') { hideResourceForm(); hideDeadlineForm(); }
       });
     });
   </script>

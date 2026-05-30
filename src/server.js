@@ -275,8 +275,9 @@ const server = http.createServer(async (req, res) => {
         return;
       }
 
-      if (urlPath === '/api/admin/deadlines' && req.method === 'GET') {
-        const mockReq = { method: req.method, query: queryParams, headers: { authorization: req.headers.authorization } };
+      if (urlPath === '/api/admin/deadlines') {
+        const body = ['POST', 'PUT', 'DELETE'].includes(req.method) ? await parseBody() : {};
+        const mockReq = { method: req.method, query: queryParams, body, headers: { authorization: req.headers.authorization } };
         await adminDeadlinesHandler(mockReq, mockRes);
         return;
       }
