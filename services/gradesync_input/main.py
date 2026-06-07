@@ -18,6 +18,7 @@ def main():
     script_send_email = project_root / "email-service" / "main.py"
 
     script_canvas_sync = project_root / "canvas_sync" / "canvas_sync.py"
+    script_gradesync = current_dir / "gradesync_to_db.py"
 
     # 2. Verify scripts exist
     if not script_fetch.exists():
@@ -30,7 +31,20 @@ def main():
         print(f"❌ Error: Could not find {script_send_email}")
         return
 
-    # 2.5 Run Step 0: Canvas Sync (optional — skip if script not found)
+    # 2.5 Run Step 0: GradeSync → Firestore (class_roster + assignment_submissions)
+    if script_gradesync.exists():
+        print("--------------------------------------------------")
+        print("STEP 0a: Syncing GradeSync Roster & Submissions")
+        print("--------------------------------------------------")
+        gradesync_cmd = [sys.executable, str(script_gradesync)]
+        try:
+            subprocess.run(gradesync_cmd, check=True)
+        except subprocess.CalledProcessError as e:
+            print(f"\n⚠️  Step 0a Warning: GradeSync sync failed (Exit code: {e.returncode}). Continuing...")
+    else:
+        print("ℹ️  gradesync_to_db.py not found, skipping GradeSync sync.")
+
+    # Run Step 0b: Canvas Sync (optional — skip if script not found)
     if script_canvas_sync.exists():
         print("--------------------------------------------------")
         print("STEP 0: Syncing Canvas Assignments")
@@ -40,9 +54,10 @@ def main():
         try:
             subprocess.run(canvas_cmd, check=True)
         except subprocess.CalledProcessError as e:
-            print(f"\n⚠️  Step 0 Warning: Canvas sync failed (Exit code: {e.returncode}). Continuing...")
+            print(f"\n⚠️  Step 0b Warning: Canvas sync failed (Exit code: {e.returncode}). Continuing...")
     else:
         print("ℹ️  Canvas sync script not found, skipping Canvas sync.")
+
 
     # 3. Run Step 1: db_fetch.py
     print("--------------------------------------------------")
