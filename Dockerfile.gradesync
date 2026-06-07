@@ -1,0 +1,13 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+COPY gradesync_input/requirements.txt ./requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY gradesync_input/simple_sync.py ./simple_sync.py
+
+ENV GRADESCOPE_COURSE_ID=1297200
+ENV SPREADSHEET_ID=1tDmN2HREa6SWwcRLzfqdtt_JJxwNPdjLHQevcHl04gQ
+
+CMD ["python3", "simple_sync.py"]
