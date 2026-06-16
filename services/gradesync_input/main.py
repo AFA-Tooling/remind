@@ -1,7 +1,10 @@
 """
 Main orchestration script.
-1. Runs db_fetch.py to generate the Discord CSV.
-2. Runs send_discord_reminders.py to send the messages.
+1. Syncs Canvas assignments (optional).
+2. Syncs Google Sheet submission statuses → Firestore.
+3. Runs db_fetch.py to generate reminder CSVs.
+4. Sends Discord reminders.
+5. Sends Gmail reminders.
 """
 
 import sys
@@ -12,7 +15,8 @@ def main():
     # 1. Setup Paths
     current_dir = Path(__file__).resolve().parent
     project_root = current_dir.parent
-    
+
+    script_gradesync = current_dir / "gradesync_to_db.py"
     script_fetch = current_dir / "db_fetch.py"
     script_send = project_root / "discord_service" / "send_discord_reminders.py"
     script_send_email = project_root / "email-service" / "main.py"
@@ -44,7 +48,20 @@ def main():
     else:
         print("ℹ️  Canvas sync script not found, skipping Canvas sync.")
 
-    # 3. Run Step 1: db_fetch.py
+    # 3. Run Step 0.5: gradesync_to_db.py — sync Sheet submission statuses → Firestore
+    print("--------------------------------------------------")
+    print("STEP 0.5: Syncing Google Sheet Submissions → Firestore")
+    print("--------------------------------------------------")
+
+    if script_gradesync.exists():
+        try:
+            subprocess.run([sys.executable, str(script_gradesync)], check=True)
+        except subprocess.CalledProcessError as e:
+            print(f"\n⚠️  Step 0.5 Warning: gradesync_to_db failed (Exit code: {e.returncode}). Continuing with existing submission data...")
+    else:
+        print(f"⚠️  gradesync_to_db.py not found at {script_gradesync}, skipping.")
+
+    # 4. Run Step 1: db_fetch.py
     print("--------------------------------------------------")
     print("STEP 1: Fetching Data & Generating Reminders CSV")
     print("--------------------------------------------------")

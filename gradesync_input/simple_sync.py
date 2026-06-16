@@ -207,8 +207,8 @@ def main():
     config_path = base / args.config
     creds_path = base / args.credentials
 
-    if os.getenv("K_SERVICE"):
-        # Running on Cloud Run — read from env vars / mounted secrets
+    if os.getenv("K_SERVICE") or os.getenv("K_JOB"):
+        # Running on Cloud Run (Service or Job) — read from env vars / mounted secrets
         course_id = os.environ["GRADESCOPE_COURSE_ID"]
         spreadsheet_id = os.environ["SPREADSHEET_ID"]
         gs_email = os.environ["GRADESCOPE_EMAIL"]
@@ -222,7 +222,7 @@ def main():
         gs_password = config["GRADESCOPE_PASSWORD"]
 
     print("Authenticating with Google Sheets…")
-    if os.getenv("K_SERVICE"):
+    if os.getenv("K_SERVICE") or os.getenv("K_JOB"):
         # Running on Cloud Run — use ADC
         creds, _ = google.auth.default(scopes=SHEETS_SCOPES)
     else:

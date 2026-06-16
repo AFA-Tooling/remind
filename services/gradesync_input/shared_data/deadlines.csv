@@ -1,7 +1,8 @@
-course_code, assignment_code, assignment_name, due
-CS10, PROJ01, Project 1: Wordle™-lite, 2026-01-25 23:59:59
-CS10, PROJ02, Project 2: Spelling Bee,2026-01-26 23:59:59
-CS10, PROJ03, Project 3: 2048,2026-01-27 23:59:59
-CS10, PROJ04, Project 4: Artifact + Documentation, 2026-01-28 23:59:59
-CS10, PROJ05, Project 5: Final Project Proposal, 2026-01-29 23:59:59
-CS10, PROJ0, Project 5 RESUBMISSION: Final Project Submission, 2026-01-30 23:59:59
+course_code,assignment_code,assignment_name,due
+CS61A,Lab 6,Lab 6,2026-06-13 23:59:59
+CS61A,Lab 7,Lab 7,2026-06-14 23:59:59
+CS61A,Ants Checkpoint 1,Ants Checkpoint 1,2026-06-15 23:59:59
+CS61A,HW05,Homework 5,2026-06-16 23:59:59
+CS61A,Ants Checkpoint 2,Ants Checkpoint 2,2026-06-17 23:59:59
+CS61A,HW06,Homework 6,2026-06-18 23:59:59
+CS61A,Ants,Ants,2026-06-19 23:59:59
