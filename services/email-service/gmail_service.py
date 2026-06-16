@@ -146,17 +146,16 @@ def fetch_assignment_resources(
             for doc in docs
         ]
 
-        # If no results and no course_code was specified, try without course filter
-        if not resources and not course_code:
-            logger.debug("No resources found, retrying without course filter...")
-            docs = (
-                db.collection("assignment_resources")
-                .where("assignment_code", "==", assignment_code)
-                .stream()
-            )
+        # Fallback: try matching by assignment_name (e.g. "Homework 5") when code
+        # lookup ("HW05") returns nothing — handles cases where the CSV carries the
+        # display name rather than the short code.
+        if not resources:
+            name_query = db.collection("assignment_resources").where("assignment_name", "==", assignment_code)
+            if course_code:
+                name_query = name_query.where("course_code", "==", course_code)
             resources = [
                 {k: v for k, v in doc.to_dict().items() if k in ("resource_type", "resource_name", "link")}
-                for doc in docs
+                for doc in name_query.stream()
             ]
 
         if resources:
