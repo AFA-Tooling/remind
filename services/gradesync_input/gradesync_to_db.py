@@ -37,7 +37,8 @@ from shared import settings
 # OLD test sheet:
 #google_sheet_id = '11H0hRtJOHCy59jaxbdRSp7JhDtkaiOibvexZ4Shj4wE'
 # Replacing with CS10 Autoreminder ID:
-google_sheet_id = '1tDmN2HREa6SWwcRLzfqdtt_JJxwNPdjLHQevcHl04gQ'
+#google_sheet_id = '1tDmN2HREa6SWwcRLzfqdtt_JJxwNPdjLHQevcHl04gQ'
+google_sheet_id = '1HPaMeAudhiOXNZ-JfGr5Viw9qpoaZWRn-kAuOX6gGx8'
 # google_sheet_credentials = 'credentials.json'
 # config_folder = os.path.join(os.path.dirname(__file__), 'config')
 # credentials_path = os.path.join(config_folder, google_sheet_credentials)
