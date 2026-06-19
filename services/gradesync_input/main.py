@@ -1,7 +1,10 @@
 """
 Main orchestration script.
-1. Runs db_fetch.py to generate the Discord CSV.
-2. Runs send_discord_reminders.py to send the messages.
+1. Syncs Canvas assignments (optional).
+2. Syncs Google Sheet submission statuses → Firestore.
+3. Runs db_fetch.py to generate reminder CSVs.
+4. Sends Discord reminders.
+5. Sends Gmail reminders.
 """
 
 import sys
@@ -12,13 +15,13 @@ def main():
     # 1. Setup Paths
     current_dir = Path(__file__).resolve().parent
     project_root = current_dir.parent
-    
+
+    script_gradesync = current_dir / "gradesync_to_db.py"
     script_fetch = current_dir / "db_fetch.py"
     script_send = project_root / "discord_service" / "send_discord_reminders.py"
     script_send_email = project_root / "email-service" / "main.py"
 
     script_canvas_sync = project_root / "canvas_sync" / "canvas_sync.py"
-    script_gradesync = current_dir / "gradesync_to_db.py"
 
     # 2. Verify scripts exist
     if not script_fetch.exists():

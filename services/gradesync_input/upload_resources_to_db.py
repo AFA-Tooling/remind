@@ -1,16 +1,14 @@
 """
-Upload assignment resources to Firestore from Supabase SQL export.
+Upload assignment resources to Firestore.
 
-Parses the SQL INSERT statement and uploads each row to the
-'assignment_resources' collection. Uses auto-generated document IDs
-(matching existing Firestore convention for this collection).
-
-Re-running is safe — duplicates are skipped based on
-(course_code, assignment_code, resource_name) composite key.
+Uploads each row to the 'assignment_resources' collection using a stable
+document ID derived from (course_code, assignment_code, resource_name) so
+re-running always updates existing entries (e.g. assignment_name renames)
+rather than silently skipping them.
 """
 
+import re
 import sys
-from datetime import datetime
 from pathlib import Path
 from typing import Dict, List
 
@@ -35,38 +33,71 @@ def init_firestore() -> firestore.Client:
     return firestore.client()
 
 
-# Raw data extracted from Supabase SQL export.
-# Fields: (id, course_code, assignment_code, assignment_name, resource_type, resource_name, link)
-# Rows with null links are excluded.
+# Fields: (course_code, assignment_code, assignment_name, resource_type, resource_name, link)
+# assignment_name must exactly match the Google Sheet tab name.
+# Entries with empty resource_name/link are placeholder entries that ensure
+# the assignment appears in the reminder lookup even without specific resources.
 RESOURCES = [
-    ("CS61A", "HW01", "Functions, Control", "Reading", "Section 1.1", "https://www.composingprograms.com/"),
-    ("CS61A", "HW01", "Functions, Control", "Reading", "Section 1.2", "https://www.composingprograms.com/"),
-    ("CS61A", "HW01", "Functions, Control", "Reading", "Section 1.3", "https://www.composingprograms.com/"),
-    ("CS61A", "HW01", "Functions, Control", "Reading", "Section 1.4", "https://www.composingprograms.com/"),
-    ("CS61A", "HW01", "Functions, Control", "Reading", "Section 1.5", "https://www.composingprograms.com/"),
-    ("CS61A", "HW01", "Functions, Control", "Video", "Getting Started", "https://www.youtube.com/watch?v=playlist&list=PLx38hZJ5RLZdE6Ugbn03lUj4utfzETMHA"),
-    ("CS61A", "HW02", "Higher-Order Functions", "Reading", "Section 1.6", "https://www.composingprograms.com/"),
-    ("CS61A", "HW02", "Higher-Order Functions", "Reading", "ok guide", "https://cs61a.org/articles/using-ok/"),
-    ("CS61A", "HW03", "Recursion, Tree Recursion", "Reading", "Section 1.7", "https://www.composingprograms.com/"),
-    ("CS61A", "HW03", "Recursion, Tree Recursion", "Reading", "ok guide", "https://cs61a.org/articles/using-ok/"),
-    ("CS61A", "HW04", "Python Lists, Object-Oriented Programming", "Reading", "Section 2.3", "https://www.composingprograms.com/"),
-    ("CS61A", "HW04", "Python Lists, Object-Oriented Programming", "Reading", "Section 2.5", "https://www.composingprograms.com/"),
-    ("CS61A", "HW04", "Python Lists, Object-Oriented Programming", "Reading", "ok guide", "https://cs61a.org/articles/using-ok/"),
-    ("CS61A", "HW05", "Trees, Linked Lists", "Reading", "Section 4.2", "https://www.composingprograms.com/"),
-    ("CS61A", "HW06", "Scheme, Scheme Lists", "Reading", "Scheme Specification", "https://cs61a.vercel.app/articles/scheme-spec/index.html"),
-    ("CS61A", "HW06", "Scheme, Scheme Lists", "Reading", "Scheme Built-in Procedure Reference", "https://cs61a.vercel.app/articles/scheme-builtins/index.html"),
-    ("CS61A", "HW06", "Scheme, Scheme Lists", "Video", "Getting Started*", "https://www.youtube.com/playlist?list=PLx38hZJ5RLZfnXDXftRu5P0mn_crGWaWd"),
-    ("CS61A", "HW07", "Scheme Data Abstractions, Programs as Data", "Reading", "Scheme Specification", "https://cs61a.vercel.app/articles/scheme-spec/index.html"),
-    ("CS61A", "HW07", "Scheme Data Abstractions, Programs as Data", "Reading", "Scheme Built-in Procedure Reference", "https://cs61a.vercel.app/articles/scheme-builtins/index.html"),
-    ("CS61A", "HW07", "Scheme Data Abstractions, Programs as Data", "Video", "Getting Started*", "https://www.youtube.com/playlist?list=PLx38hZJ5RLZea1rWe3s2JtuCIku_blUu_"),
-    ("CS61A", "Project 1", "The Game of Hog", "Reading", "Sections 1.2", "https://www.composingprograms.com/"),
-    ("CS61A", "Project 1", "The Game of Hog", "Reading", "Sections 1.3", "https://www.composingprograms.com/"),
-    ("CS61A", "Project 1", "The Game of Hog", "Reading", "Sections 1.4", "https://www.composingprograms.com/"),
-    ("CS61A", "Project 1", "The Game of Hog", "Reading", "Sections 1.5", "https://www.composingprograms.com/"),
-    ("CS61A", "Project 1", "The Game of Hog", "Reading", "Sections 1.6", "https://www.composingprograms.com/"),
-    ("CS61A", "Project 1", "The Game of Hog", "Video", "Getting Started", "https://www.youtube.com/playlist?list=PLx38hZJ5RLZfpHDDcEnevQqlX4wTxuMAD"),
-    ("CS61A", "Project 2", "Ants", "Video", "Getting Started", "https://www.youtube.com/playlist?list=PLx38hZJ5RLZdH1AQFUuP-ixu7nAEK4OLP"),
-    ("CS61A", "Project 3", "Scheme", "Video", "Getting Started", "https://www.youtube.com/playlist?list=PLx38hZJ5RLZez4iVyVRr52Eknxs4RF27w"),
+    # ── CS61A Homework ──────────────────────────────────────────────────────
+    ("CS61A", "HW01", "Homework 1", "Reading", "Section 1.1", "https://www.composingprograms.com/"),
+    ("CS61A", "HW01", "Homework 1", "Reading", "Section 1.2", "https://www.composingprograms.com/"),
+    ("CS61A", "HW01", "Homework 1", "Reading", "Section 1.3", "https://www.composingprograms.com/"),
+    ("CS61A", "HW01", "Homework 1", "Reading", "Section 1.4", "https://www.composingprograms.com/"),
+    ("CS61A", "HW01", "Homework 1", "Reading", "Section 1.5", "https://www.composingprograms.com/"),
+    ("CS61A", "HW01", "Homework 1", "Video", "Getting Started", "https://www.youtube.com/watch?v=playlist&list=PLx38hZJ5RLZdE6Ugbn03lUj4utfzETMHA"),
+    ("CS61A", "HW02", "Homework 2", "Reading", "Section 1.6", "https://www.composingprograms.com/"),
+    ("CS61A", "HW02", "Homework 2", "Reading", "ok guide", "https://cs61a.org/articles/using-ok/"),
+    ("CS61A", "HW03", "Homework 3", "Reading", "Section 1.7", "https://www.composingprograms.com/"),
+    ("CS61A", "HW03", "Homework 3", "Reading", "ok guide", "https://cs61a.org/articles/using-ok/"),
+    ("CS61A", "HW04", "Homework 4", "Reading", "Section 2.3", "https://www.composingprograms.com/"),
+    ("CS61A", "HW04", "Homework 4", "Reading", "Section 2.5", "https://www.composingprograms.com/"),
+    ("CS61A", "HW04", "Homework 4", "Reading", "ok guide", "https://cs61a.org/articles/using-ok/"),
+    ("CS61A", "HW05", "Homework 5", "Reading", "Section 4.2", "https://www.composingprograms.com/"),
+    ("CS61A", "HW06", "Homework 6", "Reading", "Scheme Specification", "https://cs61a.vercel.app/articles/scheme-spec/index.html"),
+    ("CS61A", "HW06", "Homework 6", "Reading", "Scheme Built-in Procedure Reference", "https://cs61a.vercel.app/articles/scheme-builtins/index.html"),
+    ("CS61A", "HW06", "Homework 6", "Video", "Getting Started", "https://www.youtube.com/playlist?list=PLx38hZJ5RLZfnXDXftRu5P0mn_crGWaWd"),
+    ("CS61A", "HW07", "Homework 7", "Reading", "Scheme Specification", "https://cs61a.vercel.app/articles/scheme-spec/index.html"),
+    ("CS61A", "HW07", "Homework 7", "Reading", "Scheme Built-in Procedure Reference", "https://cs61a.vercel.app/articles/scheme-builtins/index.html"),
+    ("CS61A", "HW07", "Homework 7", "Video", "Getting Started", "https://www.youtube.com/playlist?list=PLx38hZJ5RLZea1rWe3s2JtuCIku_blUu_"),
+    ("CS61A", "HW08", "Homework 8", "", "", ""),
+
+    # ── CS61A Labs ──────────────────────────────────────────────────────────
+    ("CS61A", "Lab O", "Lab O", "", "", ""),
+    ("CS61A", "Lab 1", "Lab 1", "", "", ""),
+    ("CS61A", "Lab 2", "Lab 2", "", "", ""),
+    ("CS61A", "Lab 3", "Lab 3", "", "", ""),
+    ("CS61A", "Lab 4", "Lab 4", "", "", ""),
+    ("CS61A", "Lab 5", "Lab 5", "", "", ""),
+    ("CS61A", "Lab 6", "Lab 6", "", "", ""),
+    ("CS61A", "Lab 7", "Lab 7", "", "", ""),
+    ("CS61A", "Lab 8", "Lab 8", "", "", ""),
+    ("CS61A", "Lab 9", "Lab 9", "", "", ""),
+
+    # ── CS61A Projects ──────────────────────────────────────────────────────
+    # Note: the YouTube links for Cats and Ants were inherited from the old
+    # "Project 2" and "Project 3" entries — please verify they point to the
+    # correct getting-started playlists.
+    ("CS61A", "Hog", "Hog", "Reading", "Sections 1.2", "https://www.composingprograms.com/"),
+    ("CS61A", "Hog", "Hog", "Reading", "Sections 1.3", "https://www.composingprograms.com/"),
+    ("CS61A", "Hog", "Hog", "Reading", "Sections 1.4", "https://www.composingprograms.com/"),
+    ("CS61A", "Hog", "Hog", "Reading", "Sections 1.5", "https://www.composingprograms.com/"),
+    ("CS61A", "Hog", "Hog", "Reading", "Sections 1.6", "https://www.composingprograms.com/"),
+    ("CS61A", "Hog", "Hog", "Video", "Getting Started", "https://www.youtube.com/playlist?list=PLx38hZJ5RLZfpHDDcEnevQqlX4wTxuMAD"),
+    ("CS61A", "Hog Checkpoint", "Hog Checkpoint", "", "", ""),
+    ("CS61A", "Cats", "Cats", "Video", "Getting Started", "https://www.youtube.com/playlist?list=PLx38hZJ5RLZdH1AQFUuP-ixu7nAEK4OLP"),
+    ("CS61A", "Cats Checkpoint", "Cats Checkpoint", "", "", ""),
+    ("CS61A", "Ants", "Ants", "Video", "Getting Started", "https://www.youtube.com/playlist?list=PLx38hZJ5RLZez4iVyVRr52Eknxs4RF27w"),
+    ("CS61A", "Ants Checkpoint 1", "Ants Checkpoint 1", "", "", ""),
+    ("CS61A", "Ants Checkpoint 2", "Ants Checkpoint 2", "", "", ""),
+    ("CS61A", "Scheme", "Scheme", "", "", ""),
+    ("CS61A", "Scheme Checkpoint 1", "Scheme Checkpoint 1", "", "", ""),
+    ("CS61A", "Scheme Checkpoint 2", "Scheme Checkpoint 2", "", "", ""),
+    ("CS61A", "Scheme Contest", "Scheme Contest", "", "", ""),
+
+    # ── CS61A Other ─────────────────────────────────────────────────────────
+    ("CS61A", "Midterm", "Midterm", "", "", ""),
+
+    # ── CS10 Projects ───────────────────────────────────────────────────────
     ("CS10", "Project 1", "Project 1: Wordle™-lite", "Reading", "Proj 1 Walkthrough Slides", "https://drive.google.com/file/d/1liTxubkrh5-Vtp5CbQETI9BurAquIVSx/view"),
     ("CS10", "Project 2", "Project 2: Spelling Bee", "Reading", "Proj 2 Walkthrough Slides", "https://drive.google.com/file/d/1eJQpY5PpUwt3vesplElChY293NFQk4Vp/view"),
     ("CS10", "Project 3", "Project 3: 2048", "Reading", "Proj 3 Walkthrough Slides", "https://drive.google.com/file/d/1koa1TbOmoDa5tiIEm6hohQjiMaWjLI1H/view"),
@@ -77,6 +108,12 @@ RESOURCES = [
     ("CS10", "Project 5", "Project 5: Proposal Meetings", "Reading", "Example bug writeup", "https://docs.google.com/document/d/1A6Tzm0UZte8gMnnmE2PV1J9xO__z6SaLkDVA6j3-I5s/edit?tab=t.0"),
     ("CS10", "Project 5", "Project 5: Final Project", "Reading", "Example bug writeup", "https://docs.google.com/document/d/1A6Tzm0UZte8gMnnmE2PV1J9xO__z6SaLkDVA6j3-I5s/edit?tab=t.0"),
 ]
+
+
+def _doc_id(course_code: str, assignment_code: str, resource_name: str) -> str:
+    """Stable document ID derived from the composite key."""
+    raw = f"{course_code}__{assignment_code}__{resource_name}"
+    return re.sub(r"[^\w]", "_", raw)
 
 
 def build_documents() -> List[Dict[str, str]]:
@@ -96,39 +133,40 @@ def build_documents() -> List[Dict[str, str]]:
 
 def upload_resources(db: firestore.Client, documents: List[Dict[str, str]]) -> Dict[str, int]:
     """
-    Upload resources to Firestore, skipping duplicates.
+    Upsert resources to Firestore using stable document IDs.
 
-    Duplicate detection: checks existing docs where
-    (course_code, assignment_code, resource_name) all match.
+    Uses set(merge=True) so re-running updates changed fields (e.g. renamed
+    assignment_name) rather than skipping existing entries.
     """
-    stats = {"inserted": 0, "skipped": 0, "errors": 0}
+    stats = {"inserted": 0, "updated": 0, "errors": 0}
     collection_ref = db.collection("assignment_resources")
 
-    # Pre-fetch existing resources to detect duplicates
-    print("   Fetching existing resources for dedup...")
-    existing = set()
-    for doc in collection_ref.stream():
-        d = doc.to_dict()
-        key = (d.get("course_code"), d.get("assignment_code"), d.get("resource_name"))
-        existing.add(key)
-    print(f"   Found {len(existing)} existing resource(s)")
-
     for doc_data in documents:
-        key = (doc_data["course_code"], doc_data["assignment_code"], doc_data["resource_name"])
-
-        if key in existing:
-            stats["skipped"] += 1
-            print(f"   Skipped (exists): {doc_data['course_code']} / {doc_data['assignment_code']} / {doc_data['resource_name']}")
-            continue
+        doc_id = _doc_id(
+            doc_data["course_code"],
+            doc_data["assignment_code"],
+            doc_data.get("resource_name", ""),
+        )
+        doc_ref = collection_ref.document(doc_id)
 
         try:
-            collection_ref.add(doc_data)
-            existing.add(key)
-            stats["inserted"] += 1
-            print(f"   Inserted: {doc_data['course_code']} / {doc_data['assignment_code']} / {doc_data['resource_name']}")
+            existing = doc_ref.get()
+            if existing.exists:
+                existing_data = existing.to_dict()
+                changed = any(existing_data.get(k) != v for k, v in doc_data.items())
+                if changed:
+                    doc_ref.set(doc_data, merge=True)
+                    stats["updated"] += 1
+                    print(f"   Updated: {doc_data['course_code']} / {doc_data['assignment_code']} / {doc_data['resource_name'] or '(no resource)'}")
+                else:
+                    print(f"   No change: {doc_data['course_code']} / {doc_data['assignment_code']} / {doc_data['resource_name'] or '(no resource)'}")
+            else:
+                doc_ref.set(doc_data)
+                stats["inserted"] += 1
+                print(f"   Inserted: {doc_data['course_code']} / {doc_data['assignment_code']} / {doc_data['resource_name'] or '(no resource)'}")
         except Exception as e:
             stats["errors"] += 1
-            print(f"   Error: {doc_data['resource_name']}: {e}")
+            print(f"   Error ({doc_data['assignment_code']}): {e}")
 
     return stats
 
@@ -147,16 +185,16 @@ def main():
         return
 
     documents = build_documents()
-    print(f"\nPrepared {len(documents)} resource(s) to upload")
+    print(f"\nPrepared {len(documents)} resource entries to upload\n")
 
-    # Note: 1 row from Supabase had a null link (id=21, "Slides", "Lectures 1-4") and was excluded.
-    print("(1 row with null link excluded from migration)\n")
-
-    print("Uploading...\n")
     stats = upload_resources(db, documents)
 
-    print(f"\nDone! Inserted: {stats['inserted']}, Skipped: {stats['skipped']}, Errors: {stats['errors']}")
+    print(f"\nDone! Inserted: {stats['inserted']}, Updated: {stats['updated']}, Errors: {stats['errors']}")
     print("=" * 60)
+    if stats["errors"] == 0:
+        print("\n⚠️  Note: old Firestore entries with the previous CS61A project codes")
+        print("   (Project 1/2/3) still exist and should be deleted manually from the")
+        print("   Firestore console to avoid duplicate assignment lookups.")
 
 
 if __name__ == "__main__":
