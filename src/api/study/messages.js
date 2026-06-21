@@ -6,6 +6,7 @@ export const LOCKOUT_MESSAGE =
   "If access opens up in the future, we'll reach out to your registered email.";
 
 export const WAITLIST_MESSAGE =
-  "Because this is AutoRemind's pilot semester, we have limited compute available. " +
-  "For now we've placed you on the waitlist — your preferences have been saved, and " +
-  "we'll email your registered address as soon as access opens up.";
+  "You’re on the waitlist. Your preferences have been saved. As part of this study, " +
+  "participants are randomly assigned to receive AutoRemind notifications either at the " +
+  "start of the semester or at another time. You’ll receive an email when your access " +
+  "is activated. Thank you!";
