@@ -33,6 +33,10 @@ import adminStudentsHandler from './api/admin/students.js';
 import adminDeadlinesHandler from './api/admin/deadlines.js';
 import adminResourcesHandler from './api/admin/resources.js';
 import adminDeliveryLogsHandler from './api/admin/delivery-logs.js';
+import adminStudyHandler from './api/admin/study.js';
+
+// Study-gating handlers
+import studyStatusHandler from './api/study/status.js';
 
 // Use PORT from environment variable (GCP Cloud Run sets this) or default to 3000 for local dev
 const PORT = process.env.PORT || 3000;
@@ -192,6 +196,22 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // Handle /api/study/status (authenticated user's study-gating status)
+  if (urlPath === '/api/study/status' && req.method === 'GET') {
+    const mockReq = { method: req.method, headers: { authorization: req.headers.authorization } };
+    const mockRes = {
+      status: (code) => { res.statusCode = code; return mockRes; },
+      json: (data) => { res.setHeader('Content-Type', 'application/json'); res.end(JSON.stringify(data)); }
+    };
+    try {
+      await studyStatusHandler(mockReq, mockRes);
+    } catch (error) {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Internal server error', details: error.message }));
+    }
+    return;
+  }
+
   // Handle /api/deadlines
   if (urlPath === '/api/deadlines' && req.method === 'GET') {
     const queryParams = {};
@@ -292,6 +312,13 @@ const server = http.createServer(async (req, res) => {
       if (urlPath === '/api/admin/delivery-logs' && req.method === 'GET') {
         const mockReq = { method: req.method, query: queryParams, headers: { authorization: req.headers.authorization } };
         await adminDeliveryLogsHandler(mockReq, mockRes);
+        return;
+      }
+
+      if (urlPath === '/api/admin/study') {
+        const body = ['POST', 'PUT', 'DELETE'].includes(req.method) ? await parseBody() : {};
+        const mockReq = { method: req.method, query: queryParams, body, headers: { authorization: req.headers.authorization } };
+        await adminStudyHandler(mockReq, mockRes);
         return;
       }
     } catch (error) {

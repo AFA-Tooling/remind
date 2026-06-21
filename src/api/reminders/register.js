@@ -1,5 +1,7 @@
 import { getDb } from '../firestore.js';
 import { verifyUserAuth } from '../auth/verifyUser.js';
+import { getStudyStatus } from '../study/studyStatus.js';
+import { LOCKOUT_MESSAGE } from '../study/messages.js';
 
 // Creates a minimal student document on first login (idempotent — no-op if already exists).
 export default async function handler(req, res) {
@@ -22,6 +24,13 @@ export default async function handler(req, res) {
     }
 
     const db = getDb();
+
+    // Study-gating: don't create a student doc for non-consented users.
+    const study = await getStudyStatus(db, loginEmail);
+    if (study.status === 'not_consented') {
+      return res.status(403).json({ error: 'Not consented', code: 'NOT_CONSENTED', message: LOCKOUT_MESSAGE });
+    }
+
     const docRef = db.collection('students').doc(loginEmail);
     const existing = await docRef.get();
 

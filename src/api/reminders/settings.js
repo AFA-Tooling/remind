@@ -1,6 +1,8 @@
 import { getDb } from '../firestore.js';
 import { sendWelcomeEmail } from '../../services/welcomeEmail.js';
 import { verifyUserAuth } from '../auth/verifyUser.js';
+import { getStudyStatus } from '../study/studyStatus.js';
+import { LOCKOUT_MESSAGE, WAITLIST_MESSAGE } from '../study/messages.js';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -13,6 +15,15 @@ export default async function handler(req, res) {
   }
 
   try {
+    // Study-gating: non-consented students may not save settings at all.
+    // Waitlisted/pending students DO save (their prefs activate when access opens),
+    // but the response flags them so the UI can show the waitlist popup.
+    const study = await getStudyStatus(getDb(), authResult.email);
+    if (study.status === 'not_consented') {
+      return res.status(403).json({ error: 'Not consented', code: 'NOT_CONSENTED', message: LOCKOUT_MESSAGE });
+    }
+    const waitlisted = study.status === 'waitlisted' || study.status === 'pending';
+
     let body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
 
     const { channels = {}, days_before, preferred_first_name, category_prefs } = body;
@@ -63,8 +74,10 @@ export default async function handler(req, res) {
     await docRef.set(studentData, { merge: true });
     const saved = (await docRef.get()).data();
 
-    // Send welcome email on first settings save with email enabled
-    if (wantsEmailChannel && !alreadySentWelcome) {
+    // Send welcome email on first settings save with email enabled.
+    // Skip for waitlisted students — they get no notifications yet, so a
+    // "you're all set" welcome would be misleading.
+    if (wantsEmailChannel && !alreadySentWelcome && !waitlisted) {
       try {
         console.log(`[Settings] Sending welcome email to new user: ${loginEmail}`);
 
@@ -91,7 +104,12 @@ export default async function handler(req, res) {
       }
     }
 
-    return res.status(200).json({ success: true, data: saved });
+    return res.status(200).json({
+      success: true,
+      data: saved,
+      waitlisted,
+      message: waitlisted ? WAITLIST_MESSAGE : null,
+    });
 
   } catch (error) {
     return res.status(500).json({ error: 'Internal server error', details: error.message });

@@ -80,6 +80,7 @@
         <button class="admin-tab" data-tab="deadlines">Deadlines</button>
         <button class="admin-tab" data-tab="resources">Resources</button>
         <button class="admin-tab" data-tab="delivery-logs">Delivery Logs</button>
+        <button class="admin-tab" data-tab="study">Research Study</button>
       </div>
 
       <div id="section-overview" class="admin-section active">
@@ -120,6 +121,47 @@
         </div>
         <div class="admin-stats" id="delivery-stats"></div>
         <div id="logs-content" class="loading">Loading logs...</div>
+      </div>
+
+      <div id="section-study" class="admin-section">
+        <h2>Research Study</h2>
+        <p style="color:#555; max-width:720px; line-height:1.5;">
+          Manage consent, randomize consented students into two groups, and control who receives notifications.
+          <strong>Only Group 1 receives notifications until you grant everyone access.</strong>
+        </p>
+
+        <div class="admin-stats" id="study-stats" style="margin-top:16px;"></div>
+
+        <div id="study-access-banner" style="margin:12px 0; padding:12px 16px; border-radius:8px; font-size:14px;"></div>
+
+        <div style="display:flex; gap:24px; flex-wrap:wrap; margin:20px 0;">
+          <div style="flex:1; min-width:280px; border:1px solid var(--line); border-radius:10px; padding:16px;">
+            <h3 style="margin-top:0; font-size:15px;">Consent list</h3>
+            <p style="font-size:13px; color:#666;">Upload a CSV with an <code>email</code> column. Adds new consented students (never removes).</p>
+            <input type="file" id="study-csv-input" accept=".csv" style="margin-bottom:10px; display:block;">
+            <button class="btn btn--primary btn-small" id="study-upload-btn">Upload consent CSV</button>
+            <div style="margin-top:14px; display:flex; gap:6px;">
+              <input type="email" id="study-add-email" placeholder="add single email" style="flex:1; padding:8px; border:1px solid var(--line); border-radius:6px;">
+              <button class="btn btn--outline btn-small" id="study-add-btn">Add</button>
+            </div>
+            <div id="study-upload-result" style="margin-top:10px; font-size:13px; color:#555;"></div>
+          </div>
+
+          <div style="flex:1; min-width:280px; border:1px solid var(--line); border-radius:10px; padding:16px;">
+            <h3 style="margin-top:0; font-size:15px;">Groups &amp; access</h3>
+            <p style="font-size:13px; color:#666;">Randomly split consented students ~50/50. New consenters auto-assign after the first randomization.</p>
+            <button class="btn btn--primary btn-small" id="study-randomize-btn">Randomize into groups</button>
+            <div style="margin-top:10px; display:flex; gap:6px; flex-wrap:wrap;">
+              <button class="btn btn--outline btn-small" id="study-export-1-btn">Export Group 1 CSV</button>
+              <button class="btn btn--outline btn-small" id="study-export-2-btn">Export Group 2 CSV</button>
+            </div>
+            <hr style="margin:14px 0; border:none; border-top:1px solid var(--line);">
+            <button class="btn btn-small" id="study-open-access-btn" style="background:#b91c1c; color:#fff;">Grant everyone access</button>
+            <p style="font-size:12px; color:#888; margin-top:6px;">Opens notifications to Group 1 <em>and</em> Group 2. One-way.</p>
+          </div>
+        </div>
+
+        <div id="study-content" class="loading">Loading study participants...</div>
       </div>
     </div>
   </div>
@@ -453,6 +495,137 @@
       document.getElementById('overview-stats').innerHTML = `<div class="stat-card"><div class="stat-value">${studentCount}</div><div class="stat-label">Students</div></div><div class="stat-card"><div class="stat-value">${deadlineCount}</div><div class="stat-label">Deadlines</div></div><div class="stat-card"><div class="stat-value">${resourceCount}</div><div class="stat-label">Resources</div></div><div class="stat-card"><div class="stat-value">${successRate}%</div><div class="stat-label">Delivery Rate</div></div>`;
     }
 
+    // ---- Research Study ----
+    function parseCsvEmails(text) {
+      const emails = [];
+      const lines = text.split(/\r?\n/);
+      // Detect an "email" header column; otherwise scan every cell for an address.
+      const header = (lines[0] || '').split(',').map(c => c.trim().toLowerCase());
+      const emailCol = header.indexOf('email');
+      const start = emailCol >= 0 ? 1 : 0;
+      const re = /[^\s@,]+@[^\s@,]+\.[^\s@,]+/;
+      for (let i = start; i < lines.length; i++) {
+        const cells = lines[i].split(',');
+        const candidate = emailCol >= 0 ? (cells[emailCol] || '') : lines[i];
+        const m = candidate.match(re);
+        if (m) emails.push(m[0].trim().toLowerCase());
+      }
+      return [...new Set(emails)];
+    }
+
+    function downloadCsv(filename, emails) {
+      const csv = 'email\n' + emails.join('\n') + '\n';
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = filename;
+      document.body.appendChild(a); a.click(); a.remove();
+      URL.revokeObjectURL(url);
+    }
+
+    function renderStudy({ config, counts, participants }) {
+      document.getElementById('study-stats').innerHTML =
+        `<div class="stat-card"><div class="stat-value">${counts.total}</div><div class="stat-label">Consented</div></div>` +
+        `<div class="stat-card"><div class="stat-value">${counts.group1}</div><div class="stat-label">Group 1</div></div>` +
+        `<div class="stat-card"><div class="stat-value">${counts.group2}</div><div class="stat-label">Group 2</div></div>` +
+        `<div class="stat-card"><div class="stat-value">${counts.unassigned}</div><div class="stat-label">Unassigned</div></div>`;
+
+      const banner = document.getElementById('study-access-banner');
+      if (config.access_open) {
+        banner.style.background = '#dcfce7'; banner.style.color = '#166534';
+        banner.textContent = '✅ Access is OPEN to everyone — Group 1 and Group 2 both receive notifications.';
+      } else {
+        banner.style.background = '#fef9c3'; banner.style.color = '#854d0e';
+        banner.textContent = `🔒 Pilot mode — only Group 1 receives notifications. Randomized: ${config.randomized ? 'yes' : 'no'}.`;
+      }
+
+      const rows = participants.map(p => {
+        const statusLabel = { active: 'Active', waitlisted: 'Waitlisted', pending: 'Unassigned' }[p.status] || p.status;
+        return `<tr>
+          <td>${escHtml(p.email)}</td>
+          <td>${p.group ? 'Group ' + p.group : '—'}</td>
+          <td>${statusLabel}</td>
+          <td>
+            <select data-study-group="${escHtml(p.email)}" style="padding:4px;">
+              <option value="" ${!p.group ? 'selected' : ''}>Unassigned</option>
+              <option value="1" ${p.group === 1 ? 'selected' : ''}>Group 1</option>
+              <option value="2" ${p.group === 2 ? 'selected' : ''}>Group 2</option>
+            </select>
+            <button class="btn btn-small btn-danger" data-study-remove="${escHtml(p.email)}" style="margin-left:6px">Remove</button>
+          </td>
+        </tr>`;
+      }).join('');
+
+      document.getElementById('study-content').innerHTML = participants.length
+        ? `<div class="table-wrap"><table class="admin-table"><thead><tr><th>Email</th><th>Group</th><th>Status</th><th>Manage</th></tr></thead><tbody>${rows}</tbody></table></div>`
+        : '<p>No consented students yet. Upload a consent CSV to get started.</p>';
+    }
+
+    async function loadStudy() {
+      try {
+        const data = await fetchWithAuth('/api/admin/study?action=overview');
+        renderStudy(data);
+      } catch (e) {
+        console.error('Load study error:', e);
+        document.getElementById('study-content').innerHTML = '<p>Something went wrong loading the study. Please try again.</p>';
+      }
+    }
+
+    async function uploadConsentCsv() {
+      const input = document.getElementById('study-csv-input');
+      const result = document.getElementById('study-upload-result');
+      const file = input.files && input.files[0];
+      if (!file) { result.textContent = 'Choose a CSV file first.'; return; }
+      const text = await file.text();
+      const emails = parseCsvEmails(text);
+      if (!emails.length) { result.textContent = 'No valid emails found in that CSV.'; return; }
+      const res = await fetchWithAuth('/api/admin/study?action=consent', { method: 'POST', body: JSON.stringify({ emails, source: 'csv' }) });
+      result.textContent = `Added ${res.added}, already present ${res.alreadyPresent}, skipped ${res.skipped}, auto-assigned ${res.assigned}.`;
+      input.value = '';
+      loadStudy();
+    }
+
+    async function addSingleConsent() {
+      const el = document.getElementById('study-add-email');
+      const email = (el.value || '').trim().toLowerCase();
+      if (!email) return;
+      const res = await fetchWithAuth('/api/admin/study?action=consent', { method: 'POST', body: JSON.stringify({ emails: [email], source: 'manual' }) });
+      document.getElementById('study-upload-result').textContent =
+        res.added ? `Added ${email}.` : (res.alreadyPresent ? `${email} was already consented.` : 'No valid email added.');
+      el.value = '';
+      loadStudy();
+    }
+
+    async function removeConsent(email) {
+      if (!confirm(`Remove ${email} from the study? They will lose access.`)) return;
+      await fetchWithAuth('/api/admin/study?action=remove', { method: 'POST', body: JSON.stringify({ email }) });
+      loadStudy();
+    }
+
+    async function setStudyGroup(email, group) {
+      await fetchWithAuth('/api/admin/study?action=group', { method: 'POST', body: JSON.stringify({ email, group: group === '' ? null : Number(group) }) });
+      loadStudy();
+    }
+
+    async function randomizeStudy() {
+      if (!confirm('Randomly assign all currently-unassigned consented students into Group 1 / Group 2? Existing assignments are kept.')) return;
+      const res = await fetchWithAuth('/api/admin/study?action=randomize', { method: 'POST', body: JSON.stringify({}) });
+      document.getElementById('study-upload-result').textContent = `Randomized — assigned ${res.assigned} student(s).`;
+      loadStudy();
+    }
+
+    async function exportStudyGroup(group) {
+      const res = await fetchWithAuth(`/api/admin/study?action=export&group=${group}`);
+      if (!res.emails || !res.emails.length) { alert(`Group ${group} has no students to export.`); return; }
+      downloadCsv(`study_group_${group}.csv`, res.emails);
+    }
+
+    async function openStudyAccess() {
+      if (!confirm('Grant access to EVERYONE (Group 1 + Group 2)? Notifications will start going to Group 2 as well. This cannot be undone here.')) return;
+      await fetchWithAuth('/api/admin/study?action=open-access', { method: 'POST', body: JSON.stringify({ confirm: true }) });
+      loadStudy();
+    }
+
     document.addEventListener('DOMContentLoaded', async () => {
       await initFirebase();
 
@@ -483,6 +656,7 @@
           document.querySelectorAll('.admin-section').forEach(s => s.classList.remove('active'));
           tab.classList.add('active');
           document.getElementById('section-' + tab.dataset.tab).classList.add('active');
+          if (tab.dataset.tab === 'study') loadStudy();
         };
       });
 
@@ -498,6 +672,22 @@
       document.getElementById('add-deadline-btn').onclick = () => openDeadlineForm();
       document.getElementById('cancel-deadline-btn').onclick = hideDeadlineForm;
       document.getElementById('save-deadline-btn').onclick = saveDeadline;
+
+      // Research study handlers
+      document.getElementById('study-upload-btn').onclick = uploadConsentCsv;
+      document.getElementById('study-add-btn').onclick = addSingleConsent;
+      document.getElementById('study-randomize-btn').onclick = randomizeStudy;
+      document.getElementById('study-export-1-btn').onclick = () => exportStudyGroup(1);
+      document.getElementById('study-export-2-btn').onclick = () => exportStudyGroup(2);
+      document.getElementById('study-open-access-btn').onclick = openStudyAccess;
+      document.getElementById('study-content').addEventListener('click', (e) => {
+        const removeEmail = e.target.getAttribute('data-study-remove');
+        if (removeEmail) removeConsent(removeEmail);
+      });
+      document.getElementById('study-content').addEventListener('change', (e) => {
+        const groupEmail = e.target.getAttribute('data-study-group');
+        if (groupEmail) setStudyGroup(groupEmail, e.target.value);
+      });
 
       // Close modals when clicking the backdrop
       document.getElementById('resource-modal-overlay').addEventListener('click', (e) => {

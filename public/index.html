@@ -517,9 +517,23 @@
           headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
           body: JSON.stringify(payload)
         });
+
+        let result = {};
+        try { result = await response.json(); } catch (e) { /* ignore */ }
+
+        // Not consented — settings were NOT saved; lock the student out.
+        if (response.status === 403 && result.code === 'NOT_CONSENTED') {
+          if (window.showStudyLockout) window.showStudyLockout(result.message);
+          return;
+        }
         if (!response.ok) throw new Error('Failed to save');
 
-        document.getElementById('success-modal').style.display = 'flex';
+        // Waitlisted (Group 2) — settings WERE saved; explain the waitlist.
+        if (result.waitlisted) {
+          showMessage(result.message || 'Your preferences have been saved. You are currently on the waitlist.', "You're on the waitlist");
+        } else {
+          document.getElementById('success-modal').style.display = 'flex';
+        }
       } catch (err) {
         console.error(err);
         showMessage('Error saving settings. Please try again.', 'Error');
@@ -617,6 +631,43 @@
         check();
       }
 
+      // Full-screen lockout for students who have not consented to the study.
+      function showStudyLockout(message) {
+        if (document.getElementById('study-lockout')) return;
+        const el = document.createElement('div');
+        el.id = 'study-lockout';
+        el.style.cssText = 'position:fixed;inset:0;background:#fff;z-index:10000;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;text-align:center;';
+        el.innerHTML =
+          '<img src="/logo.png" alt="AutoRemind" style="height:48px;margin-bottom:24px;" onerror="this.style.display=\'none\'">' +
+          '<h1 style="font-size:1.4rem;color:#002676;margin-bottom:12px;">AutoRemind Research Study</h1>' +
+          '<p style="max-width:520px;color:#333;line-height:1.6;"></p>' +
+          '<button id="study-lockout-signout" style="margin-top:24px;padding:10px 20px;background:#002676;color:#fff;border:none;border-radius:6px;cursor:pointer;">Sign out</button>';
+        el.querySelector('p').textContent = message || 'Access to the AutoRemind research study is currently closed.';
+        document.body.appendChild(el);
+        document.getElementById('study-lockout-signout').addEventListener('click', async () => {
+          try { await window.auth?.signOut(); } catch (e) { /* ignore */ }
+          window.location.href = '/';
+        });
+      }
+      window.showStudyLockout = showStudyLockout;
+
+      async function enforceStudyGate(email) {
+        try {
+          const token = await window.auth?.getToken();
+          const res = await fetch('/api/study/status', {
+            headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+          });
+          if (!res.ok) return; // transient error — don't lock out a legitimate user on a blip
+          const status = await res.json();
+          window.__studyStatus = status;
+          if (status.status === 'not_consented') {
+            showStudyLockout(status.message);
+          }
+        } catch (e) {
+          // Network blip — fail open in the UI; the server still enforces on save.
+        }
+      }
+
       waitForAuth((auth) => {
         const userEmail = document.getElementById('user-email');
         const logoutBtn = document.getElementById('logout-btn');
@@ -642,6 +693,9 @@
 
             // Unlock UI
             appContainer.classList.remove('is-locked');
+
+            // Research-study gate — lock out non-consented students entirely.
+            enforceStudyGate(user.email);
 
             // Fetch Settings
             fetchSettings(user.email);

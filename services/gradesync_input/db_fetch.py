@@ -161,6 +161,55 @@ def fetch_collection_docs(
     return rows
 
 
+STUDY_PARTICIPANTS_TABLE = "study_participants"
+STUDY_CONFIG_TABLE = "study_config"
+STUDY_CONFIG_DOC = "state"
+
+
+def load_study_access(db: firestore.Client, *, debug: bool = False) -> set:
+    """Return the set of lowercased emails allowed to receive notifications.
+
+    Research-study gating: a consented student has access iff their group is 1, OR
+    access has been opened to everyone (study_config/state.access_open == True).
+    Group 2 (waitlisted) and unassigned students are excluded until access opens.
+
+    Fails CLOSED — if the study collections cannot be read we raise rather than
+    risk notifying students who should be gated out.
+    """
+    try:
+        config_snap = db.collection(STUDY_CONFIG_TABLE).document(STUDY_CONFIG_DOC).get()
+        access_open = bool(config_snap.to_dict().get("access_open")) if config_snap.exists else False
+
+        access_emails = set()
+        total = group1 = group2 = unassigned = 0
+        for doc in db.collection(STUDY_PARTICIPANTS_TABLE).stream():
+            data = doc.to_dict() or {}
+            email = str(data.get("email") or doc.id).strip().lower()
+            if not email:
+                continue
+            total += 1
+            group = data.get("group")
+            if group == 1:
+                group1 += 1
+            elif group == 2:
+                group2 += 1
+            else:
+                unassigned += 1
+            if group == 1 or access_open:
+                access_emails.add(email)
+    except Exception as exc:  # noqa: BLE001 — fail closed on any read error
+        raise RuntimeError(
+            f"Aborting reminder run: could not load study gating data ({exc!r}). "
+            "Refusing to send notifications without an enforceable allowlist."
+        ) from exc
+
+    print(
+        f"🔒 Study gate: {len(access_emails)} of {total} consented students have access "
+        f"(group1={group1}, group2={group2}, unassigned={unassigned}, access_open={access_open})"
+    )
+    return access_emails
+
+
 def parse_deadline(value: str) -> Optional[datetime]:
     value = (value or "").strip()
     if not value:
@@ -911,6 +960,33 @@ def gather_reminders(
     return reminders
 
 
+def apply_study_gate(
+    db: firestore.Client,
+    reminders: List[Dict[str, Any]],
+    *,
+    debug: bool = False,
+) -> List[Dict[str, Any]]:
+    """Drop any reminder for a student without research-study access.
+
+    Single choke point for ALL reminder sources (gradesync + Canvas). Every channel
+    (email/SMS/Discord) is fed from these reminders, so gating here gates them all.
+    THIS IS THE CRITICAL INVARIANT: only Group 1 (or everyone once access is opened)
+    may receive notifications.
+    """
+    access_emails = load_study_access(db, debug=debug)
+    allowed: List[Dict[str, Any]] = []
+    gated_out = 0
+    for entry in reminders:
+        email = str((entry.get("student") or {}).get("email") or "").strip().lower()
+        if email in access_emails:
+            allowed.append(entry)
+        else:
+            gated_out += 1
+    if gated_out:
+        print(f"🔒 Study gate: removed {gated_out} reminder(s) for students without study access.")
+    return allowed
+
+
 def _build_reminder_for_student(
     student: Dict[str, Any],
     assignment_lookup: Dict[str, Dict[str, Dict[str, Any]]],
@@ -1132,6 +1208,9 @@ def run_reminder_mode(db: firestore.Client, args: argparse.Namespace) -> None:
     # Merge Canvas reminders
     canvas_reminders = gather_canvas_reminders(db, args)
     reminders.extend(canvas_reminders)
+
+    # Research-study gate — apply AFTER merging all sources, BEFORE any CSV/output.
+    reminders = apply_study_gate(db, reminders, debug=args.debug)
 
     if not reminders:
         print("✅ No students currently fall within their notification windows.")
