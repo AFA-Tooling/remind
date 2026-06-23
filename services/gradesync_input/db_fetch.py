@@ -114,6 +114,19 @@ def parse_args() -> argparse.Namespace:
         help="Output path for the Discord CSV (default: discord_messages.csv)",
     )
     parser.add_argument(
+        "--sms-csv",
+        action="store_true",
+        help=(
+            "If set, also write a CSV of (phone_number,text_message) for students who "
+            "have SMS enabled as a channel."
+        ),
+    )
+    parser.add_argument(
+        "--sms-output",
+        default="sms_messages.csv",
+        help="Output path for the SMS CSV (default: sms_messages.csv)",
+    )
+    parser.add_argument(
         "--gmail-csv",
         action="store_true",
         help=(
@@ -769,6 +782,38 @@ def write_discord_csv(reminders: List[Dict[str, Any]], output_path: Path) -> Non
         print(f"✅ No students with Discord reminders. Wrote empty CSV to {output_path}")
 
 
+def write_sms_csv(reminders: List[Dict[str, Any]], output_path: Path) -> None:
+    """Write a CSV with columns phone_number,text_message for entries with SMS channel."""
+    rows: List[Dict[str, str]] = []
+
+    for entry in reminders:
+        sms_channel = next(
+            (ch for ch in entry.get("channels", []) if ch.get("type") == "sms"),
+            None,
+        )
+        if not sms_channel:
+            continue
+
+        phone_number = str(sms_channel.get("target", "")).strip()
+        if not phone_number:
+            continue
+
+        rows.append({
+            "phone_number": phone_number,
+            "text_message": entry.get("message", ""),
+        })
+
+    with output_path.open("w", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=["phone_number", "text_message"])
+        writer.writeheader()
+        writer.writerows(rows)
+
+    if rows:
+        print(f"✅ Wrote {len(rows)} SMS messages to {output_path}")
+    else:
+        print(f"✅ No students with SMS reminders. Wrote empty CSV to {output_path}")
+
+
 def _safe_filename_basic(name: str) -> str:
     """
     Return a filename safe across Windows/POSIX by replacing reserved characters
@@ -1244,6 +1289,16 @@ def run_reminder_mode(db: firestore.Client, args: argparse.Namespace) -> None:
 
         output_path = base_dir / args.discord_output
         write_discord_csv(reminders, output_path)
+
+    # Write SMS CSV into text-service/message_requests if requested
+    if args.sms_csv:
+        script_dir = Path(__file__).resolve().parent
+        project_root = script_dir.parent
+        base_dir = project_root / "text-service" / "message_requests"
+        base_dir.mkdir(parents=True, exist_ok=True)
+
+        output_path = base_dir / args.sms_output
+        write_sms_csv(reminders, output_path)
 
     # Write Gmail CSV into gradesync_input/message_requests if requested
     if args.gmail_csv:
