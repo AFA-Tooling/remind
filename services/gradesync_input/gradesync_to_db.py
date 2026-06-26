@@ -56,9 +56,20 @@ ROSTER_COURSE_CODE = "CS61A"
 # Tabs that are never assignments
 NON_ASSIGNMENT_TABS = {"Sheet1", "Roster"}
 
+# Known CS61A project tab names (lowercased). Matched by prefix so that
+# "Hog Checkpoint" and "Hog" both resolve to the Hog project, "Scheme Challenge"
+# to Scheme, etc. Update this when a new project is added to the course.
+PROJECT_NAMES = {"hog", "cats", "ants", "scheme", "maps"}
 
-def categorize_tab(tab_name: str) -> str:
-    """Map a sheet tab name to an assignment category."""
+
+def categorize_tab(tab_name: str) -> Optional[str]:
+    """Map a sheet tab name to an assignment category.
+
+    Returns one of "Lab", "Homework", "Midterm", or "Project". Returns None for
+    tabs that don't match any known assignment or project (e.g. "Test",
+    "Test Autograder") so callers can skip them instead of mislabeling them as
+    projects.
+    """
     name = (tab_name or "").strip().lower()
     if name.startswith("lab"):
         return "Lab"
@@ -66,7 +77,9 @@ def categorize_tab(tab_name: str) -> str:
         return "Homework"
     if name.startswith("midterm"):
         return "Midterm"
-    return "Project"
+    if any(name.startswith(proj) for proj in PROJECT_NAMES):
+        return "Project"
+    return None
 
 def safe_filename_for_windows(name: str) -> str:
     """
@@ -142,11 +155,26 @@ def preprocess_df(df, tab_name):
     Returns:
         pd.DataFrame: Cleaned and formatted DataFrame
     """
-    # The Name column is sometimes exported with a stray bytes-literal prefix ("b'Name").
-    # Accept either form so sheets from different sources work.
-    name_col = "b'Name" if "b'Name" in df.columns else ("Name" if "Name" in df.columns else None)
-    if name_col is None:
-        raise ValueError("Missing required name column: expected 'Name' or \"b'Name\"")
+    # Resolve the student name column. Newer Gradescope exports split the name
+    # into separate "First Name" / "Last Name" columns; older sheets use a single
+    # "Name" (sometimes exported with a stray bytes-literal prefix, "b'Name").
+    df = df.copy()
+    if "First Name" in df.columns and "Last Name" in df.columns:
+        df["Name"] = (
+            df["First Name"].fillna("").astype(str).str.strip()
+            + " "
+            + df["Last Name"].fillna("").astype(str).str.strip()
+        ).str.strip()
+        name_col = "Name"
+    elif "b'Name" in df.columns:
+        name_col = "b'Name"
+    elif "Name" in df.columns:
+        name_col = "Name"
+    else:
+        raise ValueError(
+            "Missing required name column: expected 'First Name'+'Last Name', "
+            "'Name', or \"b'Name\""
+        )
 
     required_columns = [name_col, 'SID', 'Email', 'Status', 'Submission Time', 'Lateness (H:M:S)']
     missing = [col for col in required_columns if col not in df.columns]
@@ -420,6 +448,9 @@ if __name__ == "__main__":
             continue
 
         category = categorize_tab(tab)
+        if category is None:
+            print(f"Skipping {tab} (unrecognized tab — not a known assignment or project)")
+            continue
         print(f"\n Parsing tab: {tab} (category={category})")
         range_str = f"{tab}"
         raw_data = get_google_sheet_data(google_sheet_id, range_str, creds)
