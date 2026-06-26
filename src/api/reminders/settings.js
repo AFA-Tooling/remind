@@ -26,7 +26,7 @@ export default async function handler(req, res) {
 
     let body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
 
-    const { channels = {}, days_before, preferred_first_name, category_prefs } = body;
+    const { channels = {}, days_before, preferred_first_name, category_prefs, project_early_reminder } = body;
 
     const loginEmail = authResult.email;
 
@@ -68,6 +68,8 @@ export default async function handler(req, res) {
         midterm: !!category_prefs.midterm,
         project: !!category_prefs.project,
       };
+      // Roster-only: remind a day earlier for projects (early submission = extra credit).
+      studentData.project_early_reminder = !!project_early_reminder;
     }
 
     // Document ID = email — set(merge:true) acts as upsert

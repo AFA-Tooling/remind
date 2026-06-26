@@ -50,7 +50,8 @@ export default async function handler(req, res) {
                     homework: categoryPrefs.homework !== false,
                     midterm: categoryPrefs.midterm !== false,
                     project: categoryPrefs.project !== false,
-                }
+                },
+                project_early_reminder: data.project_early_reminder === true,
             }
         });
 

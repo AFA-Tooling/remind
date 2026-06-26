@@ -634,8 +634,20 @@ def build_assignment_payload(
         debug_print(debug, msg)
         return None
 
+    # Project early-reminder shift: roster students can opt to be reminded a day
+    # earlier for projects, since submitting a project a day early earns extra
+    # credit. We only shift the date used to decide *whether* to send; the payload
+    # (and message) still surfaces the real personal deadline.
+    effective_deadline = personal_deadline
+    if student.get("project_early_reminder"):
+        category = derive_assignment_category(entry.get("assignment_name"), code)
+        if category == "Project":
+            effective_deadline = personal_deadline - timedelta(days=1)
+            if is_target_student or debug:
+                print(f"   📌 Project early-reminder ON for {code}: effective deadline shifted back 1 day")
+
     freq_days = get_notification_frequency(student, code)
-    deadline_local = local_date(personal_deadline)
+    deadline_local = local_date(effective_deadline)
     today_local = today.date() if today.tzinfo is None else today.astimezone(PROJECT_TZ).date()
     delta_days = (deadline_local - today_local).days
 

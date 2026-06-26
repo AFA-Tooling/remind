@@ -216,6 +216,15 @@
                 </label>
               </li>
             </ul>
+            <ul class="channels" style="margin-top: 12px;">
+              <li>
+                <label for="project-early">
+                  <input id="project-early" type="checkbox" name="project_early_reminder" />
+                  <span class="dot" aria-hidden="true"></span>
+                  <span>Remind me a day earlier for projects (turn in early for extra credit)</span>
+                </label>
+              </li>
+            </ul>
           </div>
 
           <div class="divider" style="margin-top: 28px;"><span class="pill">bCourses Integration</span></div>
@@ -484,6 +493,7 @@
           midterm: document.getElementById('cat-midterm').checked,
           project: document.getElementById('cat-project').checked,
         };
+        payload.project_early_reminder = document.getElementById('project-early').checked;
       }
 
       return payload;
@@ -983,6 +993,7 @@
           document.getElementById('cat-homework').checked = prefs.homework !== false;
           document.getElementById('cat-midterm').checked = prefs.midterm !== false;
           document.getElementById('cat-project').checked = prefs.project !== false;
+          document.getElementById('project-early').checked = data.project_early_reminder === true;
         } else {
           cs61aSection.style.display = 'none';
         }
