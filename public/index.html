@@ -171,15 +171,15 @@
 
           <div class="days-input-row">
             <label for="days" class="label" style="margin:0;">Send reminder</label>
-            <input id="days" class="num-input" type="number" name="days_before" min="1" max="7" value="5" />
+            <input id="days" class="num-input" type="number" name="days_before" min="1" max="5" value="5" />
             <span>days before deadline.</span>
           </div>
 
           <div class="slider-row" style="margin-top:14px;">
             <span class="minmax">1</span>
-            <input id="days-range" type="range" min="1" max="7" value="5"
+            <input id="days-range" type="range" min="1" max="5" value="5"
               oninput="document.getElementById('days').value=this.value" />
-            <span class="minmax">7</span>
+            <span class="minmax">5</span>
           </div>
 
           <!-- CS61A Assignment Types (revealed for students on the roster) -->
@@ -432,7 +432,7 @@
       const preferredNameEl = document.getElementById('preferred-name');
       const payload = {
         channels: {},
-        days_before: Math.min(7, Math.max(1, Number(numEl.value || 1))),
+        days_before: Math.min(5, Math.max(1, Number(numEl.value || 1))),
         preferred_first_name: (preferredNameEl.value || '').trim() || null
       };
 
