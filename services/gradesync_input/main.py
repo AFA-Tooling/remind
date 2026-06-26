@@ -18,7 +18,8 @@ def main():
 
     script_gradesync = current_dir / "gradesync_to_db.py"
     script_fetch = current_dir / "db_fetch.py"
-    script_send = project_root / "discord_service" / "send_discord_reminders.py"
+    script_discord = project_root / "discord_service" / "send_discord_reminders.py"
+    script_sms = project_root / "text-service" / "send_text_reminders.py"
     script_send_email = project_root / "email-service" / "main.py"
 
     script_canvas_sync = project_root / "canvas_sync" / "canvas_sync.py"
@@ -27,8 +28,8 @@ def main():
     if not script_fetch.exists():
         print(f"❌ Error: Could not find {script_fetch}")
         return
-    if not script_send.exists():
-        print(f"❌ Error: Could not find {script_send}")
+    if not script_discord.exists():
+        print(f"❌ Error: Could not find {script_discord}")
         return
     if not script_send_email.exists():
         print(f"❌ Error: Could not find {script_send_email}")
@@ -69,7 +70,7 @@ def main():
     
     # We must pass --discord-csv and --gmail-csv so db_fetch generates the files 
     # required by the sender scripts.
-    fetch_cmd = [sys.executable, str(script_fetch), "--discord-csv", "--gmail-csv"]
+    fetch_cmd = [sys.executable, str(script_fetch), "--discord-csv", "--gmail-csv", "--sms-csv"]
     
     try:
         # check=True raises an exception if the script fails (returns non-zero)
@@ -83,7 +84,7 @@ def main():
     print("STEP 2: Sending Discord Messages")
     print("--------------------------------------------------")
 
-    send_cmd = [sys.executable, str(script_send)]
+    send_cmd = [sys.executable, str(script_discord)]
 
     try:
         subprocess.run(send_cmd, check=True)
@@ -91,13 +92,26 @@ def main():
         print(f"\n❌ Step 2 Failed. (Exit code: {e.returncode})")
         return
 
+    # Step 3: SMS (Twilio)
+    print("\n--------------------------------------------------")
+    print("STEP 3: Sending SMS Reminders (Twilio)")
+    print("--------------------------------------------------")
+
+    if script_sms.exists():
+        try:
+            subprocess.run([sys.executable, str(script_sms)], check=True)
+        except subprocess.CalledProcessError as e:
+            print(f"\n⚠️  Step 3 Warning: SMS sending failed (Exit code: {e.returncode}). Continuing...")
+    else:
+        print(f"⚠️  SMS script not found, skipping: {script_sms}")
+
     print("\n--------------------------------------------------")
     print("✅ AUTOMATION COMPLETE")
     print("--------------------------------------------------")
 
-    # 5. Run Step 3: email-service/main.py
+    # 5. Run Step 4: email-service/main.py
     print("\n--------------------------------------------------")
-    print("STEP 3: Sending Gmail Reminders")
+    print("STEP 4: Sending Gmail Reminders")
     print("--------------------------------------------------")
 
     # If you want to explicitly point it at email-service/message_requests:
@@ -108,7 +122,7 @@ def main():
     try:
         subprocess.run(email_cmd, check=True)
     except subprocess.CalledProcessError as e:
-        print(f"\n❌ Step 3 Failed. (Exit code: {e.returncode})")
+        print(f"\n❌ Step 4 Failed. (Exit code: {e.returncode})")
         return
 
 if __name__ == "__main__":
