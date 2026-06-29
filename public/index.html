@@ -685,12 +685,7 @@
         const appContainer = document.getElementById('app-container');
 
         auth.onAuthStateChange(async (user, session, loading) => {
-          if (!loading) {
-            const loader = document.getElementById('auth-loading');
-            const guard = document.getElementById('auth-guard');
-            if (loader) loader.style.display = 'none';
-            if (guard) guard.remove();
-          }
+          if (loading) return;
 
           if (user) {
             // Logged In
@@ -707,10 +702,16 @@
             // Research-study gate — lock out non-consented students entirely.
             enforceStudyGate(user.email);
 
-            // Fetch Settings
-            fetchSettings(user.email);
+            // Wait for settings to populate before revealing the form so the
+            // user never sees the default template values flash on screen.
+            await fetchSettings(user.email);
+            const loader = document.getElementById('auth-loading');
+            const guard = document.getElementById('auth-guard');
+            if (loader) loader.style.display = 'none';
+            if (guard) guard.remove();
+
             loadAssignmentsPreview(user.email);
-          } else if (!loading) {
+          } else {
             // Auth resolved with no user — bounce to landing
             window.location.replace('/');
           }

@@ -38,9 +38,23 @@
   </script>
 
   <link rel="stylesheet" href="style.css">
+  <style id="auth-guard">
+    body>*:not(#auth-loading) {
+      display: none !important;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+  </style>
 </head>
 
 <body data-page="about">
+  <div id="auth-loading"
+    style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center; background: white; z-index: 9999;">
+    <div style="width: 40px; height: 40px; margin-bottom: 16px; border: 4px solid #f3f3f3; border-top: 4px solid #002676; border-radius: 50%; animation: spin 1s linear infinite;"></div>
+    <div style="font-family: system-ui; color: #002676; font-weight: 600;">Loading AutoRemind...</div>
+  </div>
   <!-- HEADER -->
 
   <!-- Hero -->
@@ -119,6 +133,10 @@
         <a href="mailto:autoremind@berkeley.edu"
           style="color: var(--olive); font-weight: 600; display: inline-block; margin-top: 8px;">Reach out to us →</a>
       </p>
+      <p style="margin-top: 12px;">
+        For questions or inquiries regarding the research study, please contact
+        <a href="mailto:oindree@berkeley.edu" style="color: var(--olive); font-weight: 600;">oindree@berkeley.edu</a>.
+      </p>
     </div>
   </main>
 
@@ -142,7 +160,13 @@
         const featuresLink = document.getElementById('nav-features-link');
         const howItWorksLink = document.getElementById('nav-howitworks-link');
         const aboutLink = document.getElementById('nav-about-link');
-        auth.onAuthStateChange((user) => {
+        auth.onAuthStateChange((user, session, loading) => {
+          if (!loading) {
+            const loader = document.getElementById('auth-loading');
+            const guard = document.getElementById('auth-guard');
+            if (loader) loader.style.display = 'none';
+            if (guard) guard.remove();
+          }
           if (user) {
             userEmail.textContent = user.email;
             userEmail.style.display = 'inline-block';
