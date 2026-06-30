@@ -157,6 +157,8 @@ DISCORD_BOT_TOKEN="$(_env_get DISCORD_BOT_TOKEN)"
 DISCORD_CHANNEL_ID="$(_env_get DISCORD_CHANNEL_ID)"
 DISCORD_PUBLIC_KEY="$(_env_get DISCORD_PUBLIC_KEY)"
 DISCORD_GUILD_ID="$(_env_get DISCORD_GUILD_ID)"
+TWILIO_ACCOUNT_SID="$(_env_get TWILIO_ACCOUNT_SID)"
+TWILIO_AUTH_TOKEN="$(_env_get TWILIO_AUTH_TOKEN)"
 
 # JSON file secrets
 create_or_update_secret_from_file "oauth_client_secret"     "services/config/oauth_client_secret.json"
@@ -170,6 +172,8 @@ create_or_update_secret_from_value "DISCORD_BOT_TOKEN"         "$DISCORD_BOT_TOK
 create_or_update_secret_from_value "DISCORD_CHANNEL_ID"        "$DISCORD_CHANNEL_ID"
 create_or_update_secret_from_value "DISCORD_PUBLIC_KEY"        "$DISCORD_PUBLIC_KEY"
 create_or_update_secret_from_value "DISCORD_GUILD_ID"          "$DISCORD_GUILD_ID"
+create_or_update_secret_from_value "TWILIO_ACCOUNT_SID"        "$TWILIO_ACCOUNT_SID"
+create_or_update_secret_from_value "TWILIO_AUTH_TOKEN"         "$TWILIO_AUTH_TOKEN"
 
 # ─── 4. Build & push the Docker image ─────────────────────────────────────────
 info "Building & pushing Docker image: $IMAGE"
@@ -193,12 +197,14 @@ SECRETS=(
     oauth_client_secret service_account firebase_service_account gmail_token
     FIREBASE_PROJECT_ID
     DISCORD_BOT_TOKEN DISCORD_CHANNEL_ID DISCORD_PUBLIC_KEY DISCORD_GUILD_ID
+    TWILIO_ACCOUNT_SID TWILIO_AUTH_TOKEN
 )
 for SECRET in "${SECRETS[@]}"; do
     gcloud secrets add-iam-policy-binding "$SECRET" \
         --member="serviceAccount:${SERVICE_ACCOUNT}" \
         --role="roles/secretmanager.secretAccessor" \
         --project="$PROJECT_ID" \
+        --condition=None \
         --quiet
 done
 success "Secret access granted"
@@ -218,6 +224,8 @@ ALL_SECRETS=(
     "DISCORD_CHANNEL_ID=DISCORD_CHANNEL_ID:latest"
     "DISCORD_PUBLIC_KEY=DISCORD_PUBLIC_KEY:latest"
     "DISCORD_GUILD_ID=DISCORD_GUILD_ID:latest"
+    "TWILIO_ACCOUNT_SID=TWILIO_ACCOUNT_SID:latest"
+    "TWILIO_AUTH_TOKEN=TWILIO_AUTH_TOKEN:latest"
     # File-mounted secrets — each in its own subdirectory
     # (Cloud Run only allows one secret mounted per directory)
     "/secrets/oauth/oauth_client_secret.json=oauth_client_secret:latest"
@@ -256,6 +264,7 @@ fi
 gcloud projects add-iam-policy-binding "$PROJECT_ID" \
     --member="serviceAccount:${SCHEDULER_SA}" \
     --role="roles/run.invoker" \
+    --condition=None \
     --quiet
 success "Invoker role granted to scheduler SA"
 
