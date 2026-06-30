@@ -42,6 +42,16 @@
 
   <link rel="stylesheet" href="style.css">
 
+  <style id="auth-guard">
+    body>*:not(#auth-loading) {
+      display: none !important;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+  </style>
+
   <!-- Landing-only layout tweaks. Colors/typography stay on the shared theme variables. -->
   <style>
     .landing-hero {
@@ -379,6 +389,13 @@
 </head>
 
 <body data-page="landing">
+  <div id="auth-loading"
+    style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center; background: white; z-index: 9999;">
+    <div
+      style="width: 40px; height: 40px; margin-bottom: 16px; border: 4px solid #f3f3f3; border-top: 4px solid #002676; border-radius: 50%; animation: spin 1s linear infinite;">
+    </div>
+    <div style="font-family: system-ui; color: #002676; font-weight: 600;">Loading AutoRemind...</div>
+  </div>
   <!-- HEADER -->
 
   <main class="container">
@@ -578,9 +595,15 @@
         ch();
       }
       waitForAuth((auth) => {
-        auth.onAuthStateChange((user) => {
+        auth.onAuthStateChange((user, session, loading) => {
           if (user) {
             window.location.replace('./index.html');
+          } else if (!loading) {
+            // Auth resolved with no user — reveal the landing page
+            const loader = document.getElementById('auth-loading');
+            const guard = document.getElementById('auth-guard');
+            if (loader) loader.style.display = 'none';
+            if (guard) guard.remove();
           }
         });
       });
