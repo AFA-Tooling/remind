@@ -764,7 +764,7 @@ def compose_message(student: Dict[str, Any], assignments: List[Dict[str, Any]], 
                 lines.append(resource_line)
 
     lines.append("")
-    lines.append("Let us know if you need any support!")
+    lines.append("Feel free to reach out to course staff if you need any support!")
     return "\n".join(lines)
 
 
