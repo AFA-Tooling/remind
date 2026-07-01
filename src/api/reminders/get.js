@@ -28,7 +28,7 @@ export default async function handler(req, res) {
         const rosterSnap = await db.collection('class_roster').doc(loginEmail.toLowerCase()).get();
         const onRoster = rosterSnap.exists;
 
-        const categoryPrefs = data.category_prefs || { lab: true, homework: true, midterm: true, project: true };
+        const categoryPrefs = data.category_prefs || { lab: true, homework: true, midterm: true, quiz: true, project: true };
 
         // Return user data
         return res.status(200).json({
@@ -49,6 +49,7 @@ export default async function handler(req, res) {
                     lab: categoryPrefs.lab !== false,
                     homework: categoryPrefs.homework !== false,
                     midterm: categoryPrefs.midterm !== false,
+                    quiz: categoryPrefs.quiz !== false,
                     project: categoryPrefs.project !== false,
                 },
                 project_early_reminder: data.project_early_reminder === true,

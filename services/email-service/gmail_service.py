@@ -364,11 +364,12 @@ def send_gmail_reminder(
     course_code: str = "",
     credentials_path: str = str(settings.OAUTH_CLIENT_SECRET_PATH),
     sender_email: str = None,
-    token_path: str = str(settings.TOKEN_PATH)
+    token_path: str = str(settings.TOKEN_PATH),
+    message_body: Optional[str] = None
 ) -> bool:
     """
     Send a Gmail reminder to a student.
-    
+
     Args:
         student_email: Student email address
         student_name: Student name or ID
@@ -378,13 +379,17 @@ def send_gmail_reminder(
         credentials_path: Path to OAuth 2.0 client credentials JSON file
         sender_email: Email address to send from (optional, uses authenticated user if not provided)
         token_path: Path to store/load the OAuth token
-        
+        message_body: Optional pre-composed email body. When provided, it is sent
+            verbatim (covering all of the student's assignments) and the
+            motivating template / resource fetch are skipped.
+
     Returns:
         True if email was sent successfully, False otherwise
     """
     try:
-        # Fetch resources from Firestore if not provided
-        if resources is None:
+        # Only fetch resources when we're going to build the body ourselves.
+        # A caller-supplied message_body already contains any resource links.
+        if message_body is None and resources is None:
             assignment_code = extract_assignment_code(assignment_name)
             if assignment_code:
                 logger.info(f"Fetching resources for assignment code: {assignment_code}")
@@ -392,7 +397,7 @@ def send_gmail_reminder(
             else:
                 logger.warning(f"Could not extract assignment code from: {assignment_name}")
                 resources = []
-        
+
         # Create Gmail service
         # Try service account first (for automation), fall back to OAuth if needed
         service = create_gmail_service(credentials_path, sender_email, token_path, use_service_account=True)
@@ -413,18 +418,23 @@ def send_gmail_reminder(
                 # Use a placeholder - Gmail will replace it with the actual authenticated email
                 actual_sender = "noreply@autoremind.com"
         
-        # Format resources
-        resources_text = format_resources(resources)
-        
-        # Create email body using a random motivating template
-        email_body = get_motivating_email_body(
-            student_name=student_name,
-            assignment_name=assignment_name,
-            resources_text=resources_text
-        )
-        
-        # Create subject
-        subject = f"Reminder: {assignment_name} is due soon!"
+        if message_body is not None:
+            # Use the pre-composed combined message verbatim.
+            email_body = message_body
+            subject = "Reminder: You have assignments due soon!"
+        else:
+            # Format resources
+            resources_text = format_resources(resources)
+
+            # Create email body using a random motivating template
+            email_body = get_motivating_email_body(
+                student_name=student_name,
+                assignment_name=assignment_name,
+                resources_text=resources_text
+            )
+
+            # Create subject
+            subject = f"Reminder: {assignment_name} is due soon!"
         
         # Create and send message
         # Note: When using userId='me', Gmail automatically sets From to authenticated user's email

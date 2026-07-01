@@ -209,6 +209,13 @@
                 </label>
               </li>
               <li>
+                <label for="cat-quiz">
+                  <input id="cat-quiz" type="checkbox" name="cat_quiz" checked />
+                  <span class="dot" aria-hidden="true"></span>
+                  <span>Quizzes</span>
+                </label>
+              </li>
+              <li>
                 <label for="cat-project">
                   <input id="cat-project" type="checkbox" name="cat_project" checked />
                   <span class="dot" aria-hidden="true"></span>
@@ -491,6 +498,7 @@
           lab: document.getElementById('cat-lab').checked,
           homework: document.getElementById('cat-homework').checked,
           midterm: document.getElementById('cat-midterm').checked,
+          quiz: document.getElementById('cat-quiz').checked,
           project: document.getElementById('cat-project').checked,
         };
         payload.project_early_reminder = document.getElementById('project-early').checked;
@@ -989,10 +997,11 @@
         const cs61aSection = document.getElementById('cs61a-section');
         if (data.on_roster) {
           cs61aSection.style.display = 'block';
-          const prefs = data.category_prefs || { lab: true, homework: true, midterm: true, project: true };
+          const prefs = data.category_prefs || { lab: true, homework: true, midterm: true, quiz: true, project: true };
           document.getElementById('cat-lab').checked = prefs.lab !== false;
           document.getElementById('cat-homework').checked = prefs.homework !== false;
           document.getElementById('cat-midterm').checked = prefs.midterm !== false;
+          document.getElementById('cat-quiz').checked = prefs.quiz !== false;
           document.getElementById('cat-project').checked = prefs.project !== false;
           document.getElementById('project-early').checked = data.project_early_reminder === true;
         } else {

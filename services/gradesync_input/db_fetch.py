@@ -130,8 +130,9 @@ def parse_args() -> argparse.Namespace:
         "--gmail-csv",
         action="store_true",
         help=(
-            "If set, also write CSV files for Gmail reminders. Creates one CSV per assignment "
-            "in the message_requests directory with columns: name, sid, email, assignment, message_requests"
+            "If set, also write a Gmail reminder CSV (message_requests.csv) with one "
+            "row per student in the message_requests directory with columns: "
+            "name, sid, email, assignment, message_requests"
         ),
     )
     parser.add_argument(
@@ -248,11 +249,11 @@ def base_assignment_code(code: Optional[str]) -> Optional[str]:
 
 def derive_assignment_category(*candidates: Optional[str]) -> str:
     """
-    Map an assignment label to one of: Lab, Homework, Midterm, Project.
+    Map an assignment label to one of: Lab, Homework, Midterm, Quiz, Project.
 
     Tries each candidate string (assignment name first, then code) and returns
-    the first prefix match. Falls back to Project so non-matching CS61A
-    assignments still get a defined category.
+    the first match. Falls back to Project so non-matching CS61A assignments
+    still get a defined category.
     """
     for raw in candidates:
         if not raw:
@@ -264,6 +265,10 @@ def derive_assignment_category(*candidates: Optional[str]) -> str:
             return "Homework"
         if name.startswith("midterm"):
             return "Midterm"
+        # Substring (not prefix) so "Orientation Quiz (Optional)" is caught
+        # alongside the numbered "Quiz 1".."Quiz 5".
+        if "quiz" in name:
+            return "Quiz"
     return "Project"
     
 
@@ -654,7 +659,12 @@ def build_assignment_payload(
     effective_deadline = personal_deadline
     if student.get("project_early_reminder"):
         category = derive_assignment_category(entry.get("assignment_name"), code)
-        if category == "Project":
+        # Checkpoints (e.g. "Hog Checkpoint") are graded on their own deadline and
+        # earn no extra credit for early submission, so the day-early shift must not
+        # apply to them even though they fall under the Project category.
+        label = f"{entry.get('assignment_name') or ''} {code or ''}".lower()
+        is_checkpoint = "checkpoint" in label
+        if category == "Project" and not is_checkpoint:
             effective_deadline = personal_deadline - timedelta(days=1)
             if is_target_student or debug:
                 print(f"   📌 Project early-reminder ON for {code}: effective deadline shifted back 1 day")
@@ -838,13 +848,24 @@ def _safe_filename_basic(name: str) -> str:
 
 def write_gmail_csv(reminders: List[Dict[str, Any]], output_dir: Path) -> None:
     """
-    Write Gmail-compatible CSV files grouped by assignment.
-    Creates one CSV file per assignment in the output directory.
+    Write a single Gmail-compatible CSV with one row per student.
+
+    Every assignment due for a student is compacted into one combined message
+    (the same message used for Discord/SMS), so a student with multiple
+    deadlines receives a single email rather than one email per assignment.
     CSV format: name,sid,email,assignment,message_requests
     """
     output_dir.mkdir(parents=True, exist_ok=True)
-    assignment_rows: Dict[str, List[Dict[str, str]]] = {}
-    total_rows = 0
+
+    # Remove stale per-assignment CSVs from the previous (one-file-per-assignment)
+    # format so the email service doesn't re-send outdated messages.
+    for stale in output_dir.glob("message_requests_*.csv"):
+        try:
+            stale.unlink()
+        except OSError:
+            pass
+
+    rows: List[Dict[str, str]] = []
 
     for entry in reminders:
         # Find the email channel for this student, if any
@@ -859,68 +880,49 @@ def write_gmail_csv(reminders: List[Dict[str, Any]], output_dir: Path) -> None:
         if not email:
             continue
 
+        assignments = entry.get("assignments", [])
+        if not assignments:
+            continue
+
         student_data = entry.get("student", {})
         student_name = student_data.get("name", "").strip()
         student_id = student_data.get("id")
-        
+
         # Get SID from student data
         sid = student_data.get("sid", "")
         if not sid and student_id:
             sid = str(student_id)
 
-        # Create a row for each assignment
-        assignments = entry.get("assignments", [])
-        for assignment in assignments:
-            assignment_name = assignment.get("assignment_name", "Assignment")
-            assignment_code = assignment.get("assignment_code", "")
-            
-            # Use assignment_name as the key, fallback to assignment_code
-            assignment_key = assignment_name or assignment_code
-            
-            # Create a per-assignment message
-            # Use preferred_first_name if available, otherwise use first name from student_name
-            preferred_first_name = student_data.get("preferred_first_name")
-            if preferred_first_name and str(preferred_first_name).strip():
-                preferred_name = str(preferred_first_name).strip()
-            elif student_name:
-                preferred_name = student_name.split()[0] if student_name else "there"
-            else:
-                preferred_name = "there"
-            
-            due_text = format_due_datetime(assignment["personal_deadline"]) if assignment.get("personal_deadline") else "soon"
-            
-            message = f"Dear {preferred_name}, your {assignment_name} assignment is missing and it is due in {due_text}. Please submit it as soon as possible."
-            
-            if assignment_key not in assignment_rows:
-                assignment_rows[assignment_key] = []
-            
-            assignment_rows[assignment_key].append({
-                "name": student_name,
-                "sid": sid,
-                "email": email,
-                "assignment": assignment_name,
-                "message_requests": message,
-            })
+        # Summarize assignment names for the 'assignment' column. This drives the
+        # subject line / logging only; the body comes from message_requests.
+        assignment_names = [
+            a.get("assignment_name") or a.get("assignment_code", "")
+            for a in assignments
+            if a.get("assignment_name") or a.get("assignment_code")
+        ]
+        assignment_summary = ", ".join(assignment_names) if assignment_names else "your assignments"
 
-    for assignment_key, rows in assignment_rows.items():
-        safe_assignment_title = _safe_filename_basic(assignment_key)
-        csv_file_name = f"message_requests_{safe_assignment_title}.csv"
-        output_path = output_dir / csv_file_name
+        rows.append({
+            "name": student_name,
+            "sid": sid,
+            "email": email,
+            "assignment": assignment_summary,
+            # Combined, already-composed message covering all due assignments.
+            "message_requests": entry.get("message", ""),
+        })
 
-        with output_path.open("w", newline="", encoding="utf-8") as f:
-            writer = csv.DictWriter(
-                f, fieldnames=["name", "sid", "email", "assignment", "message_requests"]
-            )
-            writer.writeheader()
-            writer.writerows(rows)
+    output_path = output_dir / "message_requests.csv"
+    with output_path.open("w", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(
+            f, fieldnames=["name", "sid", "email", "assignment", "message_requests"]
+        )
+        writer.writeheader()
+        writer.writerows(rows)
 
-        total_rows += len(rows)
-        print(f"✅ Wrote {len(rows)} Gmail reminders for '{assignment_key}' to {output_path}")
-
-    if total_rows == 0:
-        print(f"✅ No students with email reminders. No Gmail CSV files created.")
+    if rows:
+        print(f"✅ Wrote {len(rows)} Gmail reminders (one per student) to {output_path}")
     else:
-        print(f"✅ Total: Wrote {total_rows} Gmail reminder rows across {len(assignment_rows)} assignment file(s)")
+        print(f"✅ No students with email reminders. Wrote empty CSV to {output_path}")
 
 
 def build_submission_lookup(submission_rows: List[Dict[str, Any]]) -> Dict[str, str]:
@@ -1259,12 +1261,86 @@ def run_raw_mode(db: firestore.Client, args: argparse.Namespace) -> None:
         print(f"Doc {idx}: {row}")
 
 
+def _assignment_signature(assignment: Dict[str, Any]) -> tuple:
+    """Stable identity for an assignment, used to dedupe across sources."""
+    deadline = assignment.get("personal_deadline")
+    return (
+        assignment.get("assignment_code"),
+        assignment.get("assignment_name"),
+        deadline.isoformat() if hasattr(deadline, "isoformat") else deadline,
+    )
+
+
+def merge_reminders_by_student(reminders: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Collapse multiple reminder entries for the same student into one.
+
+    Reminders can originate from more than one source (gradesync deadlines and
+    Canvas deadlines). Without merging, a student with deadlines from both
+    sources receives two separate messages on every channel. This unions their
+    assignments and channels (deduping each) and recomposes a single message
+    covering all of the student's due assignments.
+    """
+    merged: Dict[str, Dict[str, Any]] = {}
+    order: List[str] = []
+
+    for entry in reminders:
+        email = str((entry.get("student") or {}).get("email") or "").strip().lower()
+        # Keep students without an email as distinct entries rather than
+        # collapsing them together.
+        key = email or f"__noemail__{len(order)}"
+
+        if key not in merged:
+            merged[key] = {
+                "student": dict(entry.get("student", {})),
+                "channels": list(entry.get("channels", [])),
+                "assignments": list(entry.get("assignments", [])),
+            }
+            order.append(key)
+            continue
+
+        existing = merged[key]
+
+        seen_channels = {(c.get("type"), c.get("target")) for c in existing["channels"]}
+        for channel in entry.get("channels", []):
+            sig = (channel.get("type"), channel.get("target"))
+            if sig not in seen_channels:
+                existing["channels"].append(channel)
+                seen_channels.add(sig)
+
+        seen_assignments = {_assignment_signature(a) for a in existing["assignments"]}
+        for assignment in entry.get("assignments", []):
+            sig = _assignment_signature(assignment)
+            if sig not in seen_assignments:
+                existing["assignments"].append(assignment)
+                seen_assignments.add(sig)
+
+    result: List[Dict[str, Any]] = []
+    for key in order:
+        entry = merged[key]
+        student = entry["student"]
+        # compose_message reads preferred_first_name/first_name; the trimmed
+        # student dict on an entry only carries preferred_first_name and a full
+        # name, so reconstruct a first_name from the latter.
+        compose_student = {
+            "preferred_first_name": student.get("preferred_first_name"),
+            "first_name": (student.get("name") or "").split(" ")[0],
+        }
+        entry["message"] = compose_message(compose_student, entry["assignments"])
+        result.append(entry)
+
+    return result
+
+
 def run_reminder_mode(db: firestore.Client, args: argparse.Namespace) -> None:
     reminders = gather_reminders(db, args)
 
     # Merge Canvas reminders
     canvas_reminders = gather_canvas_reminders(db, args)
     reminders.extend(canvas_reminders)
+
+    # Collapse multiple entries for the same student (e.g. gradesync + Canvas)
+    # into a single reminder so every channel sends one combined message.
+    reminders = merge_reminders_by_student(reminders)
 
     # Research-study gate — apply AFTER merging all sources, BEFORE any CSV/output.
     reminders = apply_study_gate(db, reminders, debug=args.debug)

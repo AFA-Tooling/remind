@@ -66,6 +66,7 @@ export default async function handler(req, res) {
         lab: !!category_prefs.lab,
         homework: !!category_prefs.homework,
         midterm: !!category_prefs.midterm,
+        quiz: !!category_prefs.quiz,
         project: !!category_prefs.project,
       };
       // Roster-only: remind a day earlier for projects (early submission = extra credit).

@@ -46,6 +46,24 @@ def days_before(n):
 # "Hog" derives to the Project category (default fallback).
 PROJECT = "Hog"
 HOMEWORK = "Homework 5"
+# "Hog Checkpoint" also derives to Project, but must NOT get the day-early shift.
+CHECKPOINT = "Hog Checkpoint"
+# Quizzes are their own category (not Project), so the flag must not shift them.
+QUIZ = "Quiz 1"
+
+
+def test_quiz_is_its_own_category():
+    assert db_fetch.derive_assignment_category("Quiz 1") == "Quiz"
+    # Substring match catches the odd-named optional quiz too.
+    assert db_fetch.derive_assignment_category("Orientation Quiz (Optional)") == "Quiz"
+
+
+def test_quiz_unaffected_by_flag():
+    student = make_student(project_early_reminder=True)
+    lookup = make_lookup(QUIZ)
+    # Quizzes are no longer Project category, so the flag must not shift them.
+    assert db_fetch.build_assignment_payload(student, QUIZ, lookup, days_before(6)) is None
+    assert db_fetch.build_assignment_payload(student, QUIZ, lookup, days_before(5)) is not None
 
 
 def test_project_fires_one_day_earlier_when_flag_on():
@@ -71,6 +89,15 @@ def test_non_project_unaffected_by_flag():
     # Homework must NOT shift even with the flag on.
     assert db_fetch.build_assignment_payload(student, HOMEWORK, lookup, days_before(6)) is None
     assert db_fetch.build_assignment_payload(student, HOMEWORK, lookup, days_before(5)) is not None
+
+
+def test_checkpoint_unaffected_by_flag():
+    student = make_student(project_early_reminder=True)
+    lookup = make_lookup(CHECKPOINT)
+    # Checkpoints fall under the Project category but earn no early-submission
+    # extra credit, so the flag must not shift their schedule.
+    assert db_fetch.build_assignment_payload(student, CHECKPOINT, lookup, days_before(6)) is None
+    assert db_fetch.build_assignment_payload(student, CHECKPOINT, lookup, days_before(5)) is not None
 
 
 def test_payload_still_reports_real_personal_deadline():

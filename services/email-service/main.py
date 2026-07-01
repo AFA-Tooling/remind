@@ -114,18 +114,27 @@ def process_message_request_file(
                 # Extract required fields
                 email = row.get('email')
                 assignment = row.get('assignment', 'Assignment')
-                
+
                 # Skip if no email
                 if pd.isna(email) or not str(email).strip():
                     logger.warning(f"Row {index + 1}: No email address, skipping")
                     stats["skipped"] += 1
                     continue
-                
+
                 email = str(email).strip()
-                
+
                 # Get student name
                 student_name = get_student_name(row)
-                
+
+                # Prefer the pre-composed combined message (covers all of the
+                # student's due assignments). Falls back to the templated,
+                # per-assignment email when the column is absent/empty.
+                message_body = row.get('message_requests')
+                if pd.isna(message_body) or not str(message_body).strip():
+                    message_body = None
+                else:
+                    message_body = str(message_body)
+
                 # Send reminder
                 success = send_gmail_reminder(
                     student_email=email,
@@ -134,7 +143,8 @@ def process_message_request_file(
                     resources=resources,
                     credentials_path=credentials_path,
                     sender_email=sender_email,
-                    token_path="config/token.json"
+                    token_path="config/token.json",
+                    message_body=message_body
                 )
                 
                 if success:
@@ -299,7 +309,15 @@ def process_all_message_requests(
                     
                     # Get student name
                     student_name = get_student_name(row)
-                    
+
+                    # Prefer the pre-composed combined message (covers all of the
+                    # student's due assignments); fall back to the template.
+                    message_body = row.get('message_requests')
+                    if pd.isna(message_body) or not str(message_body).strip():
+                        message_body = None
+                    else:
+                        message_body = str(message_body)
+
                     # Send reminder
                     success = send_gmail_reminder(
                         student_email=email,
@@ -308,7 +326,8 @@ def process_all_message_requests(
                         resources=resources,
                         credentials_path=credentials_path,
                         sender_email=sender_email,
-                        token_path=str(settings.TOKEN_PATH)
+                        token_path=str(settings.TOKEN_PATH),
+                        message_body=message_body
                     )
                     
                     if success:
