@@ -41,133 +41,103 @@ def init_firestore() -> firestore.Client:
 # assignment_code and assignment_name must exactly match the Gradescope assignment name.
 # These names drive both the deadline matching (submission check) and the resource lookup.
 RESOURCES = [
-    # ── CS61A Labs ──────────────────────────────────────────────────────────
-    ("CS61A", "Lab 0", "Lab 0", "Reading", "Ch 1.1: Getting Started", "https://www.composingprograms.com/pages/11-getting-started.html"),
+    # ── CS61A ───────────────────────────────────────────────────────────────
+    ("CS61A", "Lab 0", "Lab 0", "Link", "Assignment Link", "https://cs61a.org/lab/lab00/"),
+    ("CS61A", "Lab 0", "Lab 0", "Reading", "Reading: Ch 1.1: Getting Started", "https://www.composingprograms.com/pages/11-getting-started.html"),
 
-    ("CS61A", "Lab 1", "Lab 1", "Reading", "Ch 1.2: Elements of Programming", "https://www.composingprograms.com/pages/12-elements-of-programming.html"),
-    ("CS61A", "Lab 1", "Lab 1", "Reading", "Ch 1.3: Defining New Functions", "https://www.composingprograms.com/pages/13-defining-new-functions.html"),
-    ("CS61A", "Lab 1", "Lab 1", "Reading", "Ch 1.4: Designing Functions", "https://www.composingprograms.com/pages/14-designing-functions.html"),
-    ("CS61A", "Lab 1", "Lab 1", "Reading", "Ch 1.5: Control", "https://www.composingprograms.com/pages/15-control.html"),
-    ("CS61A", "Lab 1", "Lab 1", "Video", "Lecture 1: Welcome, Functions, Exceptions", "https://www.youtube.com/watch?v=gNv81_4X0uU&list=PL6BsET-8jgYULSxiV2garZ0FxbnXR08MP&index=1"),
-    ("CS61A", "Lab 1", "Lab 1", "Video", "Lecture 2: Control", "https://www.youtube.com/watch?v=IPec2A7j2bY&list=PL6BsET-8jgYVCz97Y75GRXSWbb4sTpDIR"),
+    ("CS61A", "Lab 1", "Lab 1", "Link", "Assignment Link", "https://cs61a.org/lab/lab01/"),
+    ("CS61A", "Lab 1", "Lab 1", "Reading", "Reading: 1.2 – 1.5", "https://www.composingprograms.com/"),
+    ("CS61A", "Lab 1", "Lab 1", "Video", "Videos: Functions, Control", "https://www.askademia.org/cs61a/su26/cs61a-su26-upload-1775199158"),
 
-    ("CS61A", "Lab 2", "Lab 2", "Reading", "Ch 1.6: Higher-Order Functions", "https://www.composingprograms.com/pages/16-higher-order-functions.html"),
-    ("CS61A", "Lab 2", "Lab 2", "Video", "Lecture 3: Higher-Order Functions", "https://www.youtube.com/watch?v=pveIuZT0GJE&list=PL6BsET-8jgYXvcnnEX7x2_USaYug9xZFv"),
-    ("CS61A", "Lab 2", "Lab 2", "Video", "Lecture 4: Environments", "https://www.youtube.com/watch?v=1P2UgdAWwYg&list=PLx38hZJ5RLZfuSmYOTG7sKY44pEC01398&index=1"),
+    ("CS61A", "Orientation Quiz (Optional)", "Orientation Quiz (Optional)", "Link", "Assignment Link", "https://us.prairietest.com/"),
+    ("CS61A", "Orientation Quiz (Optional)", "Orientation Quiz (Optional)", "Video", "Lecture 1: Welcome, Functions, Exceptions", "https://www.youtube.com/watch?v=gNv81_4X0uU&list=PL6BsET-8jgYULSxiV2garZ0FxbnXR08MP&index=1"),
 
-    ("CS61A", "Lab 3", "Lab 3", "Reading", "Ch 1.7: Recursive Functions", "https://www.composingprograms.com/pages/17-recursive-functions.html"),
-    ("CS61A", "Lab 3", "Lab 3", "Video", "Lecture 5: Recursion", "https://www.youtube.com/watch?v=31EDjrN1x5k&list=PL6BsET-8jgYUUBHIgUAqjrMUoPCGQcYdl"),
-    ("CS61A", "Lab 3", "Lab 3", "Video", "Lecture 6: Tree Recursion", "https://www.youtube.com/watch?v=VYYkJ1OLXBw&list=PL6BsET-8jgYUUWPap4etQjZVWlWUeFxn0"),
+    ("CS61A", "Lab 2", "Lab 2", "Link", "Assignment Link", "https://cs61a.org/lab/lab02/"),
+    ("CS61A", "Lab 2", "Lab 2", "Reading", "Reading: 1.6", "https://www.composingprograms.com/"),
+    ("CS61A", "Lab 2", "Lab 2", "Video", "Videos: Higher Order Functions, Environments", "https://www.askademia.org/cs61a/su26/cs61a-su26-upload-1775199158"),
 
-    ("CS61A", "Lab 4", "Lab 4", "Reading", "Ch 2.3: Sequences", "https://www.composingprograms.com/pages/23-sequences.html"),
-    ("CS61A", "Lab 4", "Lab 4", "Video", "Lecture 7: Sequences and Containers", "https://www.youtube.com/watch?v=-Q45UcQ2XJk&list=PLx38hZJ5RLZc8KP9bVLM1C90HprD0ctrq&index=1"),
-    ("CS61A", "Lab 4", "Lab 4", "Video", "Lecture 9: Trees", "https://www.youtube.com/watch?v=qFCJANh5ht8&list=PLEd2rgVCX-1M"),
+    ("CS61A", "Homework 1", "Homework 1", "Link", "Assignment Link", "https://cs61a.org/hw/hw01/"),
+    ("CS61A", "Homework 1", "Homework 1", "Reading", "Reading: 1.2 – 1.6", "https://www.composingprograms.com/"),
+    ("CS61A", "Homework 1", "Homework 1", "Video", "Videos: Functions, Control, Higher Order Functions", "https://www.askademia.org/cs61a/su26/playlists/functions"),
 
-    ("CS61A", "Lab 5", "Lab 5", "Reading", "Ch 2.4: Mutable Data", "https://www.composingprograms.com/pages/24-mutable-data.html"),
-    ("CS61A", "Lab 5", "Lab 5", "Reading", "Ch 2.2: Data Abstraction", "https://www.composingprograms.com/pages/22-data-abstraction.html"),
-    ("CS61A", "Lab 5", "Lab 5", "Reading", "Ch 4.2: Implicit Sequences", "https://www.composingprograms.com/pages/42-implicit-sequences.html"),
-    ("CS61A", "Lab 5", "Lab 5", "Video", "Lecture 8: Mutability and Data Abstraction", "https://www.youtube.com/watch?v=Q-CewobDFZM&list=PLWelSnn5Gemc"),
-    ("CS61A", "Lab 5", "Lab 5", "Video", "Lecture 10: Iterators and Generators", "https://www.youtube.com/watch?v=On-kFyFp8HY&list=PLx38hZJ5RLZdEOl-AAfpul_-iySZzI4C3&index=1"),
+    ("CS61A", "Lab 3", "Lab 3", "Link", "Assignment Link", "https://cs61a.org/lab/lab03/"),
+    ("CS61A", "Lab 3", "Lab 3", "Reading", "Reading: 1.7", "https://www.composingprograms.com/"),
+    ("CS61A", "Lab 3", "Lab 3", "Video", "Videos: Recursion, Tree Recursion", "https://www.askademia.org/cs61a/su26/cs61a-su26-upload-1775199158"),
 
-    ("CS61A", "Lab 6", "Lab 6", "Reading", "Ch 2.5: Object-Oriented Programming", "https://www.composingprograms.com/pages/25-object-oriented-programming.html"),
-    ("CS61A", "Lab 6", "Lab 6", "Reading", "Ch 2.7: Object Abstraction", "https://www.composingprograms.com/pages/27-object-abstraction.html"),
-    ("CS61A", "Lab 6", "Lab 6", "Video", "Lecture 13: Objects and Attributes", "https://www.youtube.com/watch?v=XdRZkeCRXs4&list=PLx38hZJ5RLZcLC84b96V3_gkgu0L-pP8H&index=1"),
-    ("CS61A", "Lab 6", "Lab 6", "Video", "Lecture 14: Inheritance and String Representation", "https://www.youtube.com/watch?v=Bqpe1iyq5vE&list=PLx38hZJ5RLZeBJZPjGNKBdMJVczwYXHlR&index=1"),
+    ("CS61A", "Hog Checkpoint", "Hog Checkpoint", "Link", "Assignment Link", "https://cs61a.org/proj/hog/"),
+    ("CS61A", "Hog Checkpoint", "Hog Checkpoint", "Video", "Hog Starting Videos", "https://www.youtube.com/playlist?list=PLx38hZJ5RLZf9k0xEv1fD5FmR0-gjb9BM"),
 
-    ("CS61A", "Lab 7", "Lab 7", "Reading", "Ch 2.7: Object Abstraction", "https://www.composingprograms.com/pages/27-object-abstraction.html"),
-    ("CS61A", "Lab 7", "Lab 7", "Reading", "Ch 2.9: Recursive Objects", "https://www.composingprograms.com/pages/29-recursive-objects.html"),
-    ("CS61A", "Lab 7", "Lab 7", "Video", "Lecture 14: Inheritance and String Representation", "https://www.youtube.com/watch?v=Bqpe1iyq5vE&list=PLx38hZJ5RLZeBJZPjGNKBdMJVczwYXHlR&index=1"),
-    ("CS61A", "Lab 7", "Lab 7", "Video", "Lecture 15: Mutable Trees", "https://www.youtube.com/watch?v=vg9tCzw2hPc&list=PLx38hZJ5RLZc2kUmt4l-3C3yFTA1zRQW7&index=1"),
+    ("CS61A", "Hog", "Hog", "Video", "Hog Starting Videos", "https://www.youtube.com/playlist?list=PLx38hZJ5RLZf9k0xEv1fD5FmR0-gjb9BM"),
 
-    ("CS61A", "Lab 8", "Lab 8", "Reading", "Ch 2.9: Recursive Objects", "https://www.composingprograms.com/pages/29-recursive-objects.html"),
-    ("CS61A", "Lab 8", "Lab 8", "Video", "Lecture 16: Linked Lists", "https://www.youtube.com/watch?v=yC4WPw_6ehY&list=PLx38hZJ5RLZfpHYLasG2fsMHBFDWvdkBT&index=1"),
+    ("CS61A", "Lab 4", "Lab 4", "Link", "Assignment Link", "https://cs61a.org/lab/lab04/"),
+    ("CS61A", "Lab 4", "Lab 4", "Reading", "Reading: 2.3", "https://www.composingprograms.com/"),
+    ("CS61A", "Lab 4", "Lab 4", "Video", "Videos: Sequences and Containers, Trees", "https://www.askademia.org/cs61a/su26/cs61a-su26-upload-1775199158"),
 
-    ("CS61A", "Lab 9", "Lab 9", "Reading", "Ch 3.1: Scheme Introduction", "https://www.composingprograms.com/pages/31-introduction.html"),
-    ("CS61A", "Lab 9", "Lab 9", "Reading", "Ch 3.2: Functional Programming", "https://www.composingprograms.com/pages/32-functional-programming.html"),
-    ("CS61A", "Lab 9", "Lab 9", "Video", "Lecture 18: Scheme", "https://www.youtube.com/watch?v=esIvijecRFw&list=PL6BsET-8jgYWGDX7c-OKSMCh4QCBZ7Bs4"),
-    ("CS61A", "Lab 9", "Lab 9", "Video", "Lecture 19: Scheme Lists", "https://www.youtube.com/watch?v=M8nvWOAHLso&list=PL6BsET-8jgYW3h5HuWwcoTP4NTmLGB95p"),
+    ("CS61A", "Homework 2", "Homework 2", "Link", "Assignment Link", "https://cs61a.org/hw/hw02/"),
+    ("CS61A", "Homework 2", "Homework 2", "Reading", "Reading: 1.7, 2.3", "https://www.composingprograms.com/"),
+    ("CS61A", "Homework 2", "Homework 2", "Video", "Videos: Recursion, Tree Recursion, Sequences, Containers", "https://www.askademia.org/cs61a/su26/cs61a-su26-upload-1775199158"),
 
-    ("CS61A", "Lab 10", "Lab 10", "Reading", "Ch 3.4: Interpreters (Combination)", "https://www.composingprograms.com/pages/34-interpreters-for-languages-with-combination.html"),
-    ("CS61A", "Lab 10", "Lab 10", "Reading", "Ch 3.5: Interpreters (Abstraction)", "https://www.composingprograms.com/pages/35-interpreters-for-languages-with-abstraction.html"),
-    ("CS61A", "Lab 10", "Lab 10", "Video", "Lecture 20: Interpreters", "https://www.youtube.com/watch?v=bnUkFcTcUxM&list=PLx38hZJ5RLZeeyD43PD6M-wNmMg88IZXW&index=1"),
-    ("CS61A", "Lab 10", "Lab 10", "Video", "Lecture 21: Tail Calls", "https://www.youtube.com/watch?v=zOxxB-gdO9U&list=PLx38hZJ5RLZdTRcbg-7Y59QARgHW4i3E8&index=1"),
+    ("CS61A", "Lab 5", "Lab 5", "Link", "Assignment Link", "https://cs61a.org/lab/lab05/"),
+    ("CS61A", "Lab 5", "Lab 5", "Reading", "Reading: 2.2, 2.4, 4.2", "https://www.composingprograms.com/"),
+    ("CS61A", "Lab 5", "Lab 5", "Video", "Videos: Mutability, Data Abstraction, Iterators, Generators", "https://www.askademia.org/cs61a/su26/cs61a-su26-upload-1775199158"),
 
-    ("CS61A", "Lab 11", "Lab 11", "Reading", "Ch 4.3: Declarative Programming", "https://www.composingprograms.com/pages/43-declarative-programming.html"),
-    ("CS61A", "Lab 11", "Lab 11", "Video", "Lecture 22: SQL and Tables", "https://www.youtube.com/watch?v=lombSNkvRR4&list=PLx38hZJ5RLZesH9b4St6HNAH-NC0yOD00&index=1"),
-    ("CS61A", "Lab 11", "Lab 11", "Video", "Lecture 23: Aggregation and Databases", "https://www.youtube.com/watch?v=2ajhv_e_u5Q&list=PLx38hZJ5RLZeSZJObFKl1993Q5cXMABL3&index=1"),
-
-    ("CS61A", "Lab 12", "Lab 12", "Video", "Lecture 27: Final Review", "https://www.youtube.com/watch?v=_wfbb189nJA&list=PLx38hZJ5RLZf1a2bhgcoj_1Ifkn8tli0L&index=1"),
-
-    # ── CS61A Homework ──────────────────────────────────────────────────────
-    ("CS61A", "Homework 1", "Homework 1", "Reading", "Ch 1.2: Elements of Programming", "https://www.composingprograms.com/pages/12-elements-of-programming.html"),
-    ("CS61A", "Homework 1", "Homework 1", "Reading", "Ch 1.3: Defining New Functions", "https://www.composingprograms.com/pages/13-defining-new-functions.html"),
-    ("CS61A", "Homework 1", "Homework 1", "Reading", "Ch 1.4: Designing Functions", "https://www.composingprograms.com/pages/14-designing-functions.html"),
-    ("CS61A", "Homework 1", "Homework 1", "Reading", "Ch 1.5: Control", "https://www.composingprograms.com/pages/15-control.html"),
-    ("CS61A", "Homework 1", "Homework 1", "Reading", "Ch 1.6: Higher-Order Functions", "https://www.composingprograms.com/pages/16-higher-order-functions.html"),
-    ("CS61A", "Homework 1", "Homework 1", "Video", "Lecture 1: Welcome, Functions, Exceptions", "https://www.youtube.com/watch?v=gNv81_4X0uU&list=PL6BsET-8jgYULSxiV2garZ0FxbnXR08MP&index=1"),
-    ("CS61A", "Homework 1", "Homework 1", "Video", "Lecture 2: Control", "https://www.youtube.com/watch?v=IPec2A7j2bY&list=PL6BsET-8jgYVCz97Y75GRXSWbb4sTpDIR"),
-    ("CS61A", "Homework 1", "Homework 1", "Video", "Lecture 3: Higher-Order Functions", "https://www.youtube.com/watch?v=pveIuZT0GJE&list=PL6BsET-8jgYXvcnnEX7x2_USaYug9xZFv"),
-
-    ("CS61A", "Homework 2", "Homework 2", "Reading", "Ch 1.7: Recursive Functions", "https://www.composingprograms.com/pages/17-recursive-functions.html"),
-    ("CS61A", "Homework 2", "Homework 2", "Reading", "Ch 2.3: Sequences", "https://www.composingprograms.com/pages/23-sequences.html"),
-    ("CS61A", "Homework 2", "Homework 2", "Video", "Lecture 5: Recursion", "https://www.youtube.com/watch?v=31EDjrN1x5k&list=PL6BsET-8jgYUUBHIgUAqjrMUoPCGQcYdl"),
-    ("CS61A", "Homework 2", "Homework 2", "Video", "Lecture 6: Tree Recursion", "https://www.youtube.com/watch?v=VYYkJ1OLXBw&list=PL6BsET-8jgYUUWPap4etQjZVWlWUeFxn0"),
-    ("CS61A", "Homework 2", "Homework 2", "Video", "Lecture 7: Sequences and Containers", "https://www.youtube.com/watch?v=-Q45UcQ2XJk&list=PLx38hZJ5RLZc8KP9bVLM1C90HprD0ctrq&index=1"),
-
-    ("CS61A", "Homework 3", "Homework 3", "Reading", "Ch 2.4: Mutable Data", "https://www.composingprograms.com/pages/24-mutable-data.html"),
-    ("CS61A", "Homework 3", "Homework 3", "Reading", "Ch 2.2: Data Abstraction", "https://www.composingprograms.com/pages/22-data-abstraction.html"),
-    ("CS61A", "Homework 3", "Homework 3", "Reading", "Ch 2.3: Sequences", "https://www.composingprograms.com/pages/23-sequences.html"),
-    ("CS61A", "Homework 3", "Homework 3", "Reading", "Ch 4.2: Implicit Sequences", "https://www.composingprograms.com/pages/42-implicit-sequences.html"),
-    ("CS61A", "Homework 3", "Homework 3", "Video", "Lecture 8: Mutability and Data Abstraction", "https://www.youtube.com/watch?v=Q-CewobDFZM&list=PLWelSnn5Gemc"),
-    ("CS61A", "Homework 3", "Homework 3", "Video", "Lecture 9: Trees", "https://www.youtube.com/watch?v=qFCJANh5ht8&list=PLEd2rgVCX-1M"),
-    ("CS61A", "Homework 3", "Homework 3", "Video", "Lecture 10: Iterators and Generators", "https://www.youtube.com/watch?v=On-kFyFp8HY&list=PLx38hZJ5RLZdEOl-AAfpul_-iySZzI4C3&index=1"),
-
-    ("CS61A", "Homework 4", "Homework 4", "Reading", "Ch 2.5: Object-Oriented Programming", "https://www.composingprograms.com/pages/25-object-oriented-programming.html"),
-    ("CS61A", "Homework 4", "Homework 4", "Reading", "Ch 2.7: Object Abstraction", "https://www.composingprograms.com/pages/27-object-abstraction.html"),
-    ("CS61A", "Homework 4", "Homework 4", "Reading", "Ch 2.9: Recursive Objects", "https://www.composingprograms.com/pages/29-recursive-objects.html"),
-    ("CS61A", "Homework 4", "Homework 4", "Video", "Lecture 13: Objects and Attributes", "https://www.youtube.com/watch?v=XdRZkeCRXs4&list=PLx38hZJ5RLZcLC84b96V3_gkgu0L-pP8H&index=1"),
-    ("CS61A", "Homework 4", "Homework 4", "Video", "Lecture 14: Inheritance and String Representation", "https://www.youtube.com/watch?v=Bqpe1iyq5vE&list=PLx38hZJ5RLZeBJZPjGNKBdMJVczwYXHlR&index=1"),
-    ("CS61A", "Homework 4", "Homework 4", "Video", "Lecture 15: Mutable Trees", "https://www.youtube.com/watch?v=vg9tCzw2hPc&list=PLx38hZJ5RLZc2kUmt4l-3C3yFTA1zRQW7&index=1"),
-
-    ("CS61A", "Homework 5", "Homework 5", "Reading", "Ch 2.9: Recursive Objects", "https://www.composingprograms.com/pages/29-recursive-objects.html"),
-    ("CS61A", "Homework 5", "Homework 5", "Reading", "Ch 2.8: Efficiency", "https://www.composingprograms.com/pages/28-efficiency.html"),
-    ("CS61A", "Homework 5", "Homework 5", "Reading", "Ch 3.1: Scheme Introduction", "https://www.composingprograms.com/pages/31-introduction.html"),
-    ("CS61A", "Homework 5", "Homework 5", "Reading", "Ch 3.2: Functional Programming", "https://www.composingprograms.com/pages/32-functional-programming.html"),
-    ("CS61A", "Homework 5", "Homework 5", "Video", "Lecture 16: Linked Lists", "https://www.youtube.com/watch?v=yC4WPw_6ehY&list=PLx38hZJ5RLZfpHYLasG2fsMHBFDWvdkBT&index=1"),
-    ("CS61A", "Homework 5", "Homework 5", "Video", "Lecture 17: Efficiency", "https://www.youtube.com/watch?v=DWhsOSHjY98&list=PL6BsET-8jgYU9eOK2Ft8hQuzIWb4h-Tim"),
-    ("CS61A", "Homework 5", "Homework 5", "Video", "Lecture 18: Scheme", "https://www.youtube.com/watch?v=esIvijecRFw&list=PL6BsET-8jgYWGDX7c-OKSMCh4QCBZ7Bs4"),
-
-    ("CS61A", "Homework 6", "Homework 6", "Reading", "Ch 4.3: Declarative Programming", "https://www.composingprograms.com/pages/43-declarative-programming.html"),
-    ("CS61A", "Homework 6", "Homework 6", "Video", "Lecture 22: SQL and Tables", "https://www.youtube.com/watch?v=lombSNkvRR4&list=PLx38hZJ5RLZesH9b4St6HNAH-NC0yOD00&index=1"),
-    ("CS61A", "Homework 6", "Homework 6", "Video", "Lecture 23: Aggregation and Databases", "https://www.youtube.com/watch?v=2ajhv_e_u5Q&list=PLx38hZJ5RLZeSZJObFKl1993Q5cXMABL3&index=1"),
-
-    ("CS61A", "Homework 7", "Homework 7", "Video", "Lecture 27: Final Review", "https://www.youtube.com/watch?v=_wfbb189nJA&list=PLx38hZJ5RLZf1a2bhgcoj_1Ifkn8tli0L&index=1"),
-
-    # ── CS61A Projects ──────────────────────────────────────────────────────
-    ("CS61A", "Hog Checkpoint", "Hog Checkpoint", "Video", "Hog Starting Videos", "https://www.youtube.com/watch?v=FQHZwBEYGSM&list=PLx38hZJ5RLZfpHDDcEnevQqlX4wTxuMAD&index=1"),
-
-    ("CS61A", "Hog", "Hog", "Video", "Hog Starting Videos", "https://www.youtube.com/watch?v=FQHZwBEYGSM&list=PLx38hZJ5RLZfpHDDcEnevQqlX4wTxuMAD&index=1"),
-
+    ("CS61A", "Cats Checkpoint", "Cats Checkpoint", "Link", "Assignment Link", "https://cs61a.org/proj/cats/"),
     ("CS61A", "Cats Checkpoint", "Cats Checkpoint", "Video", "Cats Starting Videos", "https://www.youtube.com/watch?v=dq_cByFCRqY&list=PLx38hZJ5RLZe87guXM0aEm5VYwY6Mzbdy&index=1"),
+
+    ("CS61A", "Homework 3", "Homework 3", "Link", "Assignment Link", "https://cs61a.org/hw/hw03/"),
+    ("CS61A", "Homework 3", "Homework 3", "Reading", "Reading: 2.2 – 2.4, 4.2", "https://www.composingprograms.com/"),
+    ("CS61A", "Homework 3", "Homework 3", "Video", "Videos: Mutability, Data Abstraction, Trees, Iterators, Generators", "https://www.askademia.org/cs61a/su26/cs61a-su26-upload-1775199158"),
+
+    ("CS61A", "Lab 6", "Lab 6", "Link", "Assignment Link", "https://cs61a.org/lab/lab06/"),
+    ("CS61A", "Lab 6", "Lab 6", "Reading", "Reading: 2.5, 2.7", "https://www.composingprograms.com/"),
+    ("CS61A", "Lab 6", "Lab 6", "Video", "Videos: Objects, Attributes, Inheritance, Representation", "https://www.askademia.org/cs61a/su26/cs61a-su26-upload-1775199158"),
 
     ("CS61A", "Cats", "Cats", "Video", "Cats Starting Videos", "https://www.youtube.com/watch?v=dq_cByFCRqY&list=PLx38hZJ5RLZe87guXM0aEm5VYwY6Mzbdy&index=1"),
 
+    ("CS61A", "Lab 7", "Lab 7", "Link", "Assignment Link", "https://cs61a.org/lab/lab07/"),
+    ("CS61A", "Lab 7", "Lab 7", "Reading", "Reading: 2.7, 2.9", "https://www.composingprograms.com/"),
+    ("CS61A", "Lab 7", "Lab 7", "Video", "Videos: Inheritance, Representation, Tree Class, Tree Mutation", "https://www.askademia.org/cs61a/su26/cs61a-su26-upload-1775199158"),
+
+    ("CS61A", "Homework 4", "Homework 4", "Link", "Assignment Link", "https://cs61a.org/hw/hw04/"),
+    ("CS61A", "Homework 4", "Homework 4", "Reading", "Reading: 2.5, 2.7, 2.9", "https://www.composingprograms.com/"),
+    ("CS61A", "Homework 4", "Homework 4", "Video", "Videos: Objects, Attributes, Inheritance, String Representation, Tree Class, Tree Mutation", "https://www.askademia.org/cs61a/su26/cs61a-su26-upload-1775199158"),
+
+    ("CS61A", "Lab 8", "Lab 8", "Link", "Assignment Link", "https://cs61a.org/lab/lab08/"),
+    ("CS61A", "Lab 8", "Lab 8", "Reading", "Reading: 2.9", "https://www.composingprograms.com/"),
+    ("CS61A", "Lab 8", "Lab 8", "Video", "Videos: Linked Lists", "https://www.askademia.org/cs61a/su26/cs61a-su26-upload-1775199158"),
+
+    ("CS61A", "Ants Checkpoint", "Ants Checkpoint", "Link", "Assignment Link", "https://cs61a.org/proj/ants/"),
     ("CS61A", "Ants Checkpoint", "Ants Checkpoint", "Video", "Ants Starting Videos", "https://www.youtube.com/watch?v=aJtR9HkE3NY&list=PLx38hZJ5RLZdH1AQFUuP-ixu7nAEK4OLP&index=1"),
+
+    ("CS61A", "Lab 9", "Lab 9", "Link", "Assignment Link", "https://cs61a.org/lab/lab09/"),
+    ("CS61A", "Lab 9", "Lab 9", "Reading", "Reading: 3.1 – 3.2", "https://www.composingprograms.com/"),
+    ("CS61A", "Lab 9", "Lab 9", "Video", "Videos: Scheme and Scheme Lists", "https://www.askademia.org/cs61a/su26/cs61a-su26-upload-1775199158"),
 
     ("CS61A", "Ants", "Ants", "Video", "Ants Starting Videos", "https://www.youtube.com/watch?v=aJtR9HkE3NY&list=PLx38hZJ5RLZdH1AQFUuP-ixu7nAEK4OLP&index=1"),
 
-    ("CS61A", "Scheme Checkpoint", "Scheme Checkpoint", "Video", "Lecture 18: Scheme", "https://www.youtube.com/watch?v=esIvijecRFw&list=PL6BsET-8jgYWGDX7c-OKSMCh4QCBZ7Bs4"),
-    ("CS61A", "Scheme Checkpoint", "Scheme Checkpoint", "Video", "Lecture 19: Scheme Lists", "https://www.youtube.com/watch?v=M8nvWOAHLso&list=PL6BsET-8jgYW3h5HuWwcoTP4NTmLGB95p"),
-    ("CS61A", "Scheme Checkpoint", "Scheme Checkpoint", "Video", "Lecture 20: Interpreters", "https://www.youtube.com/watch?v=bnUkFcTcUxM&list=PLx38hZJ5RLZeeyD43PD6M-wNmMg88IZXW&index=1"),
-    ("CS61A", "Scheme Checkpoint", "Scheme Checkpoint", "Video", "Lecture 21: Tail Calls", "https://www.youtube.com/watch?v=zOxxB-gdO9U&list=PLx38hZJ5RLZdTRcbg-7Y59QARgHW4i3E8&index=1"),
+    ("CS61A", "Homework 5", "Homework 5", "Link", "Assignment Link", "https://cs61a.org/hw/hw05/"),
+    ("CS61A", "Homework 5", "Homework 5", "Reading", "Reading: 2.8 – 3.2", "https://www.composingprograms.com/"),
+    ("CS61A", "Homework 5", "Homework 5", "Video", "Videos: Linked Lists, Efficiency, Scheme", "https://www.askademia.org/cs61a/su26/cs61a-su26-upload-1775199158"),
 
-    ("CS61A", "Scheme", "Scheme", "Video", "Lecture 18: Scheme", "https://www.youtube.com/watch?v=esIvijecRFw&list=PL6BsET-8jgYWGDX7c-OKSMCh4QCBZ7Bs4"),
-    ("CS61A", "Scheme", "Scheme", "Video", "Lecture 19: Scheme Lists", "https://www.youtube.com/watch?v=M8nvWOAHLso&list=PL6BsET-8jgYW3h5HuWwcoTP4NTmLGB95p"),
-    ("CS61A", "Scheme", "Scheme", "Video", "Lecture 20: Interpreters", "https://www.youtube.com/watch?v=bnUkFcTcUxM&list=PLx38hZJ5RLZeeyD43PD6M-wNmMg88IZXW&index=1"),
-    ("CS61A", "Scheme", "Scheme", "Video", "Lecture 21: Tail Calls", "https://www.youtube.com/watch?v=zOxxB-gdO9U&list=PLx38hZJ5RLZdTRcbg-7Y59QARgHW4i3E8&index=1"),
+    ("CS61A", "Lab 10", "Lab 10", "Link", "Assignment Link", "https://cs61a.org/lab/lab10/"),
+    ("CS61A", "Lab 10", "Lab 10", "Reading", "Reading: 3.4 – 3.5", "https://www.composingprograms.com/"),
+    ("CS61A", "Lab 10", "Lab 10", "Video", "Videos: Interpreters, Tail Recursion, Tail Calls, Map and Reduce", "https://www.askademia.org/cs61a/su26/cs61a-su26-upload-1775199158"),
 
-    # ── CS61A Other ─────────────────────────────────────────────────────────
-    ("CS61A", "Orientation Quiz (Optional)", "Orientation Quiz (Optional)", "Video", "Lecture 1: Welcome, Functions, Exceptions", "https://www.youtube.com/watch?v=gNv81_4X0uU&list=PL6BsET-8jgYULSxiV2garZ0FxbnXR08MP&index=1"),
+    ("CS61A", "Lab 11", "Lab 11", "Link", "Assignment Link", "https://cs61a.org/lab/lab11/"),
+    ("CS61A", "Lab 11", "Lab 11", "Reading", "Reading: 4.3", "https://www.composingprograms.com/"),
+    ("CS61A", "Lab 11", "Lab 11", "Video", "Videos: SQL, Tables, Aggregation, Databases", "https://www.askademia.org/cs61a/su26/cs61a-su26-upload-1775199158"),
+
+    ("CS61A", "Homework 6", "Homework 6", "Link", "Assignment Link", "https://cs61a.org/hw/hw06/"),
+    ("CS61A", "Homework 6", "Homework 6", "Reading", "Reading: 4.3", "https://www.composingprograms.com/"),
+    ("CS61A", "Homework 6", "Homework 6", "Video", "Videos: SQL, Tables, Aggregation, Databases", "https://www.askademia.org/cs61a/su26/cs61a-su26-upload-1775199158"),
+
+    ("CS61A", "Scheme Checkpoint", "Scheme Checkpoint", "Video", "Videos: Scheme, Scheme Lists, Interpreters, Tail Recursion, Tail Calls, Map and Reduce", "https://www.askademia.org/cs61a/su26/cs61a-su26-upload-1775199158"),
+
+    ("CS61A", "Lab 12", "Lab 12", "Video", "Lecture 27: Final Review", "https://www.youtube.com/watch?v=_wfbb189nJA&list=PLx38hZJ5RLZf1a2bhgcoj_1Ifkn8tli0L&index=1"),
+
+    ("CS61A", "Homework 7", "Homework 7", "Video", "Lecture 27: Final Review", "https://www.youtube.com/watch?v=_wfbb189nJA&list=PLx38hZJ5RLZf1a2bhgcoj_1Ifkn8tli0L&index=1"),
+
+    ("CS61A", "Scheme", "Scheme", "Video", "Videos: Scheme, Scheme Lists, Interpreters, Tail Calls", "https://www.askademia.org/cs61a/su26/playlists/functions"),
 
     # ── CS10 Projects ───────────────────────────────────────────────────────
     ("CS10", "Project 1", "Project 1: Wordle™-lite", "Reading", "Proj 1 Walkthrough Slides", "https://drive.google.com/file/d/1liTxubkrh5-Vtp5CbQETI9BurAquIVSx/view"),
