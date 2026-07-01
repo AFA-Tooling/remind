@@ -157,7 +157,8 @@
             </div>
             <hr style="margin:14px 0; border:none; border-top:1px solid var(--line);">
             <button class="btn btn-small" id="study-open-access-btn" style="background:#b91c1c; color:#fff;">Grant everyone access</button>
-            <p style="font-size:12px; color:#888; margin-top:6px;">Opens notifications to Group 1 <em>and</em> Group 2. One-way.</p>
+            <button class="btn btn--outline btn-small" id="study-close-access-btn" style="display:none;">Revoke everyone access</button>
+            <p style="font-size:12px; color:#888; margin-top:6px;">Opens notifications to Group 1 <em>and</em> Group 2. Reversible via “Revoke everyone access”.</p>
           </div>
         </div>
 
@@ -539,6 +540,10 @@
         banner.textContent = `🔒 Pilot mode — only Group 1 receives notifications. Randomized: ${config.randomized ? 'yes' : 'no'}.`;
       }
 
+      // Show whichever access toggle matches the current state.
+      document.getElementById('study-open-access-btn').style.display = config.access_open ? 'none' : '';
+      document.getElementById('study-close-access-btn').style.display = config.access_open ? '' : 'none';
+
       const rows = participants.map(p => {
         const statusLabel = { active: 'Active', waitlisted: 'Waitlisted', pending: 'Unassigned' }[p.status] || p.status;
         return `<tr>
@@ -621,8 +626,14 @@
     }
 
     async function openStudyAccess() {
-      if (!confirm('Grant access to EVERYONE (Group 1 + Group 2)? Notifications will start going to Group 2 as well. This cannot be undone here.')) return;
+      if (!confirm('Grant access to EVERYONE (Group 1 + Group 2)? Notifications will start going to Group 2 as well. You can reverse this with “Revoke everyone access”.')) return;
       await fetchWithAuth('/api/admin/study?action=open-access', { method: 'POST', body: JSON.stringify({ confirm: true }) });
+      loadStudy();
+    }
+
+    async function closeStudyAccess() {
+      if (!confirm('Revoke open access and return to group-gated mode? Only Group 1 will receive notifications again; Group 2 goes back to waitlisted.')) return;
+      await fetchWithAuth('/api/admin/study?action=close-access', { method: 'POST', body: JSON.stringify({ confirm: true }) });
       loadStudy();
     }
 
@@ -680,6 +691,7 @@
       document.getElementById('study-export-1-btn').onclick = () => exportStudyGroup(1);
       document.getElementById('study-export-2-btn').onclick = () => exportStudyGroup(2);
       document.getElementById('study-open-access-btn').onclick = openStudyAccess;
+      document.getElementById('study-close-access-btn').onclick = closeStudyAccess;
       document.getElementById('study-content').addEventListener('click', (e) => {
         const removeEmail = e.target.getAttribute('data-study-remove');
         if (removeEmail) removeConsent(removeEmail);

@@ -8,6 +8,7 @@
 //   POST  ?action=randomize                          -> ~50/50 split of unassigned
 //   GET   ?action=export&group=1|2                   -> { emails: [...] } for that group
 //   POST  ?action=open-access { confirm: true }      -> grant Group 1 + Group 2 access
+//   POST  ?action=close-access { confirm: true }     -> revert to group-gated access (undo open-access)
 //
 // CSV parsing for upload and CSV generation for export happen client-side; this
 // endpoint speaks JSON only.
@@ -197,6 +198,18 @@ export async function runStudyAction(req, res, db = getDb()) {
         { merge: true }
       );
       return res.status(200).json({ success: true, access_open: true });
+    }
+
+    // ---- POST close-access (undo open-access) ----
+    if (req.method === 'POST' && action === 'close-access') {
+      if (req.body?.confirm !== true) {
+        return res.status(400).json({ error: 'confirm:true required to close access back to group-gated' });
+      }
+      await db.collection(STUDY_CONFIG).doc(STUDY_CONFIG_DOC).set(
+        { access_open: false, updated_at: nowIso() },
+        { merge: true }
+      );
+      return res.status(200).json({ success: true, access_open: false });
     }
 
     return res.status(400).json({ error: `Unknown action '${action}' for ${req.method}` });
