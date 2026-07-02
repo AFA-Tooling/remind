@@ -731,6 +731,10 @@ def compose_message(student: Dict[str, Any], assignments: List[Dict[str, Any]], 
         "Heads-up: you have upcoming assignments due soon:",
     ]
 
+    renderable = [a for a in assignments if a.get("personal_deadline")]
+    number_assignments = len(renderable) > 1
+
+    bullet_index = 0
     for assignment in assignments:
         due_dt = assignment.get("personal_deadline")
         if not due_dt:
@@ -744,8 +748,10 @@ def compose_message(student: Dict[str, Any], assignments: List[Dict[str, Any]], 
             days_label = "due in 1 day"
         else:
             days_label = f"due in {days_until} days"
+        bullet_index += 1
+        bullet = f"{bullet_index}." if number_assignments else "-"
         lines.append(
-            f"- {assignment['assignment_name']} ({assignment['assignment_code']}) → {days_label}, on {due_date_str}"
+            f"{bullet} {assignment['assignment_name']} ({assignment['assignment_code']}) → {days_label}, on {due_date_str}"
         )
         if assignment["offset_days"]:
             lines.append(
