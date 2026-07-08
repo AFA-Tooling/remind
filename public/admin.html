@@ -40,6 +40,14 @@
     .unauthorized { text-align: center; padding: 64px; }
     .pref-badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; margin-right: 4px; background: #e0e0e0; }
     .pref-badge.active { background: var(--olive); color: #fff; font-weight: 600; }
+    .group-badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; white-space: nowrap; }
+    .group-badge.g1 { background: var(--olive); color: #fff; }
+    .group-badge.g2 { background: #2563eb; color: #fff; }
+    .group-badge.unassigned { background: #f59e0b; color: #fff; }
+    .group-badge.none { background: #e0e0e0; color: #666; }
+    .students-toolbar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
+    .students-toolbar select { padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; }
+    .students-toolbar .toolbar-count { font-size: 13px; color: var(--muted); margin-left: auto; }
     .loading { text-align: center; padding: 40px; color: var(--muted); }
     .table-wrap { overflow-x: auto; }
   </style>
@@ -89,6 +97,18 @@
 
       <div id="section-students" class="admin-section">
         <h2>Registered Students</h2>
+        <div class="students-toolbar" id="students-toolbar" style="display:none;">
+          <label style="font-size:13px; color:var(--muted);">Study group:</label>
+          <select id="students-group-filter">
+            <option value="all">All</option>
+            <option value="1">Group 1</option>
+            <option value="2">Group 2</option>
+            <option value="unassigned">Unassigned</option>
+            <option value="none">N/A (not registered)</option>
+          </select>
+          <button class="btn btn--outline btn-small" id="students-export-btn">Export CSV</button>
+          <span class="toolbar-count" id="students-count"></span>
+        </div>
         <div id="students-content" class="loading">Loading students...</div>
       </div>
 
@@ -209,6 +229,8 @@
   <script>
     let authToken = null;
     let currentUser = null;
+    let studentsData = [];
+    let studentsWired = false;
 
     async function initFirebase() {
       await new Promise(r => setTimeout(r, 100));
@@ -236,11 +258,70 @@
       return res.json();
     }
 
+    // Map a student's study_group value to a display label + badge class.
+    function groupMeta(studyGroup) {
+      if (studyGroup === 1) return { label: 'Group 1', cls: 'g1' };
+      if (studyGroup === 2) return { label: 'Group 2', cls: 'g2' };
+      if (studyGroup === 'unassigned') return { label: 'Unassigned', cls: 'unassigned' };
+      return { label: 'N/A', cls: 'none' };
+    }
+
+    function filterStudents(filter) {
+      if (filter === 'all') return studentsData;
+      if (filter === 'none') return studentsData.filter(s => (s.study_group ?? 'none') === 'none');
+      if (filter === 'unassigned') return studentsData.filter(s => s.study_group === 'unassigned');
+      return studentsData.filter(s => s.study_group === Number(filter));
+    }
+
+    function renderStudents() {
+      const filter = document.getElementById('students-group-filter').value;
+      const rows = filterStudents(filter);
+      const countEl = document.getElementById('students-count');
+      if (countEl) countEl.textContent = `${rows.length} of ${studentsData.length} student${studentsData.length === 1 ? '' : 's'}`;
+      const body = rows.map(s => {
+        const g = groupMeta(s.study_group);
+        return `<tr>
+          <td>${escHtml(s.email || s.id)}</td>
+          <td>${escHtml(s.preferred_first_name || '-')}</td>
+          <td><span class="group-badge ${g.cls}">${g.label}</span></td>
+          <td>${escHtml(s.phone_number || '-')}</td>
+          <td>${escHtml(s.discord_id || '-')}</td>
+          <td>${s.days_before_deadline ?? '-'}</td>
+          <td><span class="pref-badge ${s.email_pref ? 'active' : ''}">Email</span><span class="pref-badge ${s.phone_pref ? 'active' : ''}">SMS</span><span class="pref-badge ${s.discord_pref ? 'active' : ''}">Discord</span></td>
+        </tr>`;
+      }).join('');
+      document.getElementById('students-content').innerHTML =
+        `<div class="table-wrap"><table class="admin-table"><thead><tr><th>Email</th><th>Name</th><th>Group</th><th>Phone</th><th>Discord</th><th>Days</th><th>Channels</th></tr></thead><tbody>${body || '<tr><td colspan="7" style="color:var(--muted)">No students match this filter.</td></tr>'}</tbody></table></div>`;
+    }
+
+    function exportStudentsCsv() {
+      const filter = document.getElementById('students-group-filter').value;
+      const rows = filterStudents(filter);
+      const csvCell = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
+      const lines = [['Email', 'Name', 'Group'].map(csvCell).join(',')];
+      rows.forEach(s => lines.push([s.email || s.id, s.preferred_first_name || '', groupMeta(s.study_group).label].map(csvCell).join(',')));
+      const blob = new Blob([lines.join('\r\n')], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `students-${filter === 'none' ? 'not-registered' : filter}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+
     async function loadStudents() {
       try {
         const { data } = await fetchWithAuth('/api/admin/students');
-        const html = `<div class="table-wrap"><table class="admin-table"><thead><tr><th>Email</th><th>Name</th><th>Phone</th><th>Discord</th><th>Days</th><th>Channels</th></tr></thead><tbody>${data.map(s => `<tr><td>${s.email || s.id}</td><td>${s.preferred_first_name || '-'}</td><td>${s.phone_number || '-'}</td><td>${s.discord_id || '-'}</td><td>${s.days_before_deadline ?? '-'}</td><td><span class="pref-badge ${s.email_pref ? 'active' : ''}">Email</span><span class="pref-badge ${s.phone_pref ? 'active' : ''}">SMS</span><span class="pref-badge ${s.discord_pref ? 'active' : ''}">Discord</span></td></tr>`).join('')}</tbody></table></div>`;
-        document.getElementById('students-content').innerHTML = html;
+        studentsData = data;
+        if (!studentsWired) {
+          document.getElementById('students-group-filter').addEventListener('change', renderStudents);
+          document.getElementById('students-export-btn').addEventListener('click', exportStudentsCsv);
+          studentsWired = true;
+        }
+        document.getElementById('students-toolbar').style.display = 'flex';
+        renderStudents();
         return data.length;
       } catch (e) { console.error('Load students error:', e); document.getElementById('students-content').innerHTML = '<p>Something went wrong. Please try again.</p>'; return 0; }
     }
