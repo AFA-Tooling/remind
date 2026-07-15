@@ -698,25 +698,36 @@ def build_assignment_payload(
         f"Student {student.get('id')} {code}: freq={freq_days}d, delta={delta_days}d",
     )
 
-    if delta_days < 0:
-        msg = f"Skipping {code}: past due (delta_days={delta_days})"
+    # Two independent reasons an assignment can fire. The due match is the original
+    # rule: an exact match on the notification frequency, against the (possibly
+    # early-reminder-shifted) deadline. The release match is an OR against a
+    # different date entirely, so it cannot be folded into the chain above.
+    due_match = delta_days >= 0 and delta_days == freq_days
+
+    release_dt = entry.get("release")
+    release_match = bool(
+        student.get("release_reminder")
+        and release_dt
+        and local_date(release_dt) == today_local
+    )
+
+    if not due_match and not release_match:
+        if delta_days < 0:
+            msg = f"Skipping {code}: past due (delta_days={delta_days})"
+        else:
+            msg = f"Skipping {code}: delta {delta_days} != freq {freq_days} and not release day"
         if is_target_student or debug:
             print(f"   ❌ {msg}")
         debug_print(debug, msg)
         return None
 
-    # New rule: only send when the diff exactly matches the notification frequency.
-    if delta_days != freq_days:
-        msg = f"Skipping {code}: delta {delta_days} != freq {freq_days} (EXACT MATCH REQUIRED)"
-        if is_target_student or debug:
-            print(f"   ❌ {msg}")
-            print(f"   💡 To send email, delta_days ({delta_days}) must exactly equal freq_days ({freq_days})")
-        debug_print(debug, msg)
-        return None
+    # Same-day collision: an assignment can be released today and hit its due match
+    # today. The due line is more actionable and implies the assignment is out, so
+    # it wins and the assignment is listed once.
+    reason = "due" if due_match else "release"
 
     if is_target_student or debug:
-        print(f"   ✅ MATCH! delta_days ({delta_days}) == freq_days ({freq_days})")
-        print(f"   ✅ Will send reminder for {code}")
+        print(f"   ✅ MATCH ({reason})! Will send reminder for {code}")
 
     return {
         "assignment_code": code,
@@ -726,6 +737,7 @@ def build_assignment_payload(
         "offset_days": offset,
         "notification_window_days": freq_days,
         "resources": entry.get("resources", []),
+        "reason": reason,
     }
 
 

@@ -87,6 +87,104 @@ def test_build_assignment_lookup_seeds_release_for_unmatched_assignment():
     assert entry["release"] is None
 
 
+def make_student(**overrides):
+    student = {
+        "email": "student@berkeley.edu",
+        "id": "stu1",
+        "course_code": "CS61A",
+        "days_before_deadline": 5,
+        "category_prefs": {"lab": True, "homework": True, "midterm": True, "quiz": True, "project": True},
+    }
+    student.update(overrides)
+    return student
+
+
+def make_lookup(assignment_name, release=RELEASE):
+    return {
+        "CS61A": {
+            assignment_name: {
+                "assignment_name": assignment_name,
+                "deadline": DUE,
+                "release": release,
+                "resources": [],
+            }
+        }
+    }
+
+
+LAB = "Lab 5"
+CHECKPOINT = "Hog Checkpoint"
+ON_RELEASE_DAY = datetime(2026, 6, 22, 9, 0, 0)   # == RELEASE date
+ON_DUE_MATCH_DAY = datetime(2026, 6, 25, 9, 0, 0)  # 5 days before DUE (June 30)
+
+
+def test_fires_on_release_day_when_enabled():
+    student = make_student(release_reminder=True)
+    payload = db_fetch.build_assignment_payload(student, LAB, make_lookup(LAB), ON_RELEASE_DAY)
+    assert payload is not None, "should fire on the release date"
+    assert payload["reason"] == "release"
+    assert payload["personal_deadline"] == DUE, "payload still carries the real due date"
+
+
+def test_silent_on_release_day_when_disabled():
+    student = make_student(release_reminder=False)
+    assert db_fetch.build_assignment_payload(student, LAB, make_lookup(LAB), ON_RELEASE_DAY) is None
+
+
+def test_silent_when_category_muted():
+    student = make_student(release_reminder=True, category_prefs={
+        "lab": False, "homework": True, "midterm": True, "quiz": True, "project": True,
+    })
+    assert db_fetch.build_assignment_payload(student, LAB, make_lookup(LAB), ON_RELEASE_DAY) is None
+
+
+def test_no_release_date_never_fires_a_release():
+    student = make_student(release_reminder=True)
+    lookup = make_lookup(CHECKPOINT, release=None)
+    assert db_fetch.build_assignment_payload(student, CHECKPOINT, lookup, ON_RELEASE_DAY) is None
+
+
+def test_silent_on_a_day_that_is_neither():
+    student = make_student(release_reminder=True)
+    neither = datetime(2026, 6, 23, 9, 0, 0)  # not release, not 5-days-before-due
+    assert db_fetch.build_assignment_payload(student, LAB, make_lookup(LAB), neither) is None
+
+
+def test_due_reminder_still_fires_and_is_tagged_due():
+    student = make_student(release_reminder=True)
+    payload = db_fetch.build_assignment_payload(student, LAB, make_lookup(LAB), ON_DUE_MATCH_DAY)
+    assert payload is not None
+    assert payload["reason"] == "due"
+
+
+def test_due_wins_when_both_match_same_day():
+    # days_before_deadline=8 puts the due match on June 22 — the release date too.
+    student = make_student(release_reminder=True, days_before_deadline=8)
+    payload = db_fetch.build_assignment_payload(student, LAB, make_lookup(LAB), ON_RELEASE_DAY)
+    assert payload is not None
+    assert payload["reason"] == "due", "due must win a same-day collision"
+
+
+def test_project_early_reminder_does_not_shift_release():
+    # The day-early shift is about extra credit for early submission — meaningless
+    # for a release date, so the release still fires on the real release day.
+    student = make_student(release_reminder=True, project_early_reminder=True)
+    lookup = make_lookup("Hog")
+    payload = db_fetch.build_assignment_payload(student, "Hog", lookup, ON_RELEASE_DAY)
+    assert payload is not None
+    assert payload["reason"] == "release"
+    # And it must not fire a day early.
+    day_before = datetime(2026, 6, 21, 9, 0, 0)
+    assert db_fetch.build_assignment_payload(student, "Hog", lookup, day_before) is None
+
+
+def test_release_reminder_off_leaves_due_behavior_untouched():
+    student = make_student(release_reminder=False)
+    lookup = make_lookup(LAB)
+    assert db_fetch.build_assignment_payload(student, LAB, lookup, ON_DUE_MATCH_DAY) is not None
+    assert db_fetch.build_assignment_payload(student, LAB, lookup, ON_RELEASE_DAY) is None
+
+
 if __name__ == "__main__":
     import sys
 
