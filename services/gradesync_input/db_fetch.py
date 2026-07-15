@@ -1378,12 +1378,20 @@ def merge_reminders_by_student(reminders: List[Dict[str, Any]]) -> List[Dict[str
                 existing["channels"].append(channel)
                 seen_channels.add(sig)
 
-        seen_assignments = {_assignment_signature(a) for a in existing["assignments"]}
+        # Signature deliberately carries no reason, so a release and a due payload for
+        # the same assignment collapse into one entry. Due wins that collision: it is
+        # more actionable and already implies the assignment is out. A payload with no
+        # reason (Canvas) counts as due.
+        seen_assignments = {
+            _assignment_signature(a): idx for idx, a in enumerate(existing["assignments"])
+        }
         for assignment in entry.get("assignments", []):
             sig = _assignment_signature(assignment)
             if sig not in seen_assignments:
+                seen_assignments[sig] = len(existing["assignments"])
                 existing["assignments"].append(assignment)
-                seen_assignments.add(sig)
+            elif assignment.get("reason", "due") != "release":
+                existing["assignments"][seen_assignments[sig]] = assignment
 
     result: List[Dict[str, Any]] = []
     for key in order:

@@ -68,6 +68,53 @@ def test_resources_render_in_the_release_section():
     assert "https://x.test/lab5" in msg
 
 
+def make_entry(assignments):
+    return {
+        "student": {"email": "ada@berkeley.edu", "name": "Ada Lovelace", "preferred_first_name": "Ada"},
+        "channels": [{"type": "email", "target": "ada@berkeley.edu"}],
+        "assignments": assignments,
+    }
+
+
+def test_due_replaces_release_for_same_assignment():
+    release_first = make_entry([make_assignment("Lab 5", "release")])
+    due_second = make_entry([make_assignment("Lab 5", "due")])
+    merged = db_fetch.merge_reminders_by_student([release_first, due_second])
+    assert len(merged) == 1
+    assignments = merged[0]["assignments"]
+    assert len(assignments) == 1, "the same assignment must not be listed twice"
+    assert assignments[0]["reason"] == "due"
+
+
+def test_release_does_not_replace_due():
+    due_first = make_entry([make_assignment("Lab 5", "due")])
+    release_second = make_entry([make_assignment("Lab 5", "release")])
+    merged = db_fetch.merge_reminders_by_student([due_first, release_second])
+    assignments = merged[0]["assignments"]
+    assert len(assignments) == 1
+    assert assignments[0]["reason"] == "due", "a release payload must never displace a due one"
+
+
+def test_canvas_payload_without_reason_beats_a_release():
+    canvas = make_assignment("Lab 5", "due")
+    del canvas["reason"]  # Canvas payloads carry no reason
+    merged = db_fetch.merge_reminders_by_student([
+        make_entry([make_assignment("Lab 5", "release")]),
+        make_entry([canvas]),
+    ])
+    assignments = merged[0]["assignments"]
+    assert len(assignments) == 1
+    assert assignments[0].get("reason", "due") == "due"
+
+
+def test_distinct_assignments_both_survive():
+    merged = db_fetch.merge_reminders_by_student([
+        make_entry([make_assignment("Lab 5", "release")]),
+        make_entry([make_assignment("Hog", "due")]),
+    ])
+    assert len(merged[0]["assignments"]) == 2
+
+
 if __name__ == "__main__":
     import sys
 
