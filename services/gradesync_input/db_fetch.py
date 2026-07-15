@@ -961,6 +961,16 @@ def write_gmail_csv(reminders: List[Dict[str, Any]], output_dir: Path) -> None:
         ]
         assignment_summary = ", ".join(assignment_names) if assignment_names else "your assignments"
 
+        # "release" only when every assignment in this entry is release-reason;
+        # a payload with no "reason" key means "due" (Canvas payloads never set
+        # one), and any mix with a due assignment keeps the more urgent "due"
+        # framing for the subject line.
+        message_kind = (
+            "release"
+            if all(a.get("reason", "due") == "release" for a in assignments)
+            else "due"
+        )
+
         rows.append({
             "name": student_name,
             "sid": sid,
@@ -968,12 +978,14 @@ def write_gmail_csv(reminders: List[Dict[str, Any]], output_dir: Path) -> None:
             "assignment": assignment_summary,
             # Combined, already-composed message covering all due assignments.
             "message_requests": entry.get("message", ""),
+            # Drives the email subject line in the (separate) email service.
+            "message_kind": message_kind,
         })
 
     output_path = output_dir / "message_requests.csv"
     with output_path.open("w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(
-            f, fieldnames=["name", "sid", "email", "assignment", "message_requests"]
+            f, fieldnames=["name", "sid", "email", "assignment", "message_requests", "message_kind"]
         )
         writer.writeheader()
         writer.writerows(rows)
