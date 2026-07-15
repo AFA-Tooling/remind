@@ -53,6 +53,13 @@ def load_deadlines_csv(csv_path: Path) -> List[Dict[str, any]]:
     deadlines = []
     with csv_path.open(newline="", encoding="utf-8") as handle:
         reader = csv.DictReader(handle)
+        fieldnames = [(name or "").strip() for name in (reader.fieldnames or [])]
+        if "release" not in fieldnames:
+            raise ValueError(
+                f"Deadlines CSV is missing the 'release' column entirely: {csv_path}. "
+                "Refusing to proceed — uploading would write release=None for every "
+                "row and silently wipe existing release dates in Firestore."
+            )
         for raw_row in reader:
             row = {(key or "").strip(): (value or "") for key, value in raw_row.items()}
 
