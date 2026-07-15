@@ -4,6 +4,8 @@ config/credentials.json
 
 # Generated output
 output/
+# Composed reminder CSVs — contain student emails and message bodies
+message_requests/
 
 # Optional Mac junk files
 .DS_Store
