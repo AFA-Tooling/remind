@@ -235,7 +235,11 @@ def parse_deadline(value: str) -> Optional[datetime]:
         return None
 
 
-DeadlineMap = Dict[str, Dict[str, Dict[str, datetime]]]
+# A deadline record carries both dates for one assignment. `due` is always present;
+# `release` is None when the assignment has no release date of its own (e.g. project
+# checkpoints, which ship with the parent project's handout).
+DeadlineRecord = Dict[str, Optional[datetime]]
+DeadlineMap = Dict[str, Dict[str, Dict[str, DeadlineRecord]]]
 
 
 def base_assignment_code(code: Optional[str]) -> Optional[str]:
@@ -283,24 +287,30 @@ def load_deadlines_from_rows(
         assignment_code = (raw_row.get("assignment_code") or "").strip()
         assignment_name = (raw_row.get("assignment_name") or raw_row.get("assignment") or "").strip()
         due_str = raw_row.get("due")
+        release_str = raw_row.get("release")
 
         due_date = parse_deadline(str(due_str) if due_str is not None else "")
         if not due_date:
             continue
 
+        release_date = parse_deadline(str(release_str) if release_str is not None else "")
+        record: DeadlineRecord = {"due": due_date, "release": release_date}
+
         course_deadlines = deadlines.setdefault(course_code, {"code": {}, "name": {}})
 
         if assignment_code:
-            course_deadlines["code"][assignment_code] = due_date
+            course_deadlines["code"][assignment_code] = record
         if assignment_name:
-            course_deadlines["name"][assignment_name] = due_date
+            course_deadlines["name"][assignment_name] = record
 
         scope = course_code or "(default)"
+        release_note = release_date.date().isoformat() if release_date else "none"
         debug_print(
             debug,
             (
                 f"Loaded deadline code='{assignment_code or 'n/a'}' "
-                f"name='{assignment_name or 'n/a'}' [{scope}] → {due_date.isoformat(sep=' ')}"
+                f"name='{assignment_name or 'n/a'}' [{scope}] → {due_date.isoformat(sep=' ')} "
+                f"(release: {release_note})"
             ),
         )
 
@@ -340,7 +350,7 @@ def find_deadline_for_entry(
     deadlines: DeadlineMap,
     *,
     debug: bool = False,
-) -> Optional[datetime]:
+) -> Optional[DeadlineRecord]:
     candidates = _iter_deadline_maps(course_code, deadlines)
     if not candidates:
         return None
@@ -382,7 +392,7 @@ def find_deadline_for_entry(
     target_phrase = f"Project {number}"
     for scope, mapping in candidates:
         by_name = mapping.get("name", {})
-        for name, due in by_name.items():
+        for name, record in by_name.items():
             if target_phrase in name:
                 debug_print(
                     debug,
@@ -391,7 +401,7 @@ def find_deadline_for_entry(
                         f"'{target_phrase}' in scope '{scope or 'default'}'"
                     ),
                 )
-                return due
+                return record
 
     return None
 
@@ -412,7 +422,8 @@ def attach_deadlines_to_resources(
                 debug=debug,
             )
             if matched:
-                entry["deadline"] = matched
+                entry["deadline"] = matched["due"]
+                entry["release"] = matched.get("release")
 
 
 def build_assignment_lookup(
