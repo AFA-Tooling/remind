@@ -448,6 +448,7 @@ def build_assignment_lookup(
                 "assignment_name": row.get("assignment_name") or normalized_code,
                 "resources": [],
                 "deadline": None,
+                "release": None,
                 "course_code": course_code,
             },
         )
@@ -472,6 +473,7 @@ def build_assignment_lookup(
                     "assignment_name": entry.get("assignment_name") or alias_code,
                     "resources": [],
                     "deadline": None,
+                    "release": None,
                     "course_code": course_code,
                 },
             )

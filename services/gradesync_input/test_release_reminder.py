@@ -70,6 +70,23 @@ def test_attach_deadlines_sets_both_dates():
     assert entry["release"] == RELEASE
 
 
+def test_build_assignment_lookup_seeds_release_for_unmatched_assignment():
+    # No deadlines at all, so the resource row's deadline will never match.
+    deadlines = db_fetch.load_deadlines_from_rows([])
+    rows = [{
+        "course_code": "CS61A",
+        "assignment_code": "Lab 99",
+        "assignment_name": "Lab 99",
+        "resource_type": "doc",
+        "resource_name": "Spec",
+        "link": "https://example.com",
+    }]
+    lookup = db_fetch.build_assignment_lookup(rows, deadlines)
+    entry = lookup["CS61A"]["Lab 99"]
+    assert "release" in entry
+    assert entry["release"] is None
+
+
 if __name__ == "__main__":
     import sys
 
