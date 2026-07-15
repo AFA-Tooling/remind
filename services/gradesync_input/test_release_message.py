@@ -115,6 +115,28 @@ def test_distinct_assignments_both_survive():
     assert len(merged[0]["assignments"]) == 2
 
 
+def test_due_collision_is_first_wins_not_last_wins():
+    # Two "due" payloads for the same assignment (e.g. a re-fetched gradesync row
+    # arriving after a Canvas payload) must not clobber each other. The first
+    # payload's content — including its resources — must be kept; this is the
+    # pre-existing dedupe behavior (a set that skips later duplicates) and must
+    # not regress just because release/due merging was introduced.
+    first = make_assignment("Lab 5", "due")
+    first["resources"] = [{"resource_name": "first-wins-resource"}]
+    second = make_assignment("Lab 5", "due")
+    second["resources"] = [{"resource_name": "second-should-be-dropped"}]
+
+    merged = db_fetch.merge_reminders_by_student([
+        make_entry([first]),
+        make_entry([second]),
+    ])
+    assignments = merged[0]["assignments"]
+    assert len(assignments) == 1
+    assert assignments[0]["resources"] == [{"resource_name": "first-wins-resource"}], (
+        "a later due payload for the same assignment must not replace the first"
+    )
+
+
 if __name__ == "__main__":
     import sys
 

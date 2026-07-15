@@ -1381,7 +1381,8 @@ def merge_reminders_by_student(reminders: List[Dict[str, Any]]) -> List[Dict[str
         # Signature deliberately carries no reason, so a release and a due payload for
         # the same assignment collapse into one entry. Due wins that collision: it is
         # more actionable and already implies the assignment is out. A payload with no
-        # reason (Canvas) counts as due.
+        # reason (Canvas) counts as due. Any other collision (due-due or release-release)
+        # is first-wins, matching the pre-existing dedupe behavior.
         seen_assignments = {
             _assignment_signature(a): idx for idx, a in enumerate(existing["assignments"])
         }
@@ -1390,7 +1391,8 @@ def merge_reminders_by_student(reminders: List[Dict[str, Any]]) -> List[Dict[str
             if sig not in seen_assignments:
                 seen_assignments[sig] = len(existing["assignments"])
                 existing["assignments"].append(assignment)
-            elif assignment.get("reason", "due") != "release":
+            elif (existing["assignments"][seen_assignments[sig]].get("reason") == "release"
+                  and assignment.get("reason", "due") != "release"):
                 existing["assignments"][seen_assignments[sig]] = assignment
 
     result: List[Dict[str, Any]] = []
