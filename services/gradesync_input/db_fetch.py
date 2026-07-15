@@ -799,7 +799,7 @@ def compose_message(student: Dict[str, Any], assignments: List[Dict[str, Any]], 
     lines = [f"Hey {preferred_name},", ""]
 
     if released:
-        lines.append("Just released: these assignments are now out:")
+        lines.append("Just released:")
         for assignment in released:
             due_dt = assignment["personal_deadline"]
             due_date_str = f"{due_dt.strftime('%B')} {due_dt.day}"
