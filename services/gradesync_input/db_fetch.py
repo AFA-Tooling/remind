@@ -132,7 +132,7 @@ def parse_args() -> argparse.Namespace:
         help=(
             "If set, also write a Gmail reminder CSV (message_requests.csv) with one "
             "row per student in the message_requests directory with columns: "
-            "name, sid, email, assignment, message_requests"
+            "name, sid, email, assignment, message_requests, message_kind"
         ),
     )
     parser.add_argument(
@@ -912,7 +912,7 @@ def write_gmail_csv(reminders: List[Dict[str, Any]], output_dir: Path) -> None:
     Every assignment due for a student is compacted into one combined message
     (the same message used for Discord/SMS), so a student with multiple
     deadlines receives a single email rather than one email per assignment.
-    CSV format: name,sid,email,assignment,message_requests
+    CSV format: name,sid,email,assignment,message_requests,message_kind
     """
     output_dir.mkdir(parents=True, exist_ok=True)
 
