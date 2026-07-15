@@ -164,6 +164,20 @@ def test_due_wins_when_both_match_same_day():
     assert payload is not None
     assert payload["reason"] == "due", "due must win a same-day collision"
 
+    # Prove this was a genuine collision — not merely that the release branch
+    # never fires. With due_match forced off (a days_before_deadline that does
+    # not land on June 22), the very same day/assignment/release_reminder=True
+    # combination independently fires as "release". That confirms release_match
+    # was true above too, so the "due" result really reflects due winning a
+    # collision rather than release being broken.
+    non_colliding_student = make_student(release_reminder=True, days_before_deadline=5)
+    release_only = db_fetch.build_assignment_payload(
+        non_colliding_student, LAB, make_lookup(LAB), ON_RELEASE_DAY
+    )
+    assert release_only is not None and release_only["reason"] == "release", (
+        "release must independently fire on this day for the collision above to be meaningful"
+    )
+
 
 def test_project_early_reminder_does_not_shift_release():
     # The day-early shift is about extra credit for early submission — meaningless
