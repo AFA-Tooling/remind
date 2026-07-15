@@ -234,6 +234,13 @@
                   <span>Remind me a day earlier for projects (turn in early for extra credit)</span>
                 </label>
               </li>
+              <li>
+                <label for="release-reminder">
+                  <input id="release-reminder" type="checkbox" name="release_reminder" />
+                  <span class="dot" aria-hidden="true"></span>
+                  <span>Notify me when a new assignment is released</span>
+                </label>
+              </li>
             </ul>
           </div>
 
@@ -513,6 +520,7 @@
           project: document.getElementById('cat-project').checked,
         };
         payload.project_early_reminder = document.getElementById('project-early').checked;
+        payload.release_reminder = document.getElementById('release-reminder').checked;
       }
 
       return payload;
@@ -1017,6 +1025,7 @@
           document.getElementById('cat-quiz').checked = prefs.quiz !== false;
           document.getElementById('cat-project').checked = prefs.project !== false;
           document.getElementById('project-early').checked = data.project_early_reminder === true;
+          document.getElementById('release-reminder').checked = data.release_reminder === true;
         } else {
           cs61aSection.style.display = 'none';
         }

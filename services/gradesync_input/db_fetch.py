@@ -132,7 +132,7 @@ def parse_args() -> argparse.Namespace:
         help=(
             "If set, also write a Gmail reminder CSV (message_requests.csv) with one "
             "row per student in the message_requests directory with columns: "
-            "name, sid, email, assignment, message_requests"
+            "name, sid, email, assignment, message_requests, message_kind"
         ),
     )
     parser.add_argument(
@@ -235,7 +235,11 @@ def parse_deadline(value: str) -> Optional[datetime]:
         return None
 
 
-DeadlineMap = Dict[str, Dict[str, Dict[str, datetime]]]
+# A deadline record carries both dates for one assignment. `due` is always present;
+# `release` is None when the assignment has no release date of its own (e.g. project
+# checkpoints, which ship with the parent project's handout).
+DeadlineRecord = Dict[str, Optional[datetime]]
+DeadlineMap = Dict[str, Dict[str, Dict[str, DeadlineRecord]]]
 
 
 def base_assignment_code(code: Optional[str]) -> Optional[str]:
@@ -283,24 +287,30 @@ def load_deadlines_from_rows(
         assignment_code = (raw_row.get("assignment_code") or "").strip()
         assignment_name = (raw_row.get("assignment_name") or raw_row.get("assignment") or "").strip()
         due_str = raw_row.get("due")
+        release_str = raw_row.get("release")
 
         due_date = parse_deadline(str(due_str) if due_str is not None else "")
         if not due_date:
             continue
 
+        release_date = parse_deadline(str(release_str) if release_str is not None else "")
+        record: DeadlineRecord = {"due": due_date, "release": release_date}
+
         course_deadlines = deadlines.setdefault(course_code, {"code": {}, "name": {}})
 
         if assignment_code:
-            course_deadlines["code"][assignment_code] = due_date
+            course_deadlines["code"][assignment_code] = record
         if assignment_name:
-            course_deadlines["name"][assignment_name] = due_date
+            course_deadlines["name"][assignment_name] = record
 
         scope = course_code or "(default)"
+        release_note = release_date.date().isoformat() if release_date else "none"
         debug_print(
             debug,
             (
                 f"Loaded deadline code='{assignment_code or 'n/a'}' "
-                f"name='{assignment_name or 'n/a'}' [{scope}] → {due_date.isoformat(sep=' ')}"
+                f"name='{assignment_name or 'n/a'}' [{scope}] → {due_date.isoformat(sep=' ')} "
+                f"(release: {release_note})"
             ),
         )
 
@@ -340,7 +350,7 @@ def find_deadline_for_entry(
     deadlines: DeadlineMap,
     *,
     debug: bool = False,
-) -> Optional[datetime]:
+) -> Optional[DeadlineRecord]:
     candidates = _iter_deadline_maps(course_code, deadlines)
     if not candidates:
         return None
@@ -382,7 +392,7 @@ def find_deadline_for_entry(
     target_phrase = f"Project {number}"
     for scope, mapping in candidates:
         by_name = mapping.get("name", {})
-        for name, due in by_name.items():
+        for name, record in by_name.items():
             if target_phrase in name:
                 debug_print(
                     debug,
@@ -391,7 +401,7 @@ def find_deadline_for_entry(
                         f"'{target_phrase}' in scope '{scope or 'default'}'"
                     ),
                 )
-                return due
+                return record
 
     return None
 
@@ -412,7 +422,8 @@ def attach_deadlines_to_resources(
                 debug=debug,
             )
             if matched:
-                entry["deadline"] = matched
+                entry["deadline"] = matched["due"]
+                entry["release"] = matched.get("release")
 
 
 def build_assignment_lookup(
@@ -437,6 +448,7 @@ def build_assignment_lookup(
                 "assignment_name": row.get("assignment_name") or normalized_code,
                 "resources": [],
                 "deadline": None,
+                "release": None,
                 "course_code": course_code,
             },
         )
@@ -461,6 +473,7 @@ def build_assignment_lookup(
                     "assignment_name": entry.get("assignment_name") or alias_code,
                     "resources": [],
                     "deadline": None,
+                    "release": None,
                     "course_code": course_code,
                 },
             )
@@ -685,25 +698,36 @@ def build_assignment_payload(
         f"Student {student.get('id')} {code}: freq={freq_days}d, delta={delta_days}d",
     )
 
-    if delta_days < 0:
-        msg = f"Skipping {code}: past due (delta_days={delta_days})"
+    # Two independent reasons an assignment can fire. The due match is the original
+    # rule: an exact match on the notification frequency, against the (possibly
+    # early-reminder-shifted) deadline. The release match is an OR against a
+    # different date entirely, so it cannot be folded into the chain above.
+    due_match = delta_days >= 0 and delta_days == freq_days
+
+    release_dt = entry.get("release")
+    release_match = bool(
+        student.get("release_reminder")
+        and release_dt
+        and local_date(release_dt) == today_local
+    )
+
+    if not due_match and not release_match:
+        if delta_days < 0:
+            msg = f"Skipping {code}: past due (delta_days={delta_days})"
+        else:
+            msg = f"Skipping {code}: delta {delta_days} != freq {freq_days} and not release day"
         if is_target_student or debug:
             print(f"   ❌ {msg}")
         debug_print(debug, msg)
         return None
 
-    # New rule: only send when the diff exactly matches the notification frequency.
-    if delta_days != freq_days:
-        msg = f"Skipping {code}: delta {delta_days} != freq {freq_days} (EXACT MATCH REQUIRED)"
-        if is_target_student or debug:
-            print(f"   ❌ {msg}")
-            print(f"   💡 To send email, delta_days ({delta_days}) must exactly equal freq_days ({freq_days})")
-        debug_print(debug, msg)
-        return None
+    # Same-day collision: an assignment can be released today and hit its due match
+    # today. The due line is more actionable and implies the assignment is out, so
+    # it wins and the assignment is listed once.
+    reason = "due" if due_match else "release"
 
     if is_target_student or debug:
-        print(f"   ✅ MATCH! delta_days ({delta_days}) == freq_days ({freq_days})")
-        print(f"   ✅ Will send reminder for {code}")
+        print(f"   ✅ MATCH ({reason})! Will send reminder for {code}")
 
     return {
         "assignment_code": code,
@@ -713,7 +737,40 @@ def build_assignment_payload(
         "offset_days": offset,
         "notification_window_days": freq_days,
         "resources": entry.get("resources", []),
+        "reason": reason,
     }
+
+
+def _render_resources(lines: List[str], assignment: Dict[str, Any]) -> None:
+    """Append an assignment's resource links to `lines`, if it has any."""
+    resources = [res for res in assignment.get("resources", []) if res.get("resource_name")]
+    if not resources:
+        return
+    lines.append("  Helpful resources:")
+    for res in resources:
+        resource_line = f"    • {res.get('resource_name')}"
+        if res.get("resource_type"):
+            resource_line += f" [{res['resource_type']}]"
+        if res.get("link"):
+            resource_line += f": {res['link']}"
+        lines.append(resource_line)
+
+
+def _render_assignment_bullet(lines: List[str], assignment: Dict[str, Any], bullet: str, label: str) -> None:
+    """Append one assignment's bullet line plus its offset-day note and resources.
+
+    `label` is the section-specific text after the "→" (a countdown for due
+    reminders, a bare due date for release reminders); everything else about
+    an assignment's rendering is identical between the two sections.
+    """
+    lines.append(
+        f"{bullet} {assignment['assignment_name']} ({assignment['assignment_code']}) → {label}"
+    )
+    if assignment.get("offset_days"):
+        lines.append(
+            f"  (Class deadline +{assignment['offset_days']} day offset for you.)"
+        )
+    _render_resources(lines, assignment)
 
 
 def compose_message(student: Dict[str, Any], assignments: List[Dict[str, Any]], today: Optional[datetime] = None) -> str:
@@ -725,49 +782,45 @@ def compose_message(student: Dict[str, Any], assignments: List[Dict[str, Any]], 
         or student.get("first_name")
         or "there"
     )
-    lines = [
-        f"Hey {preferred_name},",
-        "",
-        "Heads-up: you have upcoming assignments due soon:",
-    ]
 
     renderable = [a for a in assignments if a.get("personal_deadline")]
+    # A payload with no reason is a due reminder — Canvas-sourced payloads never set one.
+    released = [a for a in renderable if a.get("reason") == "release"]
+    due_soon = [a for a in renderable if a.get("reason", "due") != "release"]
+
     number_assignments = len(renderable) > 1
-
     bullet_index = 0
-    for assignment in assignments:
-        due_dt = assignment.get("personal_deadline")
-        if not due_dt:
-            continue
-        deadline_local = local_date(due_dt)
-        days_until = (deadline_local - today_local).days
-        due_date_str = f"{due_dt.strftime('%B')} {due_dt.day}"
-        if days_until == 0:
-            days_label = "due today"
-        elif days_until == 1:
-            days_label = "due in 1 day"
-        else:
-            days_label = f"due in {days_until} days"
-        bullet_index += 1
-        bullet = f"{bullet_index}." if number_assignments else "-"
-        lines.append(
-            f"{bullet} {assignment['assignment_name']} ({assignment['assignment_code']}) → {days_label}, on {due_date_str}"
-        )
-        if assignment["offset_days"]:
-            lines.append(
-                f"  (Class deadline +{assignment['offset_days']} day offset for you.)"
-            )
 
-        resources = [res for res in assignment.get("resources", []) if res.get("resource_name")]
-        if resources:
-            lines.append("  Helpful resources:")
-            for res in resources:
-                resource_line = f"    • {res.get('resource_name')}"
-                if res.get("resource_type"):
-                    resource_line += f" [{res['resource_type']}]"
-                if res.get("link"):
-                    resource_line += f": {res['link']}"
-                lines.append(resource_line)
+    def next_bullet() -> str:
+        nonlocal bullet_index
+        bullet_index += 1
+        return f"{bullet_index}." if number_assignments else "-"
+
+    lines = [f"Hey {preferred_name},", ""]
+
+    if released:
+        lines.append("Just released:")
+        for assignment in released:
+            due_dt = assignment["personal_deadline"]
+            due_date_str = f"{due_dt.strftime('%B')} {due_dt.day}"
+            _render_assignment_bullet(lines, assignment, next_bullet(), f"due on {due_date_str}")
+
+    if due_soon:
+        if released:
+            lines.append("")
+        lines.append("Heads-up: you have upcoming assignments due soon:")
+        for assignment in due_soon:
+            due_dt = assignment["personal_deadline"]
+            deadline_local = local_date(due_dt)
+            days_until = (deadline_local - today_local).days
+            due_date_str = f"{due_dt.strftime('%B')} {due_dt.day}"
+            if days_until == 0:
+                days_label = "due today"
+            elif days_until == 1:
+                days_label = "due in 1 day"
+            else:
+                days_label = f"due in {days_until} days"
+            _render_assignment_bullet(lines, assignment, next_bullet(), f"{days_label}, on {due_date_str}")
 
     lines.append("")
     lines.append("Feel free to reach out to course staff if you need any support!")
@@ -859,7 +912,7 @@ def write_gmail_csv(reminders: List[Dict[str, Any]], output_dir: Path) -> None:
     Every assignment due for a student is compacted into one combined message
     (the same message used for Discord/SMS), so a student with multiple
     deadlines receives a single email rather than one email per assignment.
-    CSV format: name,sid,email,assignment,message_requests
+    CSV format: name,sid,email,assignment,message_requests,message_kind
     """
     output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -908,6 +961,16 @@ def write_gmail_csv(reminders: List[Dict[str, Any]], output_dir: Path) -> None:
         ]
         assignment_summary = ", ".join(assignment_names) if assignment_names else "your assignments"
 
+        # "release" only when every assignment in this entry is release-reason;
+        # a payload with no "reason" key means "due" (Canvas payloads never set
+        # one), and any mix with a due assignment keeps the more urgent "due"
+        # framing for the subject line.
+        message_kind = (
+            "release"
+            if all(a.get("reason", "due") == "release" for a in assignments)
+            else "due"
+        )
+
         rows.append({
             "name": student_name,
             "sid": sid,
@@ -915,12 +978,14 @@ def write_gmail_csv(reminders: List[Dict[str, Any]], output_dir: Path) -> None:
             "assignment": assignment_summary,
             # Combined, already-composed message covering all due assignments.
             "message_requests": entry.get("message", ""),
+            # Drives the email subject line in the (separate) email service.
+            "message_kind": message_kind,
         })
 
     output_path = output_dir / "message_requests.csv"
     with output_path.open("w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(
-            f, fieldnames=["name", "sid", "email", "assignment", "message_requests"]
+            f, fieldnames=["name", "sid", "email", "assignment", "message_requests", "message_kind"]
         )
         writer.writeheader()
         writer.writerows(rows)
@@ -1313,12 +1378,22 @@ def merge_reminders_by_student(reminders: List[Dict[str, Any]]) -> List[Dict[str
                 existing["channels"].append(channel)
                 seen_channels.add(sig)
 
-        seen_assignments = {_assignment_signature(a) for a in existing["assignments"]}
+        # Signature deliberately carries no reason, so a release and a due payload for
+        # the same assignment collapse into one entry. Due wins that collision: it is
+        # more actionable and already implies the assignment is out. A payload with no
+        # reason (Canvas) counts as due. Any other collision (due-due or release-release)
+        # is first-wins, matching the pre-existing dedupe behavior.
+        seen_assignments = {
+            _assignment_signature(a): idx for idx, a in enumerate(existing["assignments"])
+        }
         for assignment in entry.get("assignments", []):
             sig = _assignment_signature(assignment)
             if sig not in seen_assignments:
+                seen_assignments[sig] = len(existing["assignments"])
                 existing["assignments"].append(assignment)
-                seen_assignments.add(sig)
+            elif (existing["assignments"][seen_assignments[sig]].get("reason") == "release"
+                  and assignment.get("reason", "due") != "release"):
+                existing["assignments"][seen_assignments[sig]] = assignment
 
     result: List[Dict[str, Any]] = []
     for key in order:

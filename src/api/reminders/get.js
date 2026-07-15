@@ -53,6 +53,7 @@ export default async function handler(req, res) {
                     project: categoryPrefs.project !== false,
                 },
                 project_early_reminder: data.project_early_reminder === true,
+                release_reminder: data.release_reminder === true,
             }
         });
 

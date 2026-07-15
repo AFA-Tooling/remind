@@ -135,6 +135,14 @@ def process_message_request_file(
                 else:
                     message_body = str(message_body)
 
+                # The column may be absent (CSV written before this change, or
+                # the templated fallback path); default to "due" either way.
+                message_kind = row.get('message_kind')
+                if pd.isna(message_kind) or not str(message_kind).strip():
+                    message_kind = "due"
+                else:
+                    message_kind = str(message_kind)
+
                 # Send reminder
                 success = send_gmail_reminder(
                     student_email=email,
@@ -144,7 +152,8 @@ def process_message_request_file(
                     credentials_path=credentials_path,
                     sender_email=sender_email,
                     token_path="config/token.json",
-                    message_body=message_body
+                    message_body=message_body,
+                    message_kind=message_kind
                 )
                 
                 if success:
@@ -318,6 +327,14 @@ def process_all_message_requests(
                     else:
                         message_body = str(message_body)
 
+                    # The column may be absent (CSV written before this change,
+                    # or the templated fallback path); default to "due".
+                    message_kind = row.get('message_kind')
+                    if pd.isna(message_kind) or not str(message_kind).strip():
+                        message_kind = "due"
+                    else:
+                        message_kind = str(message_kind)
+
                     # Send reminder
                     success = send_gmail_reminder(
                         student_email=email,
@@ -327,7 +344,8 @@ def process_all_message_requests(
                         credentials_path=credentials_path,
                         sender_email=sender_email,
                         token_path=str(settings.TOKEN_PATH),
-                        message_body=message_body
+                        message_body=message_body,
+                        message_kind=message_kind
                     )
                     
                     if success:

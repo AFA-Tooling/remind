@@ -53,6 +53,13 @@ def load_deadlines_csv(csv_path: Path) -> List[Dict[str, any]]:
     deadlines = []
     with csv_path.open(newline="", encoding="utf-8") as handle:
         reader = csv.DictReader(handle)
+        fieldnames = [(name or "").strip() for name in (reader.fieldnames or [])]
+        if "release" not in fieldnames:
+            raise ValueError(
+                f"Deadlines CSV is missing the 'release' column entirely: {csv_path}. "
+                "Refusing to proceed — uploading would write release=None for every "
+                "row and silently wipe existing release dates in Firestore."
+            )
         for raw_row in reader:
             row = {(key or "").strip(): (value or "") for key, value in raw_row.items()}
 
@@ -60,6 +67,7 @@ def load_deadlines_csv(csv_path: Path) -> List[Dict[str, any]]:
             assignment_code = row.get("assignment_code", "").strip() or None
             assignment_name = row.get("assignment_name", "").strip()
             due_str = row.get("due", "").strip()
+            release_str = row.get("release", "").strip()
 
             if not assignment_name:
                 print(f"⚠️  Skipping row with missing assignment_name: {row}")
@@ -70,11 +78,18 @@ def load_deadlines_csv(csv_path: Path) -> List[Dict[str, any]]:
                 print(f"⚠️  Skipping row with invalid due date '{due_str}': {row}")
                 continue
 
+            # release is optional — a blank means "no release notification for this
+            # assignment" (e.g. project checkpoints, which ship with the parent project).
+            release_date = parse_deadline(release_str)
+            if release_str and not release_date:
+                print(f"⚠️  Ignoring invalid release date '{release_str}' for {assignment_name}")
+
             deadlines.append({
                 "course_code": course_code or "",
                 "assignment_code": assignment_code,
                 "assignment_name": assignment_name,
                 "due": due_date.isoformat(),
+                "release": release_date.isoformat() if release_date else None,
             })
 
     return deadlines
@@ -109,13 +124,16 @@ def upload_deadlines_to_firestore(
             existing = doc_ref.get()
 
             if existing.exists:
-                existing_due = existing.to_dict().get("due")
-                new_due = deadline.get("due")
+                existing_data = existing.to_dict()
+                changed = any(
+                    existing_data.get(field) != deadline.get(field)
+                    for field in ("due", "release")
+                )
 
-                if existing_due != new_due:
+                if changed:
                     doc_ref.set({**deadline, "updated_at": datetime.now().isoformat()}, merge=True)
                     stats["updated"] += 1
-                    print(f"   ✅ Updated: {assignment_name} (course: {course_code}) - Due: {new_due}")
+                    print(f"   ✅ Updated: {assignment_name} (course: {course_code}) - Due: {deadline.get('due')}, Release: {deadline.get('release')}")
                 else:
                     stats["updated"] += 1
                     print(f"   ⏭️  No change: {assignment_name} (course: {course_code})")

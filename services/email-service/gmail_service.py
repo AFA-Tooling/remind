@@ -365,7 +365,8 @@ def send_gmail_reminder(
     credentials_path: str = str(settings.OAUTH_CLIENT_SECRET_PATH),
     sender_email: str = None,
     token_path: str = str(settings.TOKEN_PATH),
-    message_body: Optional[str] = None
+    message_body: Optional[str] = None,
+    message_kind: str = "due"
 ) -> bool:
     """
     Send a Gmail reminder to a student.
@@ -382,6 +383,10 @@ def send_gmail_reminder(
         message_body: Optional pre-composed email body. When provided, it is sent
             verbatim (covering all of the student's assignments) and the
             motivating template / resource fetch are skipped.
+        message_kind: "release" or "due". Only consulted when message_body is
+            provided; selects the subject line so it doesn't contradict a
+            release-only body. Defaults to "due" for any missing/unrecognized
+            value, preserving prior behavior.
 
     Returns:
         True if email was sent successfully, False otherwise
@@ -421,7 +426,11 @@ def send_gmail_reminder(
         if message_body is not None:
             # Use the pre-composed combined message verbatim.
             email_body = message_body
-            subject = "Reminder: You have assignments due soon!"
+            if message_kind == "release":
+                subject = "New assignments released!"
+            else:
+                # Covers "due" and any missing/unrecognized value.
+                subject = "Reminder: You have assignments due soon!"
         else:
             # Format resources
             resources_text = format_resources(resources)

@@ -44,6 +44,7 @@ export default async function handler(req, res) {
       phone_number: null,
       discord_id: null,
       days_before_deadline: 1,
+      release_reminder: false,
       email_pref: false,
       phone_pref: false,
       discord_pref: false,
