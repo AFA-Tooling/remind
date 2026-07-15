@@ -741,6 +741,38 @@ def build_assignment_payload(
     }
 
 
+def _render_resources(lines: List[str], assignment: Dict[str, Any]) -> None:
+    """Append an assignment's resource links to `lines`, if it has any."""
+    resources = [res for res in assignment.get("resources", []) if res.get("resource_name")]
+    if not resources:
+        return
+    lines.append("  Helpful resources:")
+    for res in resources:
+        resource_line = f"    • {res.get('resource_name')}"
+        if res.get("resource_type"):
+            resource_line += f" [{res['resource_type']}]"
+        if res.get("link"):
+            resource_line += f": {res['link']}"
+        lines.append(resource_line)
+
+
+def _render_assignment_bullet(lines: List[str], assignment: Dict[str, Any], bullet: str, label: str) -> None:
+    """Append one assignment's bullet line plus its offset-day note and resources.
+
+    `label` is the section-specific text after the "→" (a countdown for due
+    reminders, a bare due date for release reminders); everything else about
+    an assignment's rendering is identical between the two sections.
+    """
+    lines.append(
+        f"{bullet} {assignment['assignment_name']} ({assignment['assignment_code']}) → {label}"
+    )
+    if assignment.get("offset_days"):
+        lines.append(
+            f"  (Class deadline +{assignment['offset_days']} day offset for you.)"
+        )
+    _render_resources(lines, assignment)
+
+
 def compose_message(student: Dict[str, Any], assignments: List[Dict[str, Any]], today: Optional[datetime] = None) -> str:
     if today is None:
         today = datetime.now(PROJECT_TZ)
@@ -750,49 +782,45 @@ def compose_message(student: Dict[str, Any], assignments: List[Dict[str, Any]], 
         or student.get("first_name")
         or "there"
     )
-    lines = [
-        f"Hey {preferred_name},",
-        "",
-        "Heads-up: you have upcoming assignments due soon:",
-    ]
 
     renderable = [a for a in assignments if a.get("personal_deadline")]
+    # A payload with no reason is a due reminder — Canvas-sourced payloads never set one.
+    released = [a for a in renderable if a.get("reason") == "release"]
+    due_soon = [a for a in renderable if a.get("reason", "due") != "release"]
+
     number_assignments = len(renderable) > 1
-
     bullet_index = 0
-    for assignment in assignments:
-        due_dt = assignment.get("personal_deadline")
-        if not due_dt:
-            continue
-        deadline_local = local_date(due_dt)
-        days_until = (deadline_local - today_local).days
-        due_date_str = f"{due_dt.strftime('%B')} {due_dt.day}"
-        if days_until == 0:
-            days_label = "due today"
-        elif days_until == 1:
-            days_label = "due in 1 day"
-        else:
-            days_label = f"due in {days_until} days"
-        bullet_index += 1
-        bullet = f"{bullet_index}." if number_assignments else "-"
-        lines.append(
-            f"{bullet} {assignment['assignment_name']} ({assignment['assignment_code']}) → {days_label}, on {due_date_str}"
-        )
-        if assignment["offset_days"]:
-            lines.append(
-                f"  (Class deadline +{assignment['offset_days']} day offset for you.)"
-            )
 
-        resources = [res for res in assignment.get("resources", []) if res.get("resource_name")]
-        if resources:
-            lines.append("  Helpful resources:")
-            for res in resources:
-                resource_line = f"    • {res.get('resource_name')}"
-                if res.get("resource_type"):
-                    resource_line += f" [{res['resource_type']}]"
-                if res.get("link"):
-                    resource_line += f": {res['link']}"
-                lines.append(resource_line)
+    def next_bullet() -> str:
+        nonlocal bullet_index
+        bullet_index += 1
+        return f"{bullet_index}." if number_assignments else "-"
+
+    lines = [f"Hey {preferred_name},", ""]
+
+    if released:
+        lines.append("Just released: these assignments are now out:")
+        for assignment in released:
+            due_dt = assignment["personal_deadline"]
+            due_date_str = f"{due_dt.strftime('%B')} {due_dt.day}"
+            _render_assignment_bullet(lines, assignment, next_bullet(), f"due on {due_date_str}")
+
+    if due_soon:
+        if released:
+            lines.append("")
+        lines.append("Heads-up: you have upcoming assignments due soon:")
+        for assignment in due_soon:
+            due_dt = assignment["personal_deadline"]
+            deadline_local = local_date(due_dt)
+            days_until = (deadline_local - today_local).days
+            due_date_str = f"{due_dt.strftime('%B')} {due_dt.day}"
+            if days_until == 0:
+                days_label = "due today"
+            elif days_until == 1:
+                days_label = "due in 1 day"
+            else:
+                days_label = f"due in {days_until} days"
+            _render_assignment_bullet(lines, assignment, next_bullet(), f"{days_label}, on {due_date_str}")
 
     lines.append("")
     lines.append("Feel free to reach out to course staff if you need any support!")
