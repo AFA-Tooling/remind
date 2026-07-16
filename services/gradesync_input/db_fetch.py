@@ -704,9 +704,11 @@ def build_assignment_payload(
     # different date entirely, so it cannot be folded into the chain above.
     due_match = delta_days >= 0 and delta_days == freq_days
 
+    # Release reminders are opt-out: a missing field counts as opted in, and only
+    # an explicit False (student unchecked it in the portal) suppresses them.
     release_dt = entry.get("release")
     release_match = bool(
-        student.get("release_reminder")
+        student.get("release_reminder") is not False
         and release_dt
         and local_date(release_dt) == today_local
     )

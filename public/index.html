@@ -236,7 +236,7 @@
               </li>
               <li>
                 <label for="release-reminder">
-                  <input id="release-reminder" type="checkbox" name="release_reminder" />
+                  <input id="release-reminder" type="checkbox" name="release_reminder" checked />
                   <span class="dot" aria-hidden="true"></span>
                   <span>Notify me when a new assignment is released</span>
                 </label>
@@ -1025,7 +1025,8 @@
           document.getElementById('cat-quiz').checked = prefs.quiz !== false;
           document.getElementById('cat-project').checked = prefs.project !== false;
           document.getElementById('project-early').checked = data.project_early_reminder === true;
-          document.getElementById('release-reminder').checked = data.release_reminder === true;
+          // Opt-out: checked unless the student explicitly disabled it.
+          document.getElementById('release-reminder').checked = data.release_reminder !== false;
         } else {
           cs61aSection.style.display = 'none';
         }

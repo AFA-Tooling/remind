@@ -1,9 +1,10 @@
 """Tests for release-day notifications.
 
-A student with `release_reminder = True` is notified on the day an assignment is
-released, in addition to the normal due-date reminder. Release notifications
-respect category_prefs. When an assignment fires for both reasons on the same
-day, the due reason wins and it is listed once.
+Release reminders are opt-out: a student is notified on the day an assignment is
+released, in addition to the normal due-date reminder, unless they explicitly set
+`release_reminder = False` in the portal. A missing field counts as opted in.
+Release notifications respect category_prefs. When an assignment fires for both
+reasons on the same day, the due reason wins and it is listed once.
 """
 
 from datetime import datetime
@@ -124,6 +125,15 @@ def test_fires_on_release_day_when_enabled():
     assert payload is not None, "should fire on the release date"
     assert payload["reason"] == "release"
     assert payload["personal_deadline"] == DUE, "payload still carries the real due date"
+
+
+def test_fires_on_release_day_when_field_missing():
+    # Opt-out semantics: a student doc without release_reminder is opted in.
+    student = make_student()
+    assert "release_reminder" not in student
+    payload = db_fetch.build_assignment_payload(student, LAB, make_lookup(LAB), ON_RELEASE_DAY)
+    assert payload is not None, "missing field must count as opted in"
+    assert payload["reason"] == "release"
 
 
 def test_silent_on_release_day_when_disabled():
