@@ -57,3 +57,6 @@ build/
 *.egg-info/
 
 CLAUDE.md
+
+# Analysis output contains real student SID/email - keep out of git
+Analysis/output/
