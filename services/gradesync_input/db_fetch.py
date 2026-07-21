@@ -563,6 +563,23 @@ def format_due_datetime(dt_value: datetime) -> str:
     return dt_value.strftime("%Y-%m-%d %H:%M")
 
 
+_UNROUTABLE_STUDENTS_WARNED: set = set()
+
+
+def _warn_unroutable_student(student_email: Any, course_code: str) -> None:
+    """Surface students whose course_code matches no catalog, once each per run.
+
+    These students silently receive nothing, so a run that drops people must say so
+    rather than reporting a clean summary.
+    """
+    key = str(student_email)
+    if key in _UNROUTABLE_STUDENTS_WARNED:
+        return
+    _UNROUTABLE_STUDENTS_WARNED.add(key)
+    reason = f"course_code={course_code!r}" if course_code else "course_code is unset"
+    print(f"⚠️  No assignment catalog for {student_email} ({reason}) — cannot notify.")
+
+
 def build_assignment_payload(
     student: Dict[str, Any],
     code: str,
@@ -586,13 +603,14 @@ def build_assignment_payload(
         print(f"{'='*80}")
     
     course_code = (student.get("course_code") or "").strip()
-    # course_lookup = lookup.get(course_code)
-    # if course_lookup is None and course_code:
-    #     course_lookup = lookup.get("")
-    # This forces the script to look into the CS10 assignments folder
-    course_lookup = lookup.get(course_code) or lookup.get("CS10")
+    # No cross-course fallback: a student whose course_code is unset or unknown must
+    # match nothing rather than silently inherit another course's catalog. The old
+    # fallback pointed at CS10 and quietly evaluated every CS61A student against five
+    # long-expired CS10 projects, so they never matched anything.
+    course_lookup = lookup.get(course_code) if course_code else None
+    if course_lookup is None:
+        _warn_unroutable_student(student_email, course_code)
 
-    
     if is_target_student or debug:
         print(f"   Course code: '{course_code}' (empty='{not course_code}')")
         print(f"   Course lookup found: {course_lookup is not None}")
@@ -1018,9 +1036,12 @@ def is_missing_submission(
     """Return True if the student has not submitted the assignment."""
     key = (student_email.strip().lower(), assignment_name.strip())
     status = submission_lookup.get(key)
-    # Not in spreadsheet at all — not a student in the class, don't notify
+    # No row yet — the assignment is newer than the latest GradeSync sync, which is
+    # exactly the case on release day. Absence of a row is not evidence of a
+    # submission, so treat it as not submitted and let the reminder through.
+    # Enrollment is already enforced upstream by the students collection.
     if status is None:
-        return False
+        return True
     # A timestamp means submitted; "missing" means not submitted
     return status.strip().lower() == "missing"
 
