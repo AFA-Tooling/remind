@@ -2,37 +2,10 @@ import { getDb } from '../firestore.js';
 import { verifyUserAuth } from '../auth/verifyUser.js';
 import { getStudyStatus } from '../study/studyStatus.js';
 import { LOCKOUT_MESSAGE } from '../study/messages.js';
+import { buildNewStudent, resolveCourseCode } from '../students/defaults.js';
 
-// The daily pipeline routes each student to an assignment catalog by course_code.
-// A student doc without it matches no catalog and silently receives nothing, so
-// registration must always set one.
-export const DEFAULT_COURSE_CODE = process.env.COURSE_CODE || 'CS61A';
-
-// The class roster is authoritative; students who registered but are not on it
-// (staff, late adds) still need a course to be reachable.
-export function resolveCourseCode(rosterEntry) {
-  return rosterEntry?.course_code || DEFAULT_COURSE_CODE;
-}
-
-export function buildNewStudent({ email, displayName, courseCode }) {
-  const now = new Date().toISOString();
-  return {
-    email,
-    preferred_first_name: displayName ? displayName.split(' ')[0] : null,
-    course_code: courseCode,
-    phone_number: null,
-    discord_id: null,
-    days_before_deadline: 1,
-    release_reminder: true,
-    email_pref: false,
-    phone_pref: false,
-    discord_pref: false,
-    created_at: now,
-    updated_at: now,
-  };
-}
-
-// Creates a minimal student document on first login (idempotent — no-op if already exists).
+// Creates a minimal student document on first login (idempotent — no-op if already
+// exists, so a doc already created at consent time keeps its preferences).
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
@@ -72,6 +45,7 @@ export default async function handler(req, res) {
       email: loginEmail,
       displayName: display_name,
       courseCode: resolveCourseCode(rosterSnap.exists ? rosterSnap.data() : null),
+      enrolledVia: 'signup',
     });
 
     await docRef.set(newStudent);

@@ -26,6 +26,10 @@ FIREBASE_PROJECT_ID = os.getenv("FIREBASE_PROJECT_ID")
 _sa_env = os.getenv("FIREBASE_SERVICE_ACCOUNT_PATH")
 FIREBASE_SERVICE_ACCOUNT_PATH = Path(_sa_env) if _sa_env else SERVICE_ACCOUNT_PATH
 
+# Student-facing dashboard. Linked from every reminder email so students who were
+# auto-enrolled at consent time know where to change their preferences.
+AUTOREMIND_SITE_URL = os.getenv("AUTOREMIND_SITE_URL", "https://autoremind.eecs.berkeley.edu")
+
 # Twilio Configuration
 TWILIO_ACCOUNT_SID = os.getenv("TWILIO_ACCOUNT_SID")
 TWILIO_AUTH_TOKEN = os.getenv("TWILIO_AUTH_TOKEN")

@@ -23,8 +23,12 @@ import {
   deriveStatus,
 } from '../study/studyStatus.js';
 import { assignBalanced } from '../study/randomize.js';
+import { buildNewStudent, resolveCourseCode } from '../students/defaults.js';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+const STUDENTS = 'students';
+const CLASS_ROSTER = 'class_roster';
 
 function normalizeEmail(value) {
   const e = String(value || '').trim().toLowerCase();
@@ -64,6 +68,49 @@ function countGroups(participants) {
   return { total: participants.length, group1, group2, unassigned };
 }
 
+/**
+ * Create a `students` doc for any consented email that lacks one.
+ *
+ * The daily pipeline iterates `students`, so a consented participant with no
+ * student doc receives nothing. Consent alone has to be enough — the study cannot
+ * depend on students discovering the dashboard and signing in first.
+ *
+ * Existing docs are never touched, so a student's own preference changes always
+ * win over these defaults. Conversely this runs over every submitted email rather
+ * than only the newly-added participants, so re-uploading a consent CSV repairs
+ * anyone whose student doc went missing.
+ *
+ * Group 2 is enrolled too: apply_study_gate in the pipeline is the sole authority
+ * on who may actually be sent to, so the doc is inert until their group has
+ * access, and opening access needs no second migration.
+ */
+async function enrollMissingStudents(db, emails) {
+  if (!emails.length) return 0;
+
+  // Per-doc gets rather than getAll: the roster and student lookups are keyed by
+  // email, and this keeps the fake Firestore used in tests to a minimal surface.
+  const [studentSnaps, rosterSnaps] = await Promise.all([
+    Promise.all(emails.map(e => db.collection(STUDENTS).doc(e).get())),
+    Promise.all(emails.map(e => db.collection(CLASS_ROSTER).doc(e).get())),
+  ]);
+
+  const ops = [];
+  emails.forEach((email, i) => {
+    if (studentSnaps[i].exists) return;
+    const roster = rosterSnaps[i].exists ? rosterSnaps[i].data() : null;
+    const student = buildNewStudent({
+      email,
+      displayName: roster?.name || null,
+      courseCode: resolveCourseCode(roster),
+      enrolledVia: 'consent',
+    });
+    ops.push((batch) => batch.set(db.collection(STUDENTS).doc(email), student));
+  });
+
+  await commitInBatches(db, ops);
+  return ops.length;
+}
+
 // Core logic with an injectable db, so the full orchestration is unit-testable
 // against an in-memory fake Firestore (the default path uses the shared client).
 export async function runStudyAction(req, res, db = getDb()) {
@@ -101,7 +148,7 @@ export async function runStudyAction(req, res, db = getDb()) {
       const skipped = normalized.filter(e => !e).length;
       const cleaned = [...new Set(normalized.filter(Boolean))];
       if (cleaned.length === 0) {
-        return res.status(200).json({ success: true, added: 0, alreadyPresent: 0, skipped, assigned: 0 });
+        return res.status(200).json({ success: true, added: 0, alreadyPresent: 0, skipped, assigned: 0, enrolled: 0 });
       }
 
       const [participants, config] = await Promise.all([loadParticipants(db), getStudyConfig(db)]);
@@ -131,12 +178,17 @@ export async function runStudyAction(req, res, db = getDb()) {
       });
       await commitInBatches(db, ops);
 
+      // Consenting is what earns reminders, so enrollment follows the participant
+      // write rather than waiting for a sign-in that may never happen.
+      const enrolled = await enrollMissingStudents(db, cleaned);
+
       return res.status(200).json({
         success: true,
         added: toAdd.length,
         alreadyPresent,
         skipped,
         assigned: assignments.size,
+        enrolled,
       });
     }
 

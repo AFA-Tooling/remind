@@ -915,6 +915,26 @@ def write_sms_csv(reminders: List[Dict[str, Any]], output_path: Path) -> None:
         print(f"✅ No students with SMS reminders. Wrote empty CSV to {output_path}")
 
 
+def append_manage_prefs_footer(message: str) -> str:
+    """Append the dashboard link to an email body.
+
+    Students are enrolled for email at consent time, so most never visit the
+    dashboard and would have no idea the other channels or the reminder cadence are
+    theirs to change. Every reminder therefore carries the way in.
+
+    Email only: `compose_message` is shared with Discord and SMS, where this would
+    either bloat the segment count or tell a Discord user to go enable Discord.
+    """
+    return (
+        f"{message}\n"
+        "\n"
+        "—\n"
+        f"Manage your reminders at {settings.AUTOREMIND_SITE_URL}\n"
+        "Sign in with your Berkeley email to change how far ahead you're notified,\n"
+        "pick which assignment types you hear about, or add text and Discord reminders."
+    )
+
+
 def _safe_filename_basic(name: str) -> str:
     """
     Return a filename safe across Windows/POSIX by replacing reserved characters
@@ -996,8 +1016,10 @@ def write_gmail_csv(reminders: List[Dict[str, Any]], output_dir: Path) -> None:
             "sid": sid,
             "email": email,
             "assignment": assignment_summary,
-            # Combined, already-composed message covering all due assignments.
-            "message_requests": entry.get("message", ""),
+            # Combined, already-composed message covering all due assignments. The
+            # footer is added here rather than in the email service so the CSV and
+            # the delivery log hold exactly what was sent.
+            "message_requests": append_manage_prefs_footer(entry.get("message", "")),
             # Drives the email subject line in the (separate) email service.
             "message_kind": message_kind,
         })

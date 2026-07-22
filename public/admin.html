@@ -666,7 +666,7 @@
       const emails = parseCsvEmails(text);
       if (!emails.length) { result.textContent = 'No valid emails found in that CSV.'; return; }
       const res = await fetchWithAuth('/api/admin/study?action=consent', { method: 'POST', body: JSON.stringify({ emails, source: 'csv' }) });
-      result.textContent = `Added ${res.added}, already present ${res.alreadyPresent}, skipped ${res.skipped}, auto-assigned ${res.assigned}.`;
+      result.textContent = `Added ${res.added}, already present ${res.alreadyPresent}, skipped ${res.skipped}, auto-assigned ${res.assigned}, enrolled for email ${res.enrolled}.`;
       input.value = '';
       loadStudy();
     }
