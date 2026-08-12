@@ -1,0 +1,46 @@
+{
+  "default_course_code": "CS61A",
+  "courses": {
+    "CS61A": {
+      "display_name": "CS 61A",
+      "spreadsheet_id": "1HPaMeAudhiOXNZ-JfGr5Viw9qpoaZWRn-kAuOX6gGx8",
+      "categories": [
+        { "id": "lab", "name": "Lab", "label": "Labs" },
+        { "id": "homework", "name": "Homework", "label": "Homework" },
+        { "id": "midterm", "name": "Midterm", "label": "Midterms" },
+        { "id": "quiz", "name": "Quiz", "label": "Quizzes" },
+        { "id": "project", "name": "Project", "label": "Projects" }
+      ],
+      "matchers": [
+        { "category": "lab", "match": "prefix", "patterns": ["lab"] },
+        { "category": "homework", "match": "prefix", "patterns": ["homework", "hw"] },
+        { "category": "midterm", "match": "prefix", "patterns": ["midterm"] },
+        {
+          "category": "quiz",
+          "match": "contains",
+          "patterns": ["quiz"],
+          "ingest": false
+        },
+        {
+          "category": "project",
+          "match": "prefix",
+          "patterns": ["hog", "cats", "ants", "scheme", "maps"]
+        }
+      ],
+      "ingest_unmatched": "skip",
+      "reminder_unmatched": "project",
+      "features": {
+        "project_early_reminder": {
+          "enabled": true,
+          "category": "project",
+          "exclude_contains": ["checkpoint"],
+          "ui_label": "Remind me a day earlier for projects (turn in early for extra credit)"
+        },
+        "release_reminder": {
+          "enabled": true,
+          "ui_label": "Notify me when a new assignment is released"
+        }
+      }
+    }
+  }
+}

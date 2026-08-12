@@ -17,6 +17,7 @@ dotenv.config({ path: envPath });
 import settingsHandler from './api/reminders/settings.js';
 import getHandler from './api/reminders/get.js';
 import registerHandler from './api/reminders/register.js';
+import syncCourseHandler from './api/reminders/syncCourse.js';
 import deadlinesGetHandler from './api/deadlines/get.js';
 import resourcesGetHandler from './api/resources/get.js';
 
@@ -134,6 +135,29 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(500, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: 'Internal server error', details: error.message }));
     }
+    return;
+  }
+
+  if (urlPath === '/api/reminders/sync-course' && req.method === 'POST') {
+    let body = '';
+    req.on('data', chunk => { body += chunk.toString(); });
+    req.on('end', async () => {
+      try {
+        const mockReq = {
+          method: req.method,
+          body: body ? JSON.parse(body) : {},
+          headers: { authorization: req.headers.authorization },
+        };
+        const mockRes = {
+          status: (code) => { res.statusCode = code; return mockRes; },
+          json: (data) => { res.setHeader('Content-Type', 'application/json'); res.end(JSON.stringify(data)); },
+        };
+        await syncCourseHandler(mockReq, mockRes);
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Internal server error', details: error.message }));
+      }
+    });
     return;
   }
 

@@ -185,63 +185,22 @@
             Setting 0 days will remind you on the day the assignment is due.
           </p>
 
-          <!-- CS61A Assignment Types (revealed for students on the roster) -->
-          <div id="cs61a-section" style="display: none; margin-top: 28px;">
-            <div class="divider"><span class="pill">CS61A Assignment Types</span></div>
+          <!-- Course assignment types (revealed for students on the roster) -->
+          <div id="course-categories-section" style="display: none; margin-top: 28px;">
+            <div class="divider"><span class="pill" id="course-categories-title">Assignment Types</span></div>
             <p class="label">Send reminders for:</p>
-            <ul class="channels">
-              <li>
-                <label for="cat-lab">
-                  <input id="cat-lab" type="checkbox" name="cat_lab" checked />
-                  <span class="dot" aria-hidden="true"></span>
-                  <span>Labs</span>
-                </label>
-              </li>
-              <li>
-                <label for="cat-homework">
-                  <input id="cat-homework" type="checkbox" name="cat_homework" checked />
-                  <span class="dot" aria-hidden="true"></span>
-                  <span>Homework</span>
-                </label>
-              </li>
-              <li>
-                <label for="cat-midterm">
-                  <input id="cat-midterm" type="checkbox" name="cat_midterm" checked />
-                  <span class="dot" aria-hidden="true"></span>
-                  <span>Midterms</span>
-                </label>
-              </li>
-              <li>
-                <label for="cat-quiz">
-                  <input id="cat-quiz" type="checkbox" name="cat_quiz" checked />
-                  <span class="dot" aria-hidden="true"></span>
-                  <span>Quizzes</span>
-                </label>
-              </li>
-              <li>
-                <label for="cat-project">
-                  <input id="cat-project" type="checkbox" name="cat_project" checked />
-                  <span class="dot" aria-hidden="true"></span>
-                  <span>Projects</span>
-                </label>
-              </li>
+            <ul class="channels" id="course-category-list">
+              <!-- Populated from courses.json via /api/reminders/get -->
             </ul>
-            <ul class="channels" style="margin-top: 12px;">
-              <li>
-                <label for="project-early">
-                  <input id="project-early" type="checkbox" name="project_early_reminder" />
-                  <span class="dot" aria-hidden="true"></span>
-                  <span>Remind me a day earlier for projects (turn in early for extra credit)</span>
-                </label>
-              </li>
-              <li>
-                <label for="release-reminder">
-                  <input id="release-reminder" type="checkbox" name="release_reminder" checked />
-                  <span class="dot" aria-hidden="true"></span>
-                  <span>Notify me when a new assignment is released</span>
-                </label>
-              </li>
+            <ul class="channels" id="course-feature-list" style="margin-top: 12px;">
+              <!-- project_early_reminder / release_reminder when enabled for the course -->
             </ul>
+            <p style="font-size:12px; color:var(--muted); margin-top:10px;">
+              Course: <span id="course-code-label">—</span>
+              <button type="button" id="sync-course-btn" class="btn btn-small btn--outline" style="margin-left:8px;">
+                Refresh from roster
+              </button>
+            </p>
           </div>
 
           <div class="divider" style="margin-top: 28px;"><span class="pill">bCourses Integration</span></div>
@@ -509,21 +468,79 @@
         throw new Error('validation');
       }
 
-      // CS61A category prefs — only sent when the section is visible (i.e., student is on roster)
-      const cs61aSection = document.getElementById('cs61a-section');
-      if (cs61aSection && cs61aSection.style.display !== 'none') {
-        payload.category_prefs = {
-          lab: document.getElementById('cat-lab').checked,
-          homework: document.getElementById('cat-homework').checked,
-          midterm: document.getElementById('cat-midterm').checked,
-          quiz: document.getElementById('cat-quiz').checked,
-          project: document.getElementById('cat-project').checked,
-        };
-        payload.project_early_reminder = document.getElementById('project-early').checked;
-        payload.release_reminder = document.getElementById('release-reminder').checked;
+      // Course category prefs — only sent when the section is visible (on roster)
+      const courseSection = document.getElementById('course-categories-section');
+      if (courseSection && courseSection.style.display !== 'none') {
+        const prefs = {};
+        courseSection.querySelectorAll('input[data-category-id]').forEach((el) => {
+          prefs[el.getAttribute('data-category-id')] = el.checked;
+        });
+        payload.category_prefs = prefs;
+        const projectEarly = document.getElementById('project-early');
+        const releaseReminder = document.getElementById('release-reminder');
+        if (projectEarly) payload.project_early_reminder = projectEarly.checked;
+        if (releaseReminder) payload.release_reminder = releaseReminder.checked;
       }
 
       return payload;
+    }
+
+    function renderCourseCategories(data) {
+      const section = document.getElementById('course-categories-section');
+      const list = document.getElementById('course-category-list');
+      const features = document.getElementById('course-feature-list');
+      const title = document.getElementById('course-categories-title');
+      const codeLabel = document.getElementById('course-code-label');
+      if (!section || !list || !features) return;
+
+      const course = data.course;
+      if (!data.on_roster || !course) {
+        section.style.display = 'none';
+        list.innerHTML = '';
+        features.innerHTML = '';
+        return;
+      }
+
+      section.style.display = 'block';
+      title.textContent = `${course.display_name || course.course_code} Assignment Types`;
+      codeLabel.textContent = course.course_code || '—';
+
+      const prefs = data.category_prefs || {};
+      list.innerHTML = (course.categories || []).map((cat) => {
+        const id = cat.id;
+        const checked = prefs[id] !== false ? 'checked' : '';
+        return `<li>
+          <label for="cat-${id}">
+            <input id="cat-${id}" type="checkbox" data-category-id="${id}" ${checked} />
+            <span class="dot" aria-hidden="true"></span>
+            <span>${cat.label || id}</span>
+          </label>
+        </li>`;
+      }).join('');
+
+      const feat = course.features || {};
+      const rows = [];
+      if (feat.project_early_reminder?.enabled) {
+        const checked = data.project_early_reminder === true ? 'checked' : '';
+        rows.push(`<li>
+          <label for="project-early">
+            <input id="project-early" type="checkbox" name="project_early_reminder" ${checked} />
+            <span class="dot" aria-hidden="true"></span>
+            <span>${feat.project_early_reminder.ui_label || 'Remind me a day earlier for projects'}</span>
+          </label>
+        </li>`);
+      }
+      if (feat.release_reminder?.enabled) {
+        const checked = data.release_reminder !== false ? 'checked' : '';
+        rows.push(`<li>
+          <label for="release-reminder">
+            <input id="release-reminder" type="checkbox" name="release_reminder" ${checked} />
+            <span class="dot" aria-hidden="true"></span>
+            <span>${feat.release_reminder.ui_label || 'Notify me when a new assignment is released'}</span>
+          </label>
+        </li>`);
+      }
+      features.innerHTML = rows.join('');
     }
 
     mainCtaBtn.addEventListener('click', async function (e) {
@@ -1014,24 +1031,53 @@
         // bCourses state
         updateCanvasUI(!!data.canvas_connected);
 
-        // CS61A category prefs — only visible if student is on the roster
-        const cs61aSection = document.getElementById('cs61a-section');
-        if (data.on_roster) {
-          cs61aSection.style.display = 'block';
-          const prefs = data.category_prefs || { lab: true, homework: true, midterm: true, quiz: true, project: true };
-          document.getElementById('cat-lab').checked = prefs.lab !== false;
-          document.getElementById('cat-homework').checked = prefs.homework !== false;
-          document.getElementById('cat-midterm').checked = prefs.midterm !== false;
-          document.getElementById('cat-quiz').checked = prefs.quiz !== false;
-          document.getElementById('cat-project').checked = prefs.project !== false;
-          document.getElementById('project-early').checked = data.project_early_reminder === true;
-          // Opt-out: checked unless the student explicitly disabled it.
-          document.getElementById('release-reminder').checked = data.release_reminder !== false;
-        } else {
-          cs61aSection.style.display = 'none';
-        }
+        // Course category prefs — driven by courses.json for the student's roster course
+        renderCourseCategories(data);
       }
     })();
+
+    const syncCourseBtn = document.getElementById('sync-course-btn');
+    if (syncCourseBtn) {
+      syncCourseBtn.addEventListener('click', async () => {
+        if (!window.auth || !window.auth.user) {
+          window.location.href = './login.html';
+          return;
+        }
+        syncCourseBtn.disabled = true;
+        try {
+          const token = await window.auth.getToken();
+          const res = await fetch('/api/reminders/sync-course', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`,
+            },
+            body: '{}',
+          });
+          const json = await res.json();
+          if (!res.ok) throw new Error(json.error || 'Sync failed');
+          const getRes = await fetch('/api/reminders/get', {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          const getJson = await getRes.json();
+          if (getJson.success && getJson.data) {
+            renderCourseCategories(getJson.data);
+          }
+          showMessage(
+            json.patched
+              ? `Updated course to ${json.course_code}.`
+              : json.on_roster
+                ? `Already on ${json.course_code}.`
+                : 'You are not on a class roster yet.',
+            'Course sync',
+          );
+        } catch (err) {
+          showMessage(err.message || 'Could not refresh course.', 'Error');
+        } finally {
+          syncCourseBtn.disabled = false;
+        }
+      });
+    }
   </script>
 </body>
 

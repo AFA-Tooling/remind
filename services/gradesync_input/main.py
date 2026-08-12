@@ -48,6 +48,25 @@ def main():
     else:
         print("ℹ️  gradesync_to_db.py not found, skipping GradeSync sync.")
 
+    # Step 0a2: Push roster course_code onto student docs so routing stays current.
+    script_sync_courses = current_dir / "sync_student_courses_cli.py"
+    if script_sync_courses.exists():
+        print("--------------------------------------------------")
+        print("STEP 0a2: Syncing student course codes from roster")
+        print("--------------------------------------------------")
+        try:
+            subprocess.run(
+                [sys.executable, str(script_sync_courses), "--apply"],
+                check=True,
+            )
+        except subprocess.CalledProcessError as e:
+            print(
+                f"\n⚠️  Step 0a2 Warning: course sync failed "
+                f"(Exit code: {e.returncode}). Continuing..."
+            )
+    else:
+        print("ℹ️  sync_student_courses_cli.py not found, skipping course sync.")
+
     # Run Step 0b: Canvas Sync (optional — skip if script not found)
     if script_canvas_sync.exists():
         print("--------------------------------------------------")

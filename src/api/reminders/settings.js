@@ -3,6 +3,8 @@ import { sendWelcomeEmail } from '../../services/welcomeEmail.js';
 import { verifyUserAuth } from '../auth/verifyUser.js';
 import { getStudyStatus } from '../study/studyStatus.js';
 import { LOCKOUT_MESSAGE, WAITLIST_MESSAGE } from '../study/messages.js';
+import { sanitizeCategoryPrefs, getCourse } from '../../shared/courses.js';
+import { syncStudentCourseFromRoster } from '../students/syncCourse.js';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -49,6 +51,11 @@ export default async function handler(req, res) {
     const existingUser = existingDoc.exists ? existingDoc.data() : null;
     const alreadySentWelcome = existingUser?.welcome_email_sent === true;
 
+    // Refresh course from roster before validating category prefs.
+    const synced = await syncStudentCourseFromRoster(db, loginEmail, existingUser);
+    const courseCode = synced.courseCode || existingUser?.course_code || null;
+    const course = getCourse(courseCode);
+
     const studentData = {
       email: loginEmail,
       phone_number: phoneNumber ? phoneNumber.trim() : null,
@@ -61,18 +68,15 @@ export default async function handler(req, res) {
       updated_at: new Date().toISOString(),
     };
 
-    if (category_prefs && typeof category_prefs === 'object') {
-      studentData.category_prefs = {
-        lab: !!category_prefs.lab,
-        homework: !!category_prefs.homework,
-        midterm: !!category_prefs.midterm,
-        quiz: !!category_prefs.quiz,
-        project: !!category_prefs.project,
-      };
-      // Roster-only: remind a day earlier for projects (early submission = extra credit).
-      studentData.project_early_reminder = !!project_early_reminder;
-      // Roster-only: notify on the day an assignment is released.
-      studentData.release_reminder = !!release_reminder;
+    if (category_prefs && typeof category_prefs === 'object' && course) {
+      studentData.category_prefs = sanitizeCategoryPrefs(courseCode, category_prefs);
+      const features = course.features || {};
+      if (features.project_early_reminder?.enabled) {
+        studentData.project_early_reminder = !!project_early_reminder;
+      }
+      if (features.release_reminder?.enabled) {
+        studentData.release_reminder = !!release_reminder;
+      }
     }
 
     // Document ID = email — set(merge:true) acts as upsert

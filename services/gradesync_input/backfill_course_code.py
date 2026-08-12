@@ -20,7 +20,9 @@ from typing import Any, Dict, Optional
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-DEFAULT_COURSE_CODE = "CS61A"
+from shared.courses import default_course_code
+
+DEFAULT_COURSE_CODE = default_course_code()
 STUDENTS_COLLECTION = "students"
 ROSTER_COLLECTION = "class_roster"
 

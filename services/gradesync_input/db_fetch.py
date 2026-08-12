@@ -23,6 +23,10 @@ if str(SERVICES_DIR) not in sys.path:
     sys.path.append(str(SERVICES_DIR))
 
 from shared import settings
+from shared.courses import (
+    categorize_assignment,
+    should_apply_project_early,
+)
 
 
 # Berkeley-local time. Naive datetimes (manually-uploaded CSV deadlines) are
@@ -251,29 +255,18 @@ def base_assignment_code(code: Optional[str]) -> Optional[str]:
     return None
 
 
-def derive_assignment_category(*candidates: Optional[str]) -> str:
+def derive_assignment_category(
+    *candidates: Optional[str], course_code: Optional[str] = None
+) -> str:
     """
-    Map an assignment label to one of: Lab, Homework, Midterm, Quiz, Project.
+    Map an assignment label to a category name via courses.json (reminder mode).
 
     Tries each candidate string (assignment name first, then code) and returns
-    the first match. Falls back to Project so non-matching CS61A assignments
-    still get a defined category.
+    the first match. Falls back to the course's reminder_unmatched category
+    (CS61A → Project) so non-matching assignments still get a defined category.
     """
-    for raw in candidates:
-        if not raw:
-            continue
-        name = str(raw).strip().lower()
-        if name.startswith("lab"):
-            return "Lab"
-        if name.startswith("homework") or name.startswith("hw"):
-            return "Homework"
-        if name.startswith("midterm"):
-            return "Midterm"
-        # Substring (not prefix) so "Orientation Quiz (Optional)" is caught
-        # alongside the numbered "Quiz 1".."Quiz 5".
-        if "quiz" in name:
-            return "Quiz"
-    return "Project"
+    result = categorize_assignment(course_code, *candidates, mode="reminder")
+    return result or "Project"
     
 
 def load_deadlines_from_rows(
@@ -640,7 +633,9 @@ def build_assignment_payload(
     # Students without category_prefs (non-roster) get legacy behavior (all on).
     category_prefs = student.get("category_prefs")
     if isinstance(category_prefs, dict):
-        category = derive_assignment_category(entry.get("assignment_name"), code)
+        category = derive_assignment_category(
+            entry.get("assignment_name"), code, course_code=course_code
+        )
         if not category_prefs.get(category.lower(), True):
             msg = f"Skipping {code}: category '{category}' disabled in student prefs"
             if is_target_student or debug:
@@ -689,13 +684,16 @@ def build_assignment_payload(
     # (and message) still surfaces the real personal deadline.
     effective_deadline = personal_deadline
     if student.get("project_early_reminder"):
-        category = derive_assignment_category(entry.get("assignment_name"), code)
-        # Checkpoints (e.g. "Hog Checkpoint") are graded on their own deadline and
-        # earn no extra credit for early submission, so the day-early shift must not
-        # apply to them even though they fall under the Project category.
-        label = f"{entry.get('assignment_name') or ''} {code or ''}".lower()
-        is_checkpoint = "checkpoint" in label
-        if category == "Project" and not is_checkpoint:
+        category = derive_assignment_category(
+            entry.get("assignment_name"), code, course_code=course_code
+        )
+        # Checkpoints and other exclude_contains patterns come from courses.json.
+        if should_apply_project_early(
+            course_code,
+            category,
+            entry.get("assignment_name"),
+            code,
+        ):
             effective_deadline = personal_deadline - timedelta(days=1)
             if is_target_student or debug:
                 print(f"   📌 Project early-reminder ON for {code}: effective deadline shifted back 1 day")

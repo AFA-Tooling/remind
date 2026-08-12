@@ -8,10 +8,15 @@
 // services/gradesync_input/backfill_consent_enrollment.py mirrors this shape for
 // the one-time backfill of already-consented students. Keep the two in sync.
 
+import {
+  defaultCategoryPrefs as prefsForCourse,
+  defaultCourseCode,
+} from '../../shared/courses.js';
+
 // The daily pipeline routes each student to an assignment catalog by course_code.
 // A student doc without it matches no catalog and silently receives nothing, so
-// every creation path must set one.
-export const DEFAULT_COURSE_CODE = process.env.COURSE_CODE || 'CS61A';
+// every creation path must set one. Fallback when the roster has no entry.
+export const DEFAULT_COURSE_CODE = process.env.COURSE_CODE || defaultCourseCode();
 
 // Reminders fire on an exact match against this many days before the deadline,
 // not across a window — a student gets one email per assignment at T-3.
@@ -20,8 +25,8 @@ export const DEFAULT_DAYS_BEFORE_DEADLINE = 3;
 // Functionally identical to omitting the field (db_fetch.py treats a missing
 // category as enabled), but written explicitly so the dashboard renders the
 // boxes checked rather than inferring them.
-export function defaultCategoryPrefs() {
-  return { lab: true, homework: true, midterm: true, quiz: true, project: true };
+export function defaultCategoryPrefs(courseCode = DEFAULT_COURSE_CODE) {
+  return prefsForCourse(courseCode);
 }
 
 // The class roster is authoritative; students who registered but are not on it
@@ -50,7 +55,7 @@ export function buildNewStudent({ email, displayName, courseCode, enrolledVia = 
     days_before_deadline: DEFAULT_DAYS_BEFORE_DEADLINE,
     release_reminder: true,
     project_early_reminder: false,
-    category_prefs: defaultCategoryPrefs(),
+    category_prefs: defaultCategoryPrefs(courseCode),
     email_pref: true,
     phone_pref: false,
     discord_pref: false,

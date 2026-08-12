@@ -1,5 +1,10 @@
 import { getDb } from '../firestore.js';
 import { verifyUserAuth } from '../auth/verifyUser.js';
+import { publicCourseConfig } from '../../shared/courses.js';
+import {
+  syncStudentCourseFromRoster,
+  prefsForResponse,
+} from '../students/syncCourse.js';
 
 export default async function handler(req, res) {
     if (req.method !== 'GET') {
@@ -22,15 +27,14 @@ export default async function handler(req, res) {
             return res.status(404).json({ error: 'User not found' });
         }
 
-        const data = docSnap.data();
+        // Roster is authoritative: refresh course_code before returning prefs.
+        const synced = await syncStudentCourseFromRoster(db, loginEmail, docSnap.data());
+        const data = synced.data;
 
-        // Roster lookup keys on lowercased email
-        const rosterSnap = await db.collection('class_roster').doc(loginEmail.toLowerCase()).get();
-        const onRoster = rosterSnap.exists;
+        const courseCode = synced.courseCode || data.course_code || null;
+        const course = publicCourseConfig(courseCode);
+        const categoryPrefs = prefsForResponse(courseCode, data.category_prefs);
 
-        const categoryPrefs = data.category_prefs || { lab: true, homework: true, midterm: true, quiz: true, project: true };
-
-        // Return user data
         return res.status(200).json({
             success: true,
             data: {
@@ -44,17 +48,14 @@ export default async function handler(req, res) {
                 email: data.email,
                 canvas_connected: data.canvas_connected || false,
                 canvas_domain: data.canvas_domain || null,
-                on_roster: onRoster,
-                category_prefs: {
-                    lab: categoryPrefs.lab !== false,
-                    homework: categoryPrefs.homework !== false,
-                    midterm: categoryPrefs.midterm !== false,
-                    quiz: categoryPrefs.quiz !== false,
-                    project: categoryPrefs.project !== false,
-                },
+                on_roster: synced.onRoster,
+                course_code: courseCode,
+                course,
+                category_prefs: categoryPrefs,
                 project_early_reminder: data.project_early_reminder === true,
                 // Opt-out: release-day notifications are on unless explicitly disabled.
                 release_reminder: data.release_reminder !== false,
+                course_synced: synced.patched,
             }
         });
 

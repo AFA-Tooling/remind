@@ -29,21 +29,15 @@ from typing import Any, Dict, List
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-DEFAULT_COURSE_CODE = "CS61A"
+from shared.courses import default_category_prefs, default_course_code
+
+DEFAULT_COURSE_CODE = default_course_code()
 STUDENTS_COLLECTION = "students"
 ROSTER_COLLECTION = "class_roster"
 PARTICIPANTS_COLLECTION = "study_participants"
 
-# Mirrors buildNewStudent in src/api/students/defaults.js. The two runtimes cannot
-# share code, so keep them in sync by hand.
+# Mirrors buildNewStudent in src/api/students/defaults.js (category set from courses.json).
 DEFAULT_DAYS_BEFORE_DEADLINE = 3
-DEFAULT_CATEGORY_PREFS = {
-    "lab": True,
-    "homework": True,
-    "midterm": True,
-    "quiz": True,
-    "project": True,
-}
 
 
 def _now_iso() -> str:
@@ -63,7 +57,7 @@ def build_student_doc(email: str, roster_entry: Dict[str, Any], now: str) -> Dic
         "days_before_deadline": DEFAULT_DAYS_BEFORE_DEADLINE,
         "release_reminder": True,
         "project_early_reminder": False,
-        "category_prefs": dict(DEFAULT_CATEGORY_PREFS),
+        "category_prefs": default_category_prefs(course_code),
         "email_pref": True,
         "phone_pref": False,
         "discord_pref": False,
@@ -120,10 +114,11 @@ def plan_enrollment(
 
         # Only the fields that decide whether email goes out. Anything the student
         # might have set themselves (name, phone, Discord) is left alone.
+        course_code = str(student.get("course_code") or "").strip() or DEFAULT_COURSE_CODE
         activate.append((email, {
             "email_pref": True,
             "days_before_deadline": DEFAULT_DAYS_BEFORE_DEADLINE,
-            "category_prefs": dict(DEFAULT_CATEGORY_PREFS),
+            "category_prefs": default_category_prefs(course_code),
             "updated_at": now,
         }))
 

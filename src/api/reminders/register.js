@@ -37,10 +37,18 @@ export default async function handler(req, res) {
     const existing = await docRef.get();
 
     if (existing.exists) {
-      return res.status(200).json({ success: true, created: false, data: existing.data() });
+      // Keep course_code fresh from roster for returning users.
+      const { syncStudentCourseFromRoster } = await import('../students/syncCourse.js');
+      const synced = await syncStudentCourseFromRoster(db, loginEmail, existing.data());
+      return res.status(200).json({
+        success: true,
+        created: false,
+        data: synced.data || existing.data(),
+        course_synced: synced.patched,
+      });
     }
 
-    const rosterSnap = await db.collection('class_roster').doc(loginEmail).get();
+    const rosterSnap = await db.collection('class_roster').doc(loginEmail.toLowerCase()).get();
     const newStudent = buildNewStudent({
       email: loginEmail,
       displayName: display_name,

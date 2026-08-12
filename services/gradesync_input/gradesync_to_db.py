@@ -32,17 +32,19 @@ if str(SERVICES_DIR) not in sys.path:
     sys.path.append(str(SERVICES_DIR))
 
 from shared import settings
+from shared.courses import categorize_assignment, default_course_code, get_course
 
-# Sheet & credentials config
-# OLD test sheet:
-#google_sheet_id = '11H0hRtJOHCy59jaxbdRSp7JhDtkaiOibvexZ4Shj4wE'
-# Replacing with CS10 Autoreminder ID:
-#google_sheet_id = '1tDmN2HREa6SWwcRLzfqdtt_JJxwNPdjLHQevcHl04gQ'
-google_sheet_id = '1HPaMeAudhiOXNZ-JfGr5Viw9qpoaZWRn-kAuOX6gGx8'
-# google_sheet_credentials = 'credentials.json'
-# config_folder = os.path.join(os.path.dirname(__file__), 'config')
-# credentials_path = os.path.join(config_folder, google_sheet_credentials)
+# Sheet & credentials config — course spreadsheet_id comes from courses.json
+ROSTER_COURSE_CODE = default_course_code()
+_course_cfg = get_course(ROSTER_COURSE_CODE) or {}
+google_sheet_id = _course_cfg.get("spreadsheet_id") or ""
 credentials_path = str(settings.SERVICE_ACCOUNT_PATH)
+
+if not google_sheet_id:
+    logging.error(
+        f"No spreadsheet_id configured for course {ROSTER_COURSE_CODE} in courses.json"
+    )
+    sys.exit(1)
 
 if not os.path.exists(credentials_path):
     logging.error(f"Credentials file not found: {credentials_path}")
@@ -51,35 +53,18 @@ if not os.path.exists(credentials_path):
 # Firestore configuration
 DEFAULT_FIRESTORE_COLLECTION = "assignment_submissions"
 ROSTER_COLLECTION = "class_roster"
-ROSTER_COURSE_CODE = "CS61A"
 
 # Tabs that are never assignments
 NON_ASSIGNMENT_TABS = {"Sheet1", "Roster"}
 
-# Known CS61A project tab names (lowercased). Matched by prefix so that
-# "Hog Checkpoint" and "Hog" both resolve to the Hog project, "Scheme Challenge"
-# to Scheme, etc. Update this when a new project is added to the course.
-PROJECT_NAMES = {"hog", "cats", "ants", "scheme", "maps"}
 
+def categorize_tab(tab_name: str, course_code: str = ROSTER_COURSE_CODE) -> Optional[str]:
+    """Map a sheet tab name to an assignment category via courses.json.
 
-def categorize_tab(tab_name: str) -> Optional[str]:
-    """Map a sheet tab name to an assignment category.
-
-    Returns one of "Lab", "Homework", "Midterm", or "Project". Returns None for
-    tabs that don't match any known assignment or project (e.g. "Test",
-    "Test Autograder") so callers can skip them instead of mislabeling them as
-    projects.
+    Uses ingest mode: matchers with ingest=false (e.g. Quiz) are skipped, and
+    unmatched tabs return None so callers can drop them.
     """
-    name = (tab_name or "").strip().lower()
-    if name.startswith("lab"):
-        return "Lab"
-    if name.startswith("homework") or name.startswith("hw"):
-        return "Homework"
-    if name.startswith("midterm"):
-        return "Midterm"
-    if any(name.startswith(proj) for proj in PROJECT_NAMES):
-        return "Project"
-    return None
+    return categorize_assignment(course_code, tab_name, mode="ingest")
 
 def safe_filename_for_windows(name: str) -> str:
     """
