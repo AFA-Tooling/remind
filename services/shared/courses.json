@@ -3,7 +3,7 @@
   "courses": {
     "CS61A": {
       "display_name": "CS 61A",
-      "spreadsheet_id": "1HPaMeAudhiOXNZ-JfGr5Viw9qpoaZWRn-kAuOX6gGx8",
+      "spreadsheet_id": "1tDmN2HREa6SWwcRLzfqdtt_JJxwNPdjLHQevcHl04gQ",
       "categories": [
         { "id": "lab", "name": "Lab", "label": "Labs" },
         { "id": "homework", "name": "Homework", "label": "Homework" },
@@ -36,6 +36,48 @@
           "exclude_contains": ["checkpoint"],
           "ui_label": "Remind me a day earlier for projects (turn in early for extra credit)"
         },
+        "release_reminder": {
+          "enabled": true,
+          "ui_label": "Notify me when a new assignment is released"
+        }
+      }
+    },
+    "CS10": {
+      "display_name": "CS 10",
+      "spreadsheet_id": "1jQLrBjhSDbzARCHCQCVinnFqJxmT0OmenjdhcnxIm2s",
+      "categories": [
+        { "id": "lab", "name": "Lab", "label": "Labs" },
+        { "id": "discussion", "name": "Discussion", "label": "Discussions" },
+        { "id": "project", "name": "Project", "label": "Projects" },
+        { "id": "quiz", "name": "Quiz", "label": "Lecture Quizzes" },
+        { "id": "midterm", "name": "Midterm", "label": "Midterms" },
+        { "id": "postterm", "name": "Postterm", "label": "Postterms" }
+      ],
+      "matchers": [
+        { "category": "lab", "match": "contains", "patterns": ["lab"] },
+        { "category": "discussion", "match": "prefix", "patterns": ["discussion"] },
+        { "category": "project", "match": "prefix", "patterns": ["project"] },
+        {
+          "category": "quiz",
+          "match": "contains",
+          "patterns": ["quiz"],
+          "ingest": false
+        },
+        { "category": "midterm", "match": "contains", "patterns": ["midterm"] },
+        { "category": "postterm", "match": "contains", "patterns": ["postterm"] }
+      ],
+      "non_assignment_tabs": [
+        "Labs",
+        "Discussions",
+        "Projects",
+        "Lecture Quizzes",
+        "Midterms",
+        "Postterms",
+        "Pyturis"
+      ],
+      "ingest_unmatched": "skip",
+      "reminder_unmatched": "project",
+      "features": {
         "release_reminder": {
           "enabled": true,
           "ui_label": "Notify me when a new assignment is released"

@@ -32,19 +32,13 @@ if str(SERVICES_DIR) not in sys.path:
     sys.path.append(str(SERVICES_DIR))
 
 from shared import settings
-from shared.courses import categorize_assignment, default_course_code, get_course
+from shared.courses import categorize_assignment, get_course, list_course_codes
+from sync_student_courses import decide_course_code_clear
 
-# Sheet & credentials config — course spreadsheet_id comes from courses.json
-ROSTER_COURSE_CODE = default_course_code()
-_course_cfg = get_course(ROSTER_COURSE_CODE) or {}
-google_sheet_id = _course_cfg.get("spreadsheet_id") or ""
+# Credentials config — each course's spreadsheet_id comes from courses.json,
+# looked up per-course in sync_course() below since a run now covers every
+# configured course, not just one.
 credentials_path = str(settings.SERVICE_ACCOUNT_PATH)
-
-if not google_sheet_id:
-    logging.error(
-        f"No spreadsheet_id configured for course {ROSTER_COURSE_CODE} in courses.json"
-    )
-    sys.exit(1)
 
 if not os.path.exists(credentials_path):
     logging.error(f"Credentials file not found: {credentials_path}")
@@ -53,12 +47,13 @@ if not os.path.exists(credentials_path):
 # Firestore configuration
 DEFAULT_FIRESTORE_COLLECTION = "assignment_submissions"
 ROSTER_COLLECTION = "class_roster"
+STUDENTS_COLLECTION = "students"
 
 # Tabs that are never assignments
 NON_ASSIGNMENT_TABS = {"Sheet1", "Roster"}
 
 
-def categorize_tab(tab_name: str, course_code: str = ROSTER_COURSE_CODE) -> Optional[str]:
+def categorize_tab(tab_name: str, course_code: str) -> Optional[str]:
     """Map a sheet tab name to an assignment category via courses.json.
 
     Uses ingest mode: matchers with ingest=false (e.g. Quiz) are skipped, and
@@ -126,7 +121,7 @@ def convert_to_dataframe(data):
         logging.error(f"Error converting data to DataFrame: {e}")
         sys.exit(1)
 
-def preprocess_df(df, tab_name):
+def preprocess_df(df, tab_name, course_code):
     """
     Cleans and formats a Google Sheets assignment DataFrame:
     - Filters relevant columns
@@ -136,6 +131,7 @@ def preprocess_df(df, tab_name):
     Args:
         df (pd.DataFrame): Raw DataFrame from Google Sheets
         tab_name (str): Name of the Google Sheet tab (used as assignment label)
+        course_code (str): Course this tab belongs to, for category lookup
 
     Returns:
         pd.DataFrame: Cleaned and formatted DataFrame
@@ -169,7 +165,7 @@ def preprocess_df(df, tab_name):
     # Filter and format
     filtered_df = df[required_columns].copy()
     filtered_df['Assignment'] = tab_name
-    filtered_df['Category'] = categorize_tab(tab_name)
+    filtered_df['Category'] = categorize_tab(tab_name, course_code)
     filtered_df = filtered_df[['Assignment', 'Category'] + required_columns]
     filtered_df.rename(columns={name_col: 'Name'}, inplace=True)
     filtered_df.columns = filtered_df.columns.str.lower().str.strip()
@@ -195,7 +191,8 @@ def init_firestore() -> firestore.Client:
 def upsert_submissions_to_firestore(
     df: pd.DataFrame,
     db: firestore.Client,
-    collection_name: str
+    collection_name: str,
+    course_code: str
 ) -> None:
     """
     Upsert assignment submission data to a Firestore collection.
@@ -249,7 +246,7 @@ def upsert_submissions_to_firestore(
 
         category_value = row.get('category', '')
         if pd.isna(category_value) or (isinstance(category_value, str) and category_value.strip() == ''):
-            category_value = categorize_tab(assignment_name)
+            category_value = categorize_tab(assignment_name, course_code)
         else:
             category_value = str(category_value).strip()
 
@@ -283,7 +280,7 @@ def upsert_submissions_to_firestore(
 def sync_roster_to_firestore(
     raw_data: List[List[str]],
     db: firestore.Client,
-    course_code: str = ROSTER_COURSE_CODE,
+    course_code: str,
     collection_name: str = ROSTER_COLLECTION,
 ) -> None:
     """
@@ -344,11 +341,24 @@ def sync_roster_to_firestore(
     prune_batch = db.batch()
     prune_size = 0
     pruned = 0
+    cleared = 0
     for doc in existing_docs:
         if doc.id not in current_emails:
             prune_batch.delete(doc.reference)
             prune_size += 1
             pruned += 1
+
+            # Also stop this student from matching this course's assignments —
+            # otherwise they keep getting reminded for a class they dropped.
+            student_ref = db.collection(STUDENTS_COLLECTION).document(doc.id)
+            student_snap = student_ref.get()
+            if student_snap.exists:
+                patch = decide_course_code_clear(student_snap.to_dict() or {}, course_code)
+                if patch:
+                    prune_batch.set(student_ref, patch, merge=True)
+                    prune_size += 1
+                    cleared += 1
+
             if prune_size >= 499:
                 prune_batch.commit()
                 prune_batch = db.batch()
@@ -356,7 +366,105 @@ def sync_roster_to_firestore(
     if prune_size > 0:
         prune_batch.commit()
 
-    print(f"✅ Roster synced: {total_written} enrolled, {pruned} pruned (course={course_code})")
+    print(
+        f"✅ Roster synced: {total_written} enrolled, {pruned} pruned, "
+        f"{cleared} course_code cleared (course={course_code})"
+    )
+
+
+def sync_course(course_code: str, creds, db_client, args: argparse.Namespace) -> int:
+    """Sync one course's sheet (roster + assignment tabs). Returns tabs processed."""
+    course_cfg = get_course(course_code) or {}
+    sheet_id = course_cfg.get("spreadsheet_id") or ""
+    if not sheet_id:
+        logging.error(f"No spreadsheet_id configured for course {course_code} in courses.json")
+        print(f"⚠️  Skipping {course_code}: no spreadsheet_id configured")
+        return 0
+
+    tab_names = get_all_tab_names(sheet_id, creds)
+    processed_count = 0
+
+    for tab in tab_names:
+        if tab == "Roster":
+            if args.firestore and db_client:
+                print(f"\n Parsing tab: {tab} (roster sync, course={course_code})")
+                roster_data = get_google_sheet_data(sheet_id, tab, creds)
+                try:
+                    sync_roster_to_firestore(roster_data, db_client, course_code)
+                except Exception as e:
+                    logging.error(f"Error syncing roster: {e}")
+                    print(f"❌ Failed to sync roster. Continuing.")
+            else:
+                print(f"Skipping {tab} (firestore disabled)")
+            continue
+
+        if tab in NON_ASSIGNMENT_TABS or tab in (course_cfg.get("non_assignment_tabs") or []):
+            print(f"Skipping {tab} (non-assignment tab)")
+            continue
+
+        category = categorize_tab(tab, course_code)
+        if category is None:
+            print(f"Skipping {tab} (unrecognized tab — not a known assignment or project)")
+            continue
+        print(f"\n Parsing tab: {tab} (category={category}, course={course_code})")
+        range_str = f"{tab}"
+        raw_data = get_google_sheet_data(sheet_id, range_str, creds)
+
+        if not raw_data or len(raw_data) < 2:
+            print(f"Skipping {tab} (no data)")
+            continue
+
+        try:
+            # 1. Convert the raw data to a dataframe
+            df = convert_to_dataframe(raw_data)
+
+            # 2. Preprocess the dataframe
+            df = preprocess_df(df, tab, course_code)
+            print(f"Cleaned {tab} DataFrame:")
+            print(df.head())  # Preview the cleaned data
+
+            # 3. Upload to Firestore (if enabled)
+            if args.firestore and db_client:
+                try:
+                    upsert_submissions_to_firestore(
+                        df,
+                        db_client,
+                        args.collection,
+                        course_code
+                    )
+                    processed_count += 1
+                    print(f"✅ Successfully processed {tab}")
+                except Exception as e:
+                    logging.error(f"Error uploading {tab} to Firestore: {e}")
+                    if not args.csv_fallback:
+                        print(f"❌ Failed to upload {tab} to Firestore. Continuing with next tab...")
+                        continue
+
+            # 4. Export to CSV (if fallback enabled or Firestore disabled)
+            if args.csv_fallback or not args.firestore:
+                output_filename = f"{safe_filename_for_windows(tab)}.csv"
+                output_path = os.path.join(output_folder, output_filename)
+
+                # ✅ Ensure the folder exists
+                os.makedirs(os.path.dirname(output_path), exist_ok=True)
+
+                # Save the CSV
+                df.to_csv(output_path, index=False)
+                print(f"Saved {output_path}")
+                print(f"Saved {tab}.csv")
+                processed_count += 1
+
+            # If in test mode, break after processing first valid assignment
+            if args.test:
+                print(f"\n🧪 Test mode: Processed 1 assignment ({tab}) for {course_code}.")
+                break
+
+        except Exception as e:
+            logging.error(f"Error processing tab {tab}: {e}")
+            print(f"❌ Failed to process {tab}. Continuing with next tab...")
+            continue
+
+    return processed_count
 
 
 if __name__ == "__main__":
@@ -392,10 +500,9 @@ if __name__ == "__main__":
         help="Test mode: process only the first valid assignment tab"
     )
     args = parser.parse_args()
-    
+
     # Initialize Google Sheets credentials
     creds = get_credentials()
-    tab_names = get_all_tab_names(google_sheet_id, creds)
 
     # Initialize Firestore client if enabled
     db_client = None
@@ -412,83 +519,21 @@ if __name__ == "__main__":
                 print("⚠️  Firestore upload disabled, falling back to CSV only")
                 args.firestore = False
 
-    processed_count = 0
-    
-    for tab in tab_names:
-        if tab == "Roster":
-            if args.firestore and db_client:
-                print(f"\n Parsing tab: {tab} (roster sync)")
-                roster_data = get_google_sheet_data(google_sheet_id, tab, creds)
-                try:
-                    sync_roster_to_firestore(roster_data, db_client)
-                except Exception as e:
-                    logging.error(f"Error syncing roster: {e}")
-                    print(f"❌ Failed to sync roster. Continuing.")
-            else:
-                print(f"Skipping {tab} (firestore disabled)")
-            continue
+    course_codes = list_course_codes()
+    if not course_codes:
+        print("❌ No courses configured in courses.json. Exiting.")
+        sys.exit(1)
 
-        if tab in NON_ASSIGNMENT_TABS:
-            print(f"Skipping {tab} (non-assignment tab)")
-            continue
-
-        category = categorize_tab(tab)
-        if category is None:
-            print(f"Skipping {tab} (unrecognized tab — not a known assignment or project)")
-            continue
-        print(f"\n Parsing tab: {tab} (category={category})")
-        range_str = f"{tab}"
-        raw_data = get_google_sheet_data(google_sheet_id, range_str, creds)
-
-        if not raw_data or len(raw_data) < 2:
-            print(f"Skipping {tab} (no data)")
-            continue
-        
+    total_processed = 0
+    for course_code in course_codes:
+        print("\n==================================================")
+        print(f"Syncing course: {course_code}")
+        print("==================================================")
         try:
-            # 1. Convert the raw data to a dataframe
-            df = convert_to_dataframe(raw_data)
-
-            # 2. Preprocess the dataframe
-            df = preprocess_df(df, tab)
-            print(f"Cleaned {tab} DataFrame:")
-            print(df.head())  # Preview the cleaned data
-
-            # 3. Upload to Firestore (if enabled)
-            if args.firestore and db_client:
-                try:
-                    upsert_submissions_to_firestore(
-                        df,
-                        db_client,
-                        args.collection
-                    )
-                    processed_count += 1
-                    print(f"✅ Successfully processed {tab}")
-                except Exception as e:
-                    logging.error(f"Error uploading {tab} to Firestore: {e}")
-                    if not args.csv_fallback:
-                        print(f"❌ Failed to upload {tab} to Firestore. Continuing with next tab...")
-                        continue
-
-            # 4. Export to CSV (if fallback enabled or Firestore disabled)
-            if args.csv_fallback or not args.firestore:
-                output_filename = f"{safe_filename_for_windows(tab)}.csv"
-                output_path = os.path.join(output_folder, output_filename)
-
-                # ✅ Ensure the folder exists
-                os.makedirs(os.path.dirname(output_path), exist_ok=True)
-
-                # Save the CSV
-                df.to_csv(output_path, index=False)
-                print(f"Saved {output_path}")
-                print(f"Saved {tab}.csv")
-                processed_count += 1
-            
-            # If in test mode, break after processing first valid assignment
-            if args.test:
-                print(f"\n🧪 Test mode: Processed 1 assignment ({tab}). Exiting.")
-                break
-                
+            total_processed += sync_course(course_code, creds, db_client, args)
         except Exception as e:
-            logging.error(f"Error processing tab {tab}: {e}")
-            print(f"❌ Failed to process {tab}. Continuing with next tab...")
+            logging.error(f"Error syncing course {course_code}: {e}")
+            print(f"❌ Failed to sync {course_code}. Continuing with next course...")
             continue
+
+    print(f"\n✅ Done. {total_processed} assignment tab(s) processed across {len(course_codes)} course(s).")

@@ -75,6 +75,21 @@ def decide_student_course_update(
     return patch
 
 
+def decide_course_code_clear(
+    student: Dict[str, Any], dropped_course_code: str
+) -> Optional[Dict[str, Any]]:
+    """Student was just pruned from dropped_course_code's roster.
+
+    Clears course_code only if it still points at that course, so this never
+    touches a student whose course_code was set by other means (staff, or a
+    consent-enrolled participant who was never on a roster to begin with).
+    """
+    current = (student.get("course_code") or "").strip()
+    if current != dropped_course_code:
+        return None
+    return {"course_code": "", "updated_at": datetime.now().isoformat()}
+
+
 def sync_students_from_roster(db, *, dry_run: bool = False) -> Tuple[int, int, int]:
     """Apply roster course_codes onto students. Returns (updated, already_ok, not_on_roster)."""
     roster_map = build_roster_map(db)
