@@ -29,6 +29,10 @@ export function defaultCourseCode() {
   return loadCoursesConfig().default_course_code || 'CS61A';
 }
 
+export function listCourseCodes() {
+  return Object.keys(loadCoursesConfig().courses || {}).sort();
+}
+
 export function getCourse(courseCode) {
   const code = String(courseCode || '').trim().toUpperCase();
   if (!code) return null;

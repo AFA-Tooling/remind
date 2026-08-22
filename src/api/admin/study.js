@@ -1,14 +1,19 @@
 // Admin endpoints for research-study management.
 // Single handler dispatched on req.query.action (all under /api/admin/study).
 //
-//   GET   ?action=overview (default)  -> config + participants + counts
-//   POST  ?action=consent  { emails:[...], source }  -> merge/add consented students
-//   POST  ?action=remove   { email }                 -> remove a participant
-//   POST  ?action=group    { email, group }          -> manually set a student's group
-//   POST  ?action=randomize                          -> ~50/50 split of unassigned
-//   GET   ?action=export&group=1|2                   -> { emails: [...] } for that group
-//   POST  ?action=open-access { confirm: true }      -> grant Group 1 + Group 2 access
-//   POST  ?action=close-access { confirm: true }     -> revert to group-gated access (undo open-access)
+//   GET   ?action=overview&course_code=CS61A                -> config + participants + counts, for one course
+//   POST  ?action=consent  { emails:[...], source, course_code } -> merge/add consented students to that course
+//   POST  ?action=remove   { email }                         -> remove a participant
+//   POST  ?action=group    { email, group }                  -> manually set a student's group
+//   POST  ?action=randomize { course_code }                  -> ~50/50 split of that course's unassigned
+//   GET   ?action=export&group=1|2&course_code=CS61A         -> { emails: [...] } for that course+group
+//   POST  ?action=open-access { confirm: true, course_code } -> grant that course's Group 1 + Group 2 access
+//   POST  ?action=close-access { confirm: true, course_code } -> revert that course to group-gated access
+//
+// Every action except `group`/`remove` (which are keyed by email, not course) is
+// scoped to exactly one course — there is no cross-course bulk action. Each course
+// has its own study_config/{course_code} doc, so randomizing/opening access for
+// one course never touches another course's participants or config.
 //
 // CSV parsing for upload and CSV generation for export happen client-side; this
 // endpoint speaks JSON only.
@@ -18,12 +23,11 @@ import { requireAdmin } from './auth.js';
 import {
   STUDY_PARTICIPANTS,
   STUDY_CONFIG,
-  STUDY_CONFIG_DOC,
   getStudyConfig,
   deriveStatus,
 } from '../study/studyStatus.js';
 import { assignBalanced } from '../study/randomize.js';
-import { buildNewStudent, resolveCourseCode } from '../students/defaults.js';
+import { buildNewStudent } from '../students/defaults.js';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -33,6 +37,10 @@ const CLASS_ROSTER = 'class_roster';
 function normalizeEmail(value) {
   const e = String(value || '').trim().toLowerCase();
   return EMAIL_RE.test(e) ? e : null;
+}
+
+function normalizeCourseCode(value) {
+  return String(value || '').trim().toUpperCase();
 }
 
 function nowIso() {
@@ -49,13 +57,16 @@ async function commitInBatches(db, ops) {
   }
 }
 
-async function loadParticipants(db) {
+async function loadParticipants(db, courseCode) {
   const snap = await db.collection(STUDY_PARTICIPANTS).get();
-  return snap.docs.map(d => ({
-    email: d.id,
-    group: d.data().group ?? null,
-    source: d.data().source || null,
-  }));
+  return snap.docs
+    .map(d => ({
+      email: d.id,
+      group: d.data().group ?? null,
+      source: d.data().source || null,
+      course_code: d.data().course_code || null,
+    }))
+    .filter(p => p.course_code === courseCode);
 }
 
 function countGroups(participants) {
@@ -84,7 +95,7 @@ function countGroups(participants) {
  * on who may actually be sent to, so the doc is inert until their group has
  * access, and opening access needs no second migration.
  */
-async function enrollMissingStudents(db, emails) {
+async function enrollMissingStudents(db, emails, courseCode) {
   if (!emails.length) return 0;
 
   // Per-doc gets rather than getAll: the roster and student lookups are keyed by
@@ -98,10 +109,13 @@ async function enrollMissingStudents(db, emails) {
   emails.forEach((email, i) => {
     if (studentSnaps[i].exists) return;
     const roster = rosterSnaps[i].exists ? rosterSnaps[i].data() : null;
+    // The roster is authoritative when the student is on one; otherwise fall back
+    // to the course they're being consented under (the admin's active course tab),
+    // not the global default — a CS10 consent shouldn't silently enroll as CS61A.
     const student = buildNewStudent({
       email,
       displayName: roster?.name || null,
-      courseCode: resolveCourseCode(roster),
+      courseCode: roster?.course_code || courseCode,
       enrolledVia: 'consent',
     });
     ops.push((batch) => batch.set(db.collection(STUDENTS).doc(email), student));
@@ -119,26 +133,37 @@ export async function runStudyAction(req, res, db = getDb()) {
   try {
     // ---- GET overview ----
     if (req.method === 'GET' && action === 'overview') {
-      const [participants, config] = await Promise.all([loadParticipants(db), getStudyConfig(db)]);
+      const courseCode = normalizeCourseCode(req.query?.course_code);
+      if (!courseCode) return res.status(400).json({ error: 'course_code is required' });
+
+      const [participants, config] = await Promise.all([
+        loadParticipants(db, courseCode),
+        getStudyConfig(db, courseCode),
+      ]);
       const data = participants
         .map(p => ({ ...p, status: deriveStatus({ consented: true, group: p.group, access_open: config.access_open }).status }))
         .sort((a, b) => a.email.localeCompare(b.email));
-      return res.status(200).json({ success: true, config, counts: countGroups(participants), participants: data });
+      return res.status(200).json({ success: true, course_code: courseCode, config, counts: countGroups(participants), participants: data });
     }
 
     // ---- GET export ----
     if (req.method === 'GET' && action === 'export') {
+      const courseCode = normalizeCourseCode(req.query?.course_code);
+      if (!courseCode) return res.status(400).json({ error: 'course_code is required' });
       const group = Number(req.query?.group);
       if (group !== 1 && group !== 2) {
         return res.status(400).json({ error: 'group must be 1 or 2' });
       }
-      const participants = await loadParticipants(db);
+      const participants = await loadParticipants(db, courseCode);
       const emails = participants.filter(p => p.group === group).map(p => p.email).sort();
-      return res.status(200).json({ success: true, group, emails, count: emails.length });
+      return res.status(200).json({ success: true, course_code: courseCode, group, emails, count: emails.length });
     }
 
     // ---- POST consent (add/merge) ----
     if (req.method === 'POST' && action === 'consent') {
+      const courseCode = normalizeCourseCode(req.body?.course_code);
+      if (!courseCode) return res.status(400).json({ error: 'course_code is required' });
+
       const rawList = Array.isArray(req.body?.emails) ? req.body.emails : [];
       const source = req.body?.source === 'csv' ? 'csv' : 'manual';
 
@@ -151,13 +176,16 @@ export async function runStudyAction(req, res, db = getDb()) {
         return res.status(200).json({ success: true, added: 0, alreadyPresent: 0, skipped, assigned: 0, enrolled: 0 });
       }
 
-      const [participants, config] = await Promise.all([loadParticipants(db), getStudyConfig(db)]);
+      const [participants, config] = await Promise.all([
+        loadParticipants(db, courseCode),
+        getStudyConfig(db, courseCode),
+      ]);
       const existing = new Map(participants.map(p => [p.email, p]));
 
       const toAdd = cleaned.filter(e => !existing.has(e));
       const alreadyPresent = cleaned.length - toAdd.length;
 
-      // Auto-assign groups for newcomers only if randomization already happened.
+      // Auto-assign groups for newcomers only if this course already randomized.
       let assignments = new Map();
       if (config.randomized && toAdd.length) {
         const { group1, group2 } = countGroups(participants);
@@ -170,6 +198,7 @@ export async function runStudyAction(req, res, db = getDb()) {
       const ops = toAdd.map(email => (batch) => {
         batch.set(db.collection(STUDY_PARTICIPANTS).doc(email), {
           email,
+          course_code: courseCode,
           group: assignments.has(email) ? assignments.get(email) : null,
           source,
           created_at: ts,
@@ -180,7 +209,7 @@ export async function runStudyAction(req, res, db = getDb()) {
 
       // Consenting is what earns reminders, so enrollment follows the participant
       // write rather than waiting for a sign-in that may never happen.
-      const enrolled = await enrollMissingStudents(db, cleaned);
+      const enrolled = await enrollMissingStudents(db, cleaned, courseCode);
 
       return res.status(200).json({
         success: true,
@@ -218,7 +247,10 @@ export async function runStudyAction(req, res, db = getDb()) {
 
     // ---- POST randomize ----
     if (req.method === 'POST' && action === 'randomize') {
-      const participants = await loadParticipants(db);
+      const courseCode = normalizeCourseCode(req.body?.course_code);
+      if (!courseCode) return res.status(400).json({ error: 'course_code is required' });
+
+      const participants = await loadParticipants(db, courseCode);
       const { group1, group2 } = countGroups(participants);
       const unassigned = participants.filter(p => p.group !== 1 && p.group !== 2).map(p => p.email);
 
@@ -227,10 +259,10 @@ export async function runStudyAction(req, res, db = getDb()) {
       const ops = assignments.map(({ email, group }) => (batch) => {
         batch.set(db.collection(STUDY_PARTICIPANTS).doc(email), { group, updated_at: ts }, { merge: true });
       });
-      // Always flip randomized=true so future consenters auto-assign, even if
-      // there were no unassigned students at the time.
+      // Always flip randomized=true so future consenters in this course
+      // auto-assign, even if there were no unassigned students at the time.
       ops.push((batch) => {
-        batch.set(db.collection(STUDY_CONFIG).doc(STUDY_CONFIG_DOC), { randomized: true, updated_at: ts }, { merge: true });
+        batch.set(db.collection(STUDY_CONFIG).doc(courseCode), { randomized: true, updated_at: ts }, { merge: true });
       });
       await commitInBatches(db, ops);
 
@@ -242,26 +274,30 @@ export async function runStudyAction(req, res, db = getDb()) {
 
     // ---- POST open-access ----
     if (req.method === 'POST' && action === 'open-access') {
+      const courseCode = normalizeCourseCode(req.body?.course_code);
+      if (!courseCode) return res.status(400).json({ error: 'course_code is required' });
       if (req.body?.confirm !== true) {
         return res.status(400).json({ error: 'confirm:true required to open access to everyone' });
       }
-      await db.collection(STUDY_CONFIG).doc(STUDY_CONFIG_DOC).set(
+      await db.collection(STUDY_CONFIG).doc(courseCode).set(
         { access_open: true, updated_at: nowIso() },
         { merge: true }
       );
-      return res.status(200).json({ success: true, access_open: true });
+      return res.status(200).json({ success: true, course_code: courseCode, access_open: true });
     }
 
     // ---- POST close-access (undo open-access) ----
     if (req.method === 'POST' && action === 'close-access') {
+      const courseCode = normalizeCourseCode(req.body?.course_code);
+      if (!courseCode) return res.status(400).json({ error: 'course_code is required' });
       if (req.body?.confirm !== true) {
         return res.status(400).json({ error: 'confirm:true required to close access back to group-gated' });
       }
-      await db.collection(STUDY_CONFIG).doc(STUDY_CONFIG_DOC).set(
+      await db.collection(STUDY_CONFIG).doc(courseCode).set(
         { access_open: false, updated_at: nowIso() },
         { merge: true }
       );
-      return res.status(200).json({ success: true, access_open: false });
+      return res.status(200).json({ success: true, course_code: courseCode, access_open: false });
     }
 
     return res.status(400).json({ error: `Unknown action '${action}' for ${req.method}` });

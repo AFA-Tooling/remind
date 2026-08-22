@@ -180,26 +180,30 @@ def fetch_collection_docs(
 
 
 STUDY_PARTICIPANTS_TABLE = "study_participants"
-STUDY_CONFIG_TABLE = "study_config"
-STUDY_CONFIG_DOC = "state"
+STUDY_CONFIG_TABLE = "study_config"  # doc id per course_code, e.g. study_config/CS61A
 
 
 def load_study_access(db: firestore.Client, *, debug: bool = False) -> set:
     """Return the set of lowercased emails allowed to receive notifications.
 
-    Research-study gating: a consented student has access iff their group is 1, OR
-    access has been opened to everyone (study_config/state.access_open == True).
-    Group 2 (waitlisted) and unassigned students are excluded until access opens.
+    Research-study gating is per course: each course has its own study_config/{course_code}
+    doc, and a consented participant has access iff their OWN course's access is open, OR
+    their group is 1. Group 2 (waitlisted) and unassigned students are excluded until their
+    course's access opens. A participant's course_code (stamped at consent time) determines
+    which course's config governs them — independent of any other course's state.
 
     Fails CLOSED — if the study collections cannot be read we raise rather than
     risk notifying students who should be gated out.
     """
     try:
-        config_snap = db.collection(STUDY_CONFIG_TABLE).document(STUDY_CONFIG_DOC).get()
-        access_open = bool(config_snap.to_dict().get("access_open")) if config_snap.exists else False
+        course_access_open = {}
+        for doc in db.collection(STUDY_CONFIG_TABLE).stream():
+            data = doc.to_dict() or {}
+            course_access_open[doc.id] = bool(data.get("access_open"))
 
         access_emails = set()
         total = group1 = group2 = unassigned = 0
+        per_course_access = {}
         for doc in db.collection(STUDY_PARTICIPANTS_TABLE).stream():
             data = doc.to_dict() or {}
             email = str(data.get("email") or doc.id).strip().lower()
@@ -213,17 +217,21 @@ def load_study_access(db: firestore.Client, *, debug: bool = False) -> set:
                 group2 += 1
             else:
                 unassigned += 1
+            course_code = str(data.get("course_code") or "").strip()
+            access_open = course_access_open.get(course_code, False)
             if group == 1 or access_open:
                 access_emails.add(email)
+                per_course_access[course_code] = per_course_access.get(course_code, 0) + 1
     except Exception as exc:  # noqa: BLE001 — fail closed on any read error
         raise RuntimeError(
             f"Aborting reminder run: could not load study gating data ({exc!r}). "
             "Refusing to send notifications without an enforceable allowlist."
         ) from exc
 
+    per_course_summary = ", ".join(f"{code or '(no course)'}={n}" for code, n in sorted(per_course_access.items()))
     print(
         f"🔒 Study gate: {len(access_emails)} of {total} consented students have access "
-        f"(group1={group1}, group2={group2}, unassigned={unassigned}, access_open={access_open})"
+        f"(group1={group1}, group2={group2}, unassigned={unassigned}; by course: {per_course_summary or 'none'})"
     )
     return access_emails
 

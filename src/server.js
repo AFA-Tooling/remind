@@ -4,6 +4,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import dotenv from 'dotenv';
+import { listCourseCodes } from './shared/courses.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -92,6 +93,7 @@ const server = http.createServer(async (req, res) => {
       FIREBASE_API_KEY: firebaseApiKey,
       FIREBASE_AUTH_DOMAIN: firebaseAuthDomain,
       FIREBASE_PROJECT_ID: firebaseProjectId,
+      courses: listCourseCodes(),
     }));
     return;
   }
@@ -565,6 +567,7 @@ const server = http.createServer(async (req, res) => {
         window.FIREBASE_AUTH_DOMAIN = '${firebaseAuthDomain}';
         window.FIREBASE_PROJECT_ID = '${firebaseProjectId}';
         window.CANVAS_PAT_MODE = ${canvasPatMode};
+        window.COURSES = ${JSON.stringify(listCourseCodes())};
       })();
     </script>`;
 

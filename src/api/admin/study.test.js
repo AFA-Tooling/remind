@@ -67,10 +67,10 @@ function makeRes() {
   };
 }
 
-async function consent(db, emails, source = 'csv') {
+async function consent(db, emails, source = 'csv', courseCode = 'CS61A') {
   const res = makeRes();
   await runStudyAction(
-    { method: 'POST', query: { action: 'consent' }, body: { emails, source } },
+    { method: 'POST', query: { action: 'consent' }, body: { emails, source, course_code: courseCode } },
     res,
     db,
   );
@@ -107,11 +107,20 @@ test('enrollment takes course_code from the roster so the pipeline can route it'
 
 // Staff and late adds consent without being on the roster; they still need a
 // course_code or they match no assignment catalog and are silently dropped.
-test('enrollment falls back to the default course for someone not on the roster', async () => {
+// They fall back to whichever course they were consented under (the admin's
+// active course tab), not a hardcoded global default.
+test('enrollment falls back to the course consented under for someone not on the roster', async () => {
   const db = makeDb();
-  await consent(db, ['staff@berkeley.edu']);
+  await consent(db, ['staff@berkeley.edu'], 'csv', 'CS61A');
 
   assert.equal(db.read('students', 'staff@berkeley.edu').course_code, DEFAULT_COURSE_CODE);
+});
+
+test('consenting under a non-default course still falls back correctly without a roster entry', async () => {
+  const db = makeDb();
+  await consent(db, ['staff@berkeley.edu'], 'csv', 'CS10');
+
+  assert.equal(db.read('students', 'staff@berkeley.edu').course_code, 'CS10');
 });
 
 // A student's own choices must always beat the enrollment defaults.
@@ -137,7 +146,7 @@ test('an existing student doc is left completely untouched', async () => {
 test('re-consenting an existing participant repairs a missing student doc', async () => {
   const db = makeDb({
     study_participants: {
-      'jo@berkeley.edu': { email: 'jo@berkeley.edu', group: 1, source: 'csv' },
+      'jo@berkeley.edu': { email: 'jo@berkeley.edu', course_code: 'CS61A', group: 1, source: 'csv' },
     },
   });
 
@@ -153,7 +162,7 @@ test('re-consenting an existing participant repairs a missing student doc', asyn
 // on who is actually sent to, so the doc is inert until access opens — and opening
 // access then needs no second migration.
 test('group 2 participants are enrolled alongside group 1', async () => {
-  const db = makeDb({ study_config: { state: { randomized: true, access_open: false } } });
+  const db = makeDb({ study_config: { CS61A: { randomized: true, access_open: false } } });
 
   const res = await consent(db, ['a@berkeley.edu', 'b@berkeley.edu']);
 
@@ -175,4 +184,92 @@ test('an all-invalid consent upload enrolls nobody', async () => {
   assert.equal(res.body.skipped, 1);
   assert.equal(res.body.enrolled, 0);
   assert.equal(db.has('students', 'not-an-email'), false);
+});
+
+// ---- Per-course scoping ----
+// Group 1/2 randomization, access, and export are independent per course: acting
+// on one course's data must never read or write another course's participants or
+// study_config doc.
+
+test('consent stamps the course it was submitted under onto the participant doc', async () => {
+  const db = makeDb();
+  await consent(db, ['jo@berkeley.edu'], 'csv', 'CS10');
+
+  assert.equal(db.read('study_participants', 'jo@berkeley.edu').course_code, 'CS10');
+});
+
+test('overview requires a course_code', async () => {
+  const db = makeDb();
+  const res = makeRes();
+  await runStudyAction({ method: 'GET', query: { action: 'overview' } }, res, db);
+
+  assert.equal(res.statusCode, 400);
+});
+
+test('overview only returns participants for the requested course', async () => {
+  const db = makeDb({
+    study_participants: {
+      'a@berkeley.edu': { email: 'a@berkeley.edu', course_code: 'CS61A', group: 1 },
+      'b@berkeley.edu': { email: 'b@berkeley.edu', course_code: 'CS10', group: 1 },
+    },
+  });
+  const res = makeRes();
+  await runStudyAction({ method: 'GET', query: { action: 'overview', course_code: 'CS61A' } }, res, db);
+
+  assert.equal(res.body.participants.length, 1);
+  assert.equal(res.body.participants[0].email, 'a@berkeley.edu');
+  assert.equal(res.body.counts.total, 1);
+});
+
+test('randomizing one course never assigns or touches another course\'s participants', async () => {
+  const db = makeDb({
+    study_participants: {
+      'cs61a@berkeley.edu': { email: 'cs61a@berkeley.edu', course_code: 'CS61A', group: null },
+      'cs10@berkeley.edu': { email: 'cs10@berkeley.edu', course_code: 'CS10', group: null },
+    },
+  });
+  const res = makeRes();
+  await runStudyAction(
+    { method: 'POST', query: { action: 'randomize' }, body: { course_code: 'CS61A' } },
+    res,
+    db,
+  );
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.assigned, 1);
+  assert.notEqual(db.read('study_participants', 'cs61a@berkeley.edu').group, null);
+  assert.equal(db.read('study_participants', 'cs10@berkeley.edu').group, null, 'CS10 participant must be untouched');
+  assert.equal(db.has('study_config', 'CS10'), false, 'CS10 config must not be created by a CS61A randomize');
+  assert.equal(db.read('study_config', 'CS61A').randomized, true);
+});
+
+test('opening access for one course does not open it for another', async () => {
+  const db = makeDb();
+  const res = makeRes();
+  await runStudyAction(
+    { method: 'POST', query: { action: 'open-access' }, body: { confirm: true, course_code: 'CS61A' } },
+    res,
+    db,
+  );
+
+  assert.equal(db.read('study_config', 'CS61A').access_open, true);
+  assert.equal(db.has('study_config', 'CS10'), false);
+});
+
+test('export only includes the requested course and group', async () => {
+  const db = makeDb({
+    study_participants: {
+      'a@berkeley.edu': { email: 'a@berkeley.edu', course_code: 'CS61A', group: 1 },
+      'b@berkeley.edu': { email: 'b@berkeley.edu', course_code: 'CS10', group: 1 },
+      'c@berkeley.edu': { email: 'c@berkeley.edu', course_code: 'CS61A', group: 2 },
+    },
+  });
+  const res = makeRes();
+  await runStudyAction(
+    { method: 'GET', query: { action: 'export', group: '1', course_code: 'CS61A' } },
+    res,
+    db,
+  );
+
+  assert.deepEqual(res.body.emails, ['a@berkeley.edu']);
 });

@@ -13,7 +13,6 @@
 
 import { getDb } from '../firestore.js';
 
-export const STUDY_CONFIG_DOC = 'state';
 export const STUDY_PARTICIPANTS = 'study_participants';
 export const STUDY_CONFIG = 'study_config';
 
@@ -36,9 +35,15 @@ export function deriveStatus({ consented, group, access_open }) {
   return { consented: true, group: g, access_open: open, hasAccess, status };
 }
 
-/** Read the singleton study config doc, defaulting to a not-randomized / closed study. */
-export async function getStudyConfig(db) {
-  const snap = await db.collection(STUDY_CONFIG).doc(STUDY_CONFIG_DOC).get();
+/**
+ * Read one course's study config doc, defaulting to not-randomized / closed.
+ * A blank/missing courseCode has no config doc to read and defaults closed
+ * (fail closed, same as a Firestore read error would).
+ */
+export async function getStudyConfig(db, courseCode) {
+  const code = (courseCode || '').trim().toUpperCase();
+  if (!code) return { randomized: false, access_open: false };
+  const snap = await db.collection(STUDY_CONFIG).doc(code).get();
   const data = snap.exists ? snap.data() : {};
   return {
     randomized: data.randomized === true,
@@ -47,7 +52,10 @@ export async function getStudyConfig(db) {
 }
 
 /**
- * Resolve a single student's study status from Firestore.
+ * Resolve a single student's study status from Firestore. The participant's own
+ * `course_code` (stamped at consent time) determines which course's config
+ * governs their access — not the caller's notion of the student's course, so
+ * this works even before a returning student's course_code has been resolved.
  * @param {import('firebase-admin/firestore').Firestore} db
  * @param {string} email
  */
@@ -55,16 +63,13 @@ export async function getStudyStatus(db, email) {
   const key = (email || '').trim().toLowerCase();
   if (!key) return deriveStatus({ consented: false, group: null, access_open: false });
 
-  const [participantSnap, config] = await Promise.all([
-    db.collection(STUDY_PARTICIPANTS).doc(key).get(),
-    getStudyConfig(db),
-  ]);
-
+  const participantSnap = await db.collection(STUDY_PARTICIPANTS).doc(key).get();
   if (!participantSnap.exists) {
-    return deriveStatus({ consented: false, group: null, access_open: config.access_open });
+    return deriveStatus({ consented: false, group: null, access_open: false });
   }
-  const group = participantSnap.data().group ?? null;
-  return deriveStatus({ consented: true, group, access_open: config.access_open });
+  const participant = participantSnap.data() || {};
+  const config = await getStudyConfig(db, participant.course_code);
+  return deriveStatus({ consented: true, group: participant.group ?? null, access_open: config.access_open });
 }
 
 /** Convenience wrapper using the shared db singleton. */

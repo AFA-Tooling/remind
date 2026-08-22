@@ -1,5 +1,7 @@
 // API endpoint to serve Firebase public credentials
 // Firebase client-side credentials are safe to expose
+import { listCourseCodes } from '../shared/courses.js';
+
 export default async function handler(req, res) {
   // Enable CORS
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -33,5 +35,6 @@ export default async function handler(req, res) {
     FIREBASE_API_KEY: firebaseApiKey,
     FIREBASE_AUTH_DOMAIN: firebaseAuthDomain,
     FIREBASE_PROJECT_ID: firebaseProjectId,
+    courses: listCourseCodes(),
   });
 }

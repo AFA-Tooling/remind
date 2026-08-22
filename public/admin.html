@@ -13,6 +13,10 @@
     .admin-tab { padding: 10px 20px; border: 1px solid var(--line); border-radius: 8px; background: #fff; cursor: pointer; font-weight: 500; }
     .admin-tab.active { background: var(--gold); color: #1a1a1a; border-color: var(--gold-dark); }
     .admin-tab:hover:not(.active) { background: #f5f5f5; }
+    .course-subtabs { display: flex; gap: 6px; margin: 16px 0; flex-wrap: wrap; }
+    .course-tab { padding: 6px 14px; border: 1px solid var(--line); border-radius: 999px; background: #fff; cursor: pointer; font-size: 13px; font-weight: 500; }
+    .course-tab.active { background: var(--olive); color: #fff; border-color: var(--olive); }
+    .course-tab:hover:not(.active) { background: #f5f5f5; }
     .admin-section { display: none; }
     .admin-section.active { display: block; }
     .admin-table { width: 100%; border-collapse: collapse; margin-top: 16px; font-size: 14px; }
@@ -146,10 +150,16 @@
       <div id="section-study" class="admin-section">
         <h2>Research Study</h2>
         <p style="color:#555; max-width:720px; line-height:1.5;">
-          Manage consent, randomize consented students into two groups, and control who receives notifications.
-          <strong>Only Group 1 receives notifications until you grant everyone access.</strong>
+          Manage consent, randomize consented students into two groups, and control who receives notifications —
+          independently per course. <strong>Only Group 1 receives notifications until you grant that course's students access.</strong>
         </p>
 
+        <div class="course-subtabs" id="study-course-tabs"></div>
+        <div id="study-no-course" style="display:none; color:var(--muted); padding:16px 0;">
+          Select a course above to manage its research study.
+        </div>
+
+        <div id="study-course-panel">
         <div class="admin-stats" id="study-stats" style="margin-top:16px;"></div>
 
         <div id="study-access-banner" style="margin:12px 0; padding:12px 16px; border-radius:8px; font-size:14px;"></div>
@@ -176,13 +186,14 @@
               <button class="btn btn--outline btn-small" id="study-export-2-btn">Export Group 2 CSV</button>
             </div>
             <hr style="margin:14px 0; border:none; border-top:1px solid var(--line);">
-            <button class="btn btn-small" id="study-open-access-btn" style="background:#b91c1c; color:#fff;">Grant everyone access</button>
-            <button class="btn btn--outline btn-small" id="study-close-access-btn" style="display:none;">Revoke everyone access</button>
-            <p style="font-size:12px; color:#888; margin-top:6px;">Opens notifications to Group 1 <em>and</em> Group 2. Reversible via “Revoke everyone access”.</p>
+            <button class="btn btn-small" id="study-open-access-btn" style="background:#b91c1c; color:#fff;">Grant this course's students access</button>
+            <button class="btn btn--outline btn-small" id="study-close-access-btn" style="display:none;">Revoke this course's access</button>
+            <p style="font-size:12px; color:#888; margin-top:6px;">Opens notifications to this course's Group 1 <em>and</em> Group 2. Reversible via “Revoke access”. Other courses are unaffected.</p>
           </div>
         </div>
 
         <div id="study-content" class="loading">Loading study participants...</div>
+        </div>
       </div>
     </div>
   </div>
@@ -231,15 +242,23 @@
     let currentUser = null;
     let studentsData = [];
     let studentsWired = false;
+    let coursesList = [];
+    let selectedStudyCourse = null;
 
     async function initFirebase() {
       await new Promise(r => setTimeout(r, 100));
+      // The server injects credentials directly into <head> as the first script on
+      // every page (see server.js), so window.FIREBASE_API_KEY is already set by the
+      // time this runs — this fetch only fires as a fallback if that didn't happen.
       if (!window.FIREBASE_API_KEY) {
         const res = await fetch('/api/config');
         const config = await res.json();
         window.FIREBASE_API_KEY = config.FIREBASE_API_KEY;
         window.FIREBASE_AUTH_DOMAIN = config.FIREBASE_AUTH_DOMAIN;
         window.FIREBASE_PROJECT_ID = config.FIREBASE_PROJECT_ID;
+        coursesList = Array.isArray(config.courses) ? config.courses : [];
+      } else {
+        coursesList = Array.isArray(window.COURSES) ? window.COURSES : [];
       }
       firebase.initializeApp({
         apiKey: window.FIREBASE_API_KEY,
@@ -605,6 +624,32 @@
       URL.revokeObjectURL(url);
     }
 
+    function renderCourseSubtabs() {
+      const container = document.getElementById('study-course-tabs');
+      if (!coursesList.length) {
+        container.innerHTML = '';
+        document.getElementById('study-no-course').style.display = '';
+        document.getElementById('study-course-panel').style.display = 'none';
+        return;
+      }
+      if (!selectedStudyCourse || !coursesList.includes(selectedStudyCourse)) {
+        selectedStudyCourse = coursesList[0];
+      }
+      container.innerHTML = coursesList.map(code =>
+        `<button class="course-tab ${code === selectedStudyCourse ? 'active' : ''}" data-course="${escHtml(code)}">${escHtml(code)}</button>`
+      ).join('');
+      container.querySelectorAll('.course-tab').forEach(btn => {
+        btn.onclick = () => {
+          selectedStudyCourse = btn.dataset.course;
+          container.querySelectorAll('.course-tab').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          loadStudy();
+        };
+      });
+      document.getElementById('study-no-course').style.display = 'none';
+      document.getElementById('study-course-panel').style.display = '';
+    }
+
     function renderStudy({ config, counts, participants }) {
       document.getElementById('study-stats').innerHTML =
         `<div class="stat-card"><div class="stat-value">${counts.total}</div><div class="stat-label">Consented</div></div>` +
@@ -615,10 +660,10 @@
       const banner = document.getElementById('study-access-banner');
       if (config.access_open) {
         banner.style.background = '#dcfce7'; banner.style.color = '#166534';
-        banner.textContent = '✅ Access is OPEN to everyone — Group 1 and Group 2 both receive notifications.';
+        banner.textContent = `✅ Access is OPEN for ${selectedStudyCourse} — Group 1 and Group 2 both receive notifications.`;
       } else {
         banner.style.background = '#fef9c3'; banner.style.color = '#854d0e';
-        banner.textContent = `🔒 Pilot mode — only Group 1 receives notifications. Randomized: ${config.randomized ? 'yes' : 'no'}.`;
+        banner.textContent = `🔒 Pilot mode for ${selectedStudyCourse} — only Group 1 receives notifications. Randomized: ${config.randomized ? 'yes' : 'no'}.`;
       }
 
       // Show whichever access toggle matches the current state.
@@ -644,12 +689,14 @@
 
       document.getElementById('study-content').innerHTML = participants.length
         ? `<div class="table-wrap"><table class="admin-table"><thead><tr><th>Email</th><th>Group</th><th>Status</th><th>Manage</th></tr></thead><tbody>${rows}</tbody></table></div>`
-        : '<p>No consented students yet. Upload a consent CSV to get started.</p>';
+        : `<p>No consented students in ${selectedStudyCourse} yet. Upload a consent CSV to get started.</p>`;
     }
 
     async function loadStudy() {
+      renderCourseSubtabs();
+      if (!selectedStudyCourse) return;
       try {
-        const data = await fetchWithAuth('/api/admin/study?action=overview');
+        const data = await fetchWithAuth(`/api/admin/study?action=overview&course_code=${encodeURIComponent(selectedStudyCourse)}`);
         renderStudy(data);
       } catch (e) {
         console.error('Load study error:', e);
@@ -665,7 +712,7 @@
       const text = await file.text();
       const emails = parseCsvEmails(text);
       if (!emails.length) { result.textContent = 'No valid emails found in that CSV.'; return; }
-      const res = await fetchWithAuth('/api/admin/study?action=consent', { method: 'POST', body: JSON.stringify({ emails, source: 'csv' }) });
+      const res = await fetchWithAuth('/api/admin/study?action=consent', { method: 'POST', body: JSON.stringify({ emails, source: 'csv', course_code: selectedStudyCourse }) });
       result.textContent = `Added ${res.added}, already present ${res.alreadyPresent}, skipped ${res.skipped}, auto-assigned ${res.assigned}, enrolled for email ${res.enrolled}.`;
       input.value = '';
       loadStudy();
@@ -675,7 +722,7 @@
       const el = document.getElementById('study-add-email');
       const email = (el.value || '').trim().toLowerCase();
       if (!email) return;
-      const res = await fetchWithAuth('/api/admin/study?action=consent', { method: 'POST', body: JSON.stringify({ emails: [email], source: 'manual' }) });
+      const res = await fetchWithAuth('/api/admin/study?action=consent', { method: 'POST', body: JSON.stringify({ emails: [email], source: 'manual', course_code: selectedStudyCourse }) });
       document.getElementById('study-upload-result').textContent =
         res.added ? `Added ${email}.` : (res.alreadyPresent ? `${email} was already consented.` : 'No valid email added.');
       el.value = '';
@@ -694,27 +741,27 @@
     }
 
     async function randomizeStudy() {
-      if (!confirm('Randomly assign all currently-unassigned consented students into Group 1 / Group 2? Existing assignments are kept.')) return;
-      const res = await fetchWithAuth('/api/admin/study?action=randomize', { method: 'POST', body: JSON.stringify({}) });
+      if (!confirm(`Randomly assign all currently-unassigned consented students in ${selectedStudyCourse} into Group 1 / Group 2? Existing assignments are kept. Other courses are unaffected.`)) return;
+      const res = await fetchWithAuth('/api/admin/study?action=randomize', { method: 'POST', body: JSON.stringify({ course_code: selectedStudyCourse }) });
       document.getElementById('study-upload-result').textContent = `Randomized — assigned ${res.assigned} student(s).`;
       loadStudy();
     }
 
     async function exportStudyGroup(group) {
-      const res = await fetchWithAuth(`/api/admin/study?action=export&group=${group}`);
-      if (!res.emails || !res.emails.length) { alert(`Group ${group} has no students to export.`); return; }
-      downloadCsv(`study_group_${group}.csv`, res.emails);
+      const res = await fetchWithAuth(`/api/admin/study?action=export&group=${group}&course_code=${encodeURIComponent(selectedStudyCourse)}`);
+      if (!res.emails || !res.emails.length) { alert(`Group ${group} in ${selectedStudyCourse} has no students to export.`); return; }
+      downloadCsv(`study_${selectedStudyCourse}_group_${group}.csv`, res.emails);
     }
 
     async function openStudyAccess() {
-      if (!confirm('Grant access to EVERYONE (Group 1 + Group 2)? Notifications will start going to Group 2 as well. You can reverse this with “Revoke everyone access”.')) return;
-      await fetchWithAuth('/api/admin/study?action=open-access', { method: 'POST', body: JSON.stringify({ confirm: true }) });
+      if (!confirm(`Grant access to EVERYONE in ${selectedStudyCourse} (Group 1 + Group 2)? Notifications will start going to that course's Group 2 as well. Other courses are unaffected. You can reverse this with “Revoke access”.`)) return;
+      await fetchWithAuth('/api/admin/study?action=open-access', { method: 'POST', body: JSON.stringify({ confirm: true, course_code: selectedStudyCourse }) });
       loadStudy();
     }
 
     async function closeStudyAccess() {
-      if (!confirm('Revoke open access and return to group-gated mode? Only Group 1 will receive notifications again; Group 2 goes back to waitlisted.')) return;
-      await fetchWithAuth('/api/admin/study?action=close-access', { method: 'POST', body: JSON.stringify({ confirm: true }) });
+      if (!confirm(`Revoke open access for ${selectedStudyCourse} and return to group-gated mode? Only that course's Group 1 will receive notifications again; Group 2 goes back to waitlisted. Other courses are unaffected.`)) return;
+      await fetchWithAuth('/api/admin/study?action=close-access', { method: 'POST', body: JSON.stringify({ confirm: true, course_code: selectedStudyCourse }) });
       loadStudy();
     }
 

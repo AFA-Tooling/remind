@@ -7,10 +7,17 @@ import {
   publicCourseConfig,
   sanitizeCategoryPrefs,
   mergeCategoryPrefs,
+  listCourseCodes,
 } from './courses.js';
 
 test('default course is CS61A', () => {
   assert.equal(defaultCourseCode(), 'CS61A');
+});
+
+test('listCourseCodes returns every configured course, sorted', () => {
+  const codes = listCourseCodes();
+  assert.ok(codes.includes('CS61A'));
+  assert.deepEqual(codes, [...codes].sort());
 });
 
 test('default category prefs match legacy keys', () => {
