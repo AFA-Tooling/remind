@@ -12,5 +12,8 @@
     "dotenv": "^16.0.0",
     "firebase": "^12.15.0",
     "firebase-admin": "^14.0.0"
+  },
+  "overrides": {
+    "jose": "4.15.9"
   }
 }
