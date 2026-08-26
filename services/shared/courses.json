@@ -83,6 +83,27 @@
           "ui_label": "Notify me when a new assignment is released"
         }
       }
+    },
+    "CS61C": {
+      "display_name": "CS 61C",
+      "categories": [
+        { "id": "lab", "name": "Lab", "label": "Labs" },
+        { "id": "homework", "name": "Homework", "label": "Homework" },
+        { "id": "project", "name": "Project", "label": "Projects" }
+      ],
+      "matchers": [
+        { "category": "lab", "match": "prefix", "patterns": ["lab"] },
+        { "category": "homework", "match": "prefix", "patterns": ["homework", "hw"] },
+        { "category": "project", "match": "prefix", "patterns": ["project"] }
+      ],
+      "ingest_unmatched": "skip",
+      "reminder_unmatched": "project",
+      "features": {
+        "release_reminder": {
+          "enabled": true,
+          "ui_label": "Notify me when a new assignment is released"
+        }
+      }
     }
   }
 }
