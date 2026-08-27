@@ -161,6 +161,11 @@
               <div style="font-size: 12px; color: var(--muted); margin: 4px 0 0 4px;">
                 <a href="https://discord.gg/EYVRrf5Wz2" target="_blank" rel="noopener" style="color: var(--olive); text-decoration: underline;">Join our Discord server</a>, then enter your username above.
               </div>
+              <label id="discord-join-confirm" for="discord-joined" class="expansion-field" data-show-display="flex">
+                <input id="discord-joined" type="checkbox" name="discord_joined_confirm" />
+                <span class="dot" aria-hidden="true"></span>
+                <span>I've joined the Discord server (required &mdash; reminders are sent as a DM, so you won't get notified if you don't join)</span>
+              </label>
             </li>
           </ul>
         </div>
@@ -364,7 +369,7 @@
         const enabled = cb.checked;
         field.style.display = enabled ? 'block' : 'none';
         field.disabled = !enabled;
-        extras.forEach(el => { el.style.display = enabled ? 'block' : 'none'; });
+        extras.forEach(el => { el.style.display = enabled ? (el.dataset.showDisplay || 'block') : 'none'; });
         if (enabled) field.focus();
       };
       cb.addEventListener('change', update);
@@ -382,6 +387,7 @@
       {
         checkboxId: 'ch-discord',
         fieldId: 'discord-field',
+        extraIds: ['discord-join-confirm'],
         key: 'discord',
         validate: value => value.trim().length > 0,
         errorMessage: 'Please enter a Discord username.'
@@ -454,10 +460,15 @@
       // Discord
       const discordCheckbox = document.getElementById('ch-discord');
       const discordField = document.getElementById('discord-field');
+      const discordJoinedCheckbox = document.getElementById('discord-joined');
       if (discordCheckbox.checked) {
         anyChannel = true;
         if (!discordField.value.trim()) {
           showMessage('Please enter a Discord username.', 'Missing Information');
+          throw new Error('validation');
+        }
+        if (!discordJoinedCheckbox.checked) {
+          showMessage('Please check the box confirming you\'ve joined our Discord server. Reminders are sent as a DM, so if you never join the server, you will not receive any notifications.', 'Join the Discord Server');
           throw new Error('validation');
         }
         payload.channels.discord = discordField.value.trim();
@@ -1020,12 +1031,15 @@
           discordField.value = data.discord_id;
         }
 
+        const discordJoinConfirm = document.getElementById('discord-join-confirm');
         if (data.discord_pref) {
           discordCheckbox.checked = true;
           discordField.style.display = 'block';
+          discordJoinConfirm.style.display = 'flex';
         } else {
           discordCheckbox.checked = false;
           discordField.style.display = 'none';
+          discordJoinConfirm.style.display = 'none';
         }
 
         // bCourses state

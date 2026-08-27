@@ -444,12 +444,17 @@ h1, h2 {
 .dot {
     width: var(--dot-size);
     height: var(--dot-size);
+    flex-shrink: 0;
     border-radius: 3px;
     display: inline-block;
     background: #fff;
     border: var(--dot-border) solid #a8c4e0;
     transition: all .15s;
     position: relative;
+}
+
+#discord-join-confirm {
+    font-size: 14px;
 }
 
 .channels input[type="checkbox"]:focus+.dot {
