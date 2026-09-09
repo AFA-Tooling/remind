@@ -60,3 +60,8 @@ CLAUDE.md
 
 # Analysis output contains real student SID/email - keep out of git
 Analysis/output/
+
+# gradesync_input outputs contain real student names/emails - keep out of git
+gradesync_input/output/
+gradesync_input/*.csv
+gradesync_input/**/*.csv

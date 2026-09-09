@@ -3,7 +3,7 @@
   "courses": {
     "CS61A": {
       "display_name": "CS 61A",
-      "spreadsheet_id": "1tDmN2HREa6SWwcRLzfqdtt_JJxwNPdjLHQevcHl04gQ",
+      "spreadsheet_id": "1kWZlV__nnG__wgUoBDTyXrZk9LeJmggvofXIFJ7TUv8",
       "categories": [
         { "id": "lab", "name": "Lab", "label": "Labs" },
         { "id": "homework", "name": "Homework", "label": "Homework" },
@@ -27,6 +27,9 @@
           "patterns": ["hog", "cats", "ants", "scheme", "maps"]
         }
       ],
+      "non_assignment_tabs": [
+        "Homework 1 (test - sriya)"
+      ],
       "ingest_unmatched": "skip",
       "reminder_unmatched": "project",
       "features": {
@@ -44,25 +47,14 @@
     },
     "CS10": {
       "display_name": "CS 10",
-      "spreadsheet_id": "1jQLrBjhSDbzARCHCQCVinnFqJxmT0OmenjdhcnxIm2s",
+      "spreadsheet_id": "1ctQJcUUAsYDKEDQdUZJf3-yEyDMcg7IC6CJiHPK7pp8",
       "categories": [
-        { "id": "lab", "name": "Lab", "label": "Labs" },
-        { "id": "discussion", "name": "Discussion", "label": "Discussions" },
         { "id": "project", "name": "Project", "label": "Projects" },
-        { "id": "quiz", "name": "Quiz", "label": "Lecture Quizzes" },
         { "id": "midterm", "name": "Midterm", "label": "Midterms" },
         { "id": "postterm", "name": "Postterm", "label": "Postterms" }
       ],
       "matchers": [
-        { "category": "lab", "match": "contains", "patterns": ["lab"] },
-        { "category": "discussion", "match": "prefix", "patterns": ["discussion"] },
         { "category": "project", "match": "prefix", "patterns": ["project"] },
-        {
-          "category": "quiz",
-          "match": "contains",
-          "patterns": ["quiz"],
-          "ingest": false
-        },
         { "category": "midterm", "match": "contains", "patterns": ["midterm"] },
         { "category": "postterm", "match": "contains", "patterns": ["postterm"] }
       ],
@@ -86,6 +78,7 @@
     },
     "CS61C": {
       "display_name": "CS 61C",
+      "spreadsheet_id": "14Y8cNWI8bEGaf8l8a_eEliM8ioiqSWoH4UZr0fL-H3o",
       "categories": [
         { "id": "lab", "name": "Lab", "label": "Labs" },
         { "id": "homework", "name": "Homework", "label": "Homework" },
