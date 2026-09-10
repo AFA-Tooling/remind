@@ -95,8 +95,15 @@ def sync_roster_from_assignments(spreadsheet: gspread.Spreadsheet, first_assignm
         return
 
     headers = [h.strip().lower() for h in first_assignment_rows[0]]
+    # Some Gradescope exports (e.g. CS61A) split the name into "First Name" /
+    # "Last Name" instead of a single "Name" column.
+    name_idx = first_name_idx = last_name_idx = None
     try:
-        name_idx = headers.index("name")
+        if "name" in headers:
+            name_idx = headers.index("name")
+        else:
+            first_name_idx = headers.index("first name")
+            last_name_idx = headers.index("last name")
         email_idx = headers.index("email")
         sid_idx = headers.index("sid") if "sid" in headers else None
     except ValueError:
@@ -105,11 +112,15 @@ def sync_roster_from_assignments(spreadsheet: gspread.Spreadsheet, first_assignm
 
     # Build email→row map from assignment data
     assignment_students = {}
+    name_col_idx = name_idx if name_idx is not None else max(first_name_idx, last_name_idx)
     for row in first_assignment_rows[1:]:
-        if len(row) <= max(name_idx, email_idx):
+        if len(row) <= max(name_col_idx, email_idx):
             continue
         email = row[email_idx].strip().lower()
-        name = row[name_idx].strip()
+        if name_idx is not None:
+            name = row[name_idx].strip()
+        else:
+            name = f"{row[first_name_idx].strip()} {row[last_name_idx].strip()}".strip()
         sid = row[sid_idx].strip() if sid_idx is not None and len(row) > sid_idx else ""
         if email:
             assignment_students[email] = {"name": name, "sid": sid}
@@ -147,12 +158,15 @@ def safe_tab_name(name: str) -> str:
     return name[:100]
 
 
-def get_or_create_worksheet(spreadsheet: gspread.Spreadsheet, title: str):
+def get_or_create_worksheet(spreadsheet: gspread.Spreadsheet, title: str, rows_needed: int = 200, cols_needed: int = 20):
+    # Sized to the actual data plus headroom, not a flat 2000x50 (100,000 cells)
+    # per tab regardless of content — that wastes ~97% of the cell allocation and
+    # runs into Sheets' hard 10M-cell-per-spreadsheet ceiling once there are 100+ tabs.
     for attempt in range(5):
         try:
             return spreadsheet.worksheet(title)
         except gspread.exceptions.WorksheetNotFound:
-            return spreadsheet.add_worksheet(title=title, rows=2000, cols=50)
+            return spreadsheet.add_worksheet(title=title, rows=rows_needed, cols=cols_needed)
         except gspread.exceptions.APIError as e:
             if hasattr(e, "response") and e.response.status_code >= 500:
                 wait = (2 ** attempt) * 5
@@ -169,9 +183,9 @@ def write_tab(ws, rows: list[list[str]], sleep: float):
             ws.clear()
             break
         except gspread.exceptions.APIError as e:
-            if hasattr(e, "response") and e.response.status_code >= 500:
+            if hasattr(e, "response") and (e.response.status_code >= 500 or e.response.status_code == 429):
                 wait = (2 ** attempt) * 5
-                print(f"    server error on clear, retrying in {wait}s…")
+                print(f"    API error ({e.response.status_code}) on clear, retrying in {wait}s…")
                 time.sleep(wait)
             else:
                 raise
@@ -264,7 +278,9 @@ def main():
         if first_assignment_rows is None:
             first_assignment_rows = rows
 
-        ws = get_or_create_worksheet(spreadsheet, tab)
+        row_count = max(len(rows) + 20, 50)
+        col_count = max(len(rows[0]) + 5, 10) if rows else 10
+        ws = get_or_create_worksheet(spreadsheet, tab, rows_needed=row_count, cols_needed=col_count)
         write_tab(ws, rows, args.sleep)
         print(f"  → wrote {len(rows)} rows to tab '{tab}'")
         time.sleep(args.sleep)
