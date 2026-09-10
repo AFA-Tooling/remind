@@ -4,6 +4,8 @@
     "CS61A": {
       "display_name": "CS 61A",
       "spreadsheet_id": "1kWZlV__nnG__wgUoBDTyXrZk9LeJmggvofXIFJ7TUv8",
+      "gradescope_course_id": "1370542",
+      "drive_folder_id": "1aojdXbApXpSSc7dG6OpXAz3uhdIgYDNI",
       "categories": [
         { "id": "lab", "name": "Lab", "label": "Labs" },
         { "id": "homework", "name": "Homework", "label": "Homework" },
@@ -48,6 +50,8 @@
     "CS10": {
       "display_name": "CS 10",
       "spreadsheet_id": "1ctQJcUUAsYDKEDQdUZJf3-yEyDMcg7IC6CJiHPK7pp8",
+      "gradescope_course_id": "1371156",
+      "drive_folder_id": "18D_CnazKGJ7F7nAZx0flFu9o2qVJeQUz",
       "categories": [
         { "id": "project", "name": "Project", "label": "Projects" },
         { "id": "midterm", "name": "Midterm", "label": "Midterms" },
@@ -79,6 +83,8 @@
     "CS61C": {
       "display_name": "CS 61C",
       "spreadsheet_id": "14Y8cNWI8bEGaf8l8a_eEliM8ioiqSWoH4UZr0fL-H3o",
+      "gradescope_course_id": "1365362",
+      "drive_folder_id": "1dD6Ryezt0rmLSpTbqVei6O6v7Vs2RnVu",
       "categories": [
         { "id": "lab", "name": "Lab", "label": "Labs" },
         { "id": "homework", "name": "Homework", "label": "Homework" },
