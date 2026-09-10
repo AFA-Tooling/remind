@@ -782,24 +782,36 @@ def _render_resources(lines: List[str], assignment: Dict[str, Any]) -> None:
         lines.append(resource_line)
 
 
-def _render_assignment_bullet(lines: List[str], assignment: Dict[str, Any], bullet: str, label: str) -> None:
+def _render_assignment_bullet(
+    lines: List[str],
+    assignment: Dict[str, Any],
+    bullet: str,
+    label: str,
+    include_resources: bool = True,
+) -> None:
     """Append one assignment's bullet line plus its offset-day note and resources.
 
-    `label` is the section-specific text after the "→" (a countdown for due
+    `label` is the section-specific text after the ":" (a countdown for due
     reminders, a bare due date for release reminders); everything else about
     an assignment's rendering is identical between the two sections.
     """
     lines.append(
-        f"{bullet} {assignment['assignment_name']} ({assignment['assignment_code']}) → {label}"
+        f"{bullet} {assignment['assignment_name']} ({assignment['assignment_code']}): {label}"
     )
     if assignment.get("offset_days"):
         lines.append(
             f"  (Class deadline +{assignment['offset_days']} day offset for you.)"
         )
-    _render_resources(lines, assignment)
+    if include_resources:
+        _render_resources(lines, assignment)
 
 
-def compose_message(student: Dict[str, Any], assignments: List[Dict[str, Any]], today: Optional[datetime] = None) -> str:
+def compose_message(
+    student: Dict[str, Any],
+    assignments: List[Dict[str, Any]],
+    today: Optional[datetime] = None,
+    include_resources: bool = True,
+) -> str:
     if today is None:
         today = datetime.now(PROJECT_TZ)
     today_local = today.date() if today.tzinfo is None else today.astimezone(PROJECT_TZ).date()
@@ -829,7 +841,9 @@ def compose_message(student: Dict[str, Any], assignments: List[Dict[str, Any]], 
         for assignment in released:
             due_dt = assignment["personal_deadline"]
             due_date_str = f"{due_dt.strftime('%B')} {due_dt.day}"
-            _render_assignment_bullet(lines, assignment, next_bullet(), f"due on {due_date_str}")
+            _render_assignment_bullet(
+                lines, assignment, next_bullet(), f"due on {due_date_str}", include_resources
+            )
 
     if due_soon:
         if released:
@@ -846,7 +860,9 @@ def compose_message(student: Dict[str, Any], assignments: List[Dict[str, Any]], 
                 days_label = "due in 1 day"
             else:
                 days_label = f"due in {days_until} days"
-            _render_assignment_bullet(lines, assignment, next_bullet(), f"{days_label}, on {due_date_str}")
+            _render_assignment_bullet(
+                lines, assignment, next_bullet(), f"{days_label}, on {due_date_str}", include_resources
+            )
 
     lines.append("")
     lines.append("Feel free to reach out to course staff if you need any support!")
@@ -905,9 +921,12 @@ def write_sms_csv(reminders: List[Dict[str, Any]], output_path: Path) -> None:
         if not phone_number:
             continue
 
+        # SMS has a per-segment cost, so it drops the resource links that email
+        # and Discord include; `sms_message` is composed separately for that
+        # channel, falling back to the shared message if it's ever absent.
         rows.append({
             "phone_number": phone_number,
-            "text_message": entry.get("message", ""),
+            "text_message": entry.get("sms_message") or entry.get("message", ""),
         })
 
     with output_path.open("w", newline="", encoding="utf-8") as f:
@@ -1225,6 +1244,7 @@ def _build_reminder_for_student(
             print(f"   ⚠️  WARNING: No channels found! Student won't receive reminders.")
 
     message = compose_message(student, assignments_to_notify, today=today)
+    sms_message = compose_message(student, assignments_to_notify, today=today, include_resources=False)
 
     if is_target:
         print(f"   ✅ REMINDER CREATED for {student_email}")
@@ -1242,6 +1262,7 @@ def _build_reminder_for_student(
         "channels": channels,
         "assignments": assignments_to_notify,
         "message": message,
+        "sms_message": sms_message,
     }
 
 
@@ -1355,6 +1376,7 @@ def _build_canvas_reminder_for_student(
         return None
 
     message = compose_message(student, assignments_to_notify, today=today)
+    sms_message = compose_message(student, assignments_to_notify, today=today, include_resources=False)
 
     return {
         "student": {
@@ -1367,6 +1389,7 @@ def _build_canvas_reminder_for_student(
         "channels": channels,
         "assignments": assignments_to_notify,
         "message": message,
+        "sms_message": sms_message,
     }
 
 
@@ -1458,6 +1481,9 @@ def merge_reminders_by_student(reminders: List[Dict[str, Any]]) -> List[Dict[str
             "first_name": (student.get("name") or "").split(" ")[0],
         }
         entry["message"] = compose_message(compose_student, entry["assignments"])
+        entry["sms_message"] = compose_message(
+            compose_student, entry["assignments"], include_resources=False
+        )
         result.append(entry)
 
     return result
