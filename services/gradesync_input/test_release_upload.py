@@ -52,17 +52,25 @@ def test_blank_release_is_none_but_row_still_loads(tmp_path):
     assert rows[0]["release"] is None
 
 
-def test_real_csv_has_release_for_30_assignments():
+def test_real_csv_has_release_for_most_assignments():
+    # Counts track the checked-in shared_data/deadlines.csv snapshot, which gets
+    # regenerated from Firestore each time it's a live semester's deadlines — the
+    # exact numbers here are a snapshot, not a stable contract. The Fall 2026
+    # regeneration (see git history) moved this from Summer/CS61A-only (34 rows)
+    # to all 3 courses (80 rows). Re-run cross_check the CSV if this drifts again.
     rows = upload.load_deadlines_csv(CSV_PATH)
     with_release = [r for r in rows if r["release"]]
-    assert len(rows) == 34, f"expected 34 deadline rows, got {len(rows)}"
-    assert len(with_release) == 30, f"expected 30 rows with a release date, got {len(with_release)}"
+    assert len(rows) == 80, f"expected 80 deadline rows, got {len(rows)}"
+    assert len(with_release) == 61, f"expected 61 rows with a release date, got {len(with_release)}"
 
 
 def test_real_csv_checkpoints_have_no_release():
+    # The Fall 2026 catalog has no "Checkpoint"-named assignments (a Summer/CS61A
+    # naming convention) — this stays as a guard in case checkpoints come back in
+    # a future semester's data, so it doesn't silently start allowing one to leak
+    # a release date.
     rows = upload.load_deadlines_csv(CSV_PATH)
     checkpoints = [r for r in rows if "Checkpoint" in r["assignment_name"]]
-    assert len(checkpoints) == 4
     for row in checkpoints:
         assert row["release"] is None, f"{row['assignment_name']} must have no release date"
 
