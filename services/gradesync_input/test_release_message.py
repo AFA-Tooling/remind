@@ -24,7 +24,7 @@ def make_assignment(name, reason, code=None):
 
 def test_release_only_message_does_not_say_due_soon():
     msg = db_fetch.compose_message({"first_name": "Ada"}, [make_assignment("Lab 5", "release")], TODAY)
-    assert "Just released:" in msg
+    assert "Releases today:" in msg
     assert "Lab 5" in msg
     assert "due soon" not in msg, "a release-only message must not claim things are due soon"
     assert "due in 5 days" not in msg, "release bullets carry no countdown label"
@@ -32,7 +32,7 @@ def test_release_only_message_does_not_say_due_soon():
 
 def test_due_only_message_is_unchanged():
     msg = db_fetch.compose_message({"first_name": "Ada"}, [make_assignment("Lab 5", "due")], TODAY)
-    assert "Just released:" not in msg
+    assert "Releases today:" not in msg
     assert "due soon" in msg
     assert "due in 8 days" in msg
 
@@ -40,7 +40,7 @@ def test_due_only_message_is_unchanged():
 def test_both_sections_render_release_first():
     assignments = [make_assignment("Lab 5", "due"), make_assignment("Hog", "release")]
     msg = db_fetch.compose_message({"first_name": "Ada"}, assignments, TODAY)
-    assert msg.index("Just released:") < msg.index("due soon")
+    assert msg.index("Releases today:") < msg.index("due soon")
     # Numbering runs continuously across both sections.
     assert "1. Hog" in msg
     assert "2. Lab 5" in msg
@@ -51,7 +51,7 @@ def test_missing_reason_is_treated_as_due():
     assignment = make_assignment("Lab 5", "due")
     del assignment["reason"]
     msg = db_fetch.compose_message({"first_name": "Ada"}, [assignment], TODAY)
-    assert "Just released:" not in msg
+    assert "Releases today:" not in msg
     assert "due in 8 days" in msg
 
 

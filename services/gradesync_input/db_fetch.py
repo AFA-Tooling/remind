@@ -837,7 +837,7 @@ def compose_message(
     lines = [f"Hey {preferred_name},", ""]
 
     if released:
-        lines.append("Just released:")
+        lines.append("Releases today:")
         for assignment in released:
             due_dt = assignment["personal_deadline"]
             due_date_str = f"{due_dt.strftime('%B')} {due_dt.day}"
