@@ -6,7 +6,7 @@
     "start": "node src/server.js",
     "dev": "node src/server.js",
     "test-server": "node src/server.js",
-    "test": "node --test \"src/**/*.test.js\""
+    "test": "node --test src"
   },
   "dependencies": {
     "dotenv": "^16.0.0",
