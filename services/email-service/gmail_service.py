@@ -5,11 +5,13 @@ import os
 import base64
 import json
 import logging
+import time
 from pathlib import Path
 from typing import Optional, List, Dict, Any
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from googleapiclient.discovery import build
+from googleapiclient.errors import HttpError
 from google.oauth2.credentials import Credentials
 from google.oauth2 import service_account
 from google_auth_oauthlib.flow import InstalledAppFlow
@@ -356,6 +358,40 @@ def create_message(
     return {'raw': raw_message}
 
 
+def _is_rate_limit_error(e: HttpError) -> bool:
+    """True for Gmail's per-minute sending quota, not other 403s (e.g. permission
+    errors) — those should fail immediately rather than retry forever."""
+    status = getattr(getattr(e, "resp", None), "status", None)
+    message = str(e)
+    return status == 429 or (
+        status == 403 and ("rateLimitExceeded" in message or "quotaExceeded" in message)
+    )
+
+
+def _send_with_retry(service, message: Dict[str, Any], max_attempts: int = 5) -> Dict[str, Any]:
+    """Send via the Gmail API, retrying with backoff on the per-minute rate limit.
+
+    A large batch (e.g. a whole course's worth of reminders) sent back-to-back
+    with no delay reliably crosses Gmail's "Units per minute per user" quota
+    partway through — every send after that point failed outright with no
+    retry, silently dropping that day's reminder for whoever came later in the
+    batch. Backing off and retrying keeps them from being dropped.
+    """
+    for attempt in range(max_attempts):
+        try:
+            return service.users().messages().send(userId='me', body=message).execute()
+        except HttpError as e:
+            if attempt < max_attempts - 1 and _is_rate_limit_error(e):
+                wait = (2 ** attempt) * 5
+                logger.warning(
+                    f"Gmail rate limit hit, retrying in {wait}s (attempt {attempt + 1}/{max_attempts})..."
+                )
+                time.sleep(wait)
+                continue
+            raise
+    raise RuntimeError("unreachable")  # loop always returns or raises
+
+
 def send_gmail_reminder(
     student_email: str,
     student_name: str,
@@ -454,10 +490,7 @@ def send_gmail_reminder(
             message_text=email_body
         )
         
-        sent_message = service.users().messages().send(
-            userId='me',
-            body=message
-        ).execute()
+        sent_message = _send_with_retry(service, message)
 
         message_id = sent_message.get('id')
         logger.info(

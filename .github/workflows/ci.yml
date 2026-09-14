@@ -1,0 +1,34 @@
+name: CI
+
+# Runs the existing test suites on every PR and every push to main, so a
+# broken test can never land unnoticed (this already happened once — a
+# stale deadlines.csv fixture test sat red on main for a few days before
+# anyone caught it). Pair this with a branch-protection rule requiring
+# this check to pass before merging into main.
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  node-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: npm ci
+      - run: npm test
+
+  python-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -r services/requirements.txt pytest
+      - run: python -m pytest -q services/gradesync_input services/email-service

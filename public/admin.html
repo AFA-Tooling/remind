@@ -145,6 +145,9 @@
         </div>
         <div class="admin-stats" id="delivery-stats"></div>
         <div id="logs-content" class="loading">Loading logs...</div>
+        <div style="text-align:center; margin-top:12px;">
+          <button class="btn btn--outline btn-small" id="load-older-logs-btn" hidden>Load older &#8595;</button>
+        </div>
       </div>
 
       <div id="section-study" class="admin-section">
@@ -570,18 +573,50 @@
       document.getElementById('resource-modal-overlay').classList.remove('visible');
     }
 
-    async function loadDeliveryLogs() {
+    // Accumulated across "Load older" clicks, so paging back re-filters the
+    // whole growing set rather than losing earlier pages each time.
+    let deliveryLogsRaw = [];
+    let deliveryLogsCursor = null;
+
+    function renderDeliveryLogs() {
+      const channel = document.getElementById('filter-channel').value;
+      const status = document.getElementById('filter-status').value;
+      let logs = deliveryLogsRaw;
+      if (channel) logs = logs.filter(l => l.channel === channel);
+      if (status) logs = logs.filter(l => l.status === status);
+
+      const stats = {
+        total: logs.length,
+        sent: logs.filter(l => l.status === 'sent').length,
+        failed: logs.filter(l => l.status === 'failed').length,
+        by_channel: {
+          email: logs.filter(l => l.channel === 'email').length,
+          sms: logs.filter(l => l.channel === 'sms').length,
+          discord: logs.filter(l => l.channel === 'discord').length,
+        },
+      };
+      document.getElementById('delivery-stats').innerHTML = `<div class="stat-card"><div class="stat-value">${stats.total}</div><div class="stat-label">Total</div></div><div class="stat-card"><div class="stat-value">${stats.sent}</div><div class="stat-label">Sent</div></div><div class="stat-card"><div class="stat-value">${stats.failed}</div><div class="stat-label">Failed</div></div><div class="stat-card"><div class="stat-value">${stats.by_channel.email}</div><div class="stat-label">Email</div></div><div class="stat-card"><div class="stat-value">${stats.by_channel.sms}</div><div class="stat-label">SMS</div></div><div class="stat-card"><div class="stat-value">${stats.by_channel.discord}</div><div class="stat-label">Discord</div></div>`;
+      const html = `<div class="table-wrap"><table class="admin-table"><thead><tr><th>Timestamp</th><th>Channel</th><th>Recipient</th><th>Status</th><th>Message ID</th><th>Error</th></tr></thead><tbody>${logs.map(l => `<tr><td>${l.timestamp ? new Date(l.timestamp).toLocaleString() : '-'}</td><td>${l.channel || '-'}</td><td>${l.recipient || '-'}</td><td><span class="status-badge ${l.status}">${l.status}</span></td><td style="font-size:11px;">${l.provider_message_id || '-'}</td><td style="font-size:11px;color:#c00;">${l.error_message || '-'}</td></tr>`).join('')}</tbody></table></div>`;
+      document.getElementById('logs-content').innerHTML = html || '<p>No logs found.</p>';
+      document.getElementById('load-older-logs-btn').hidden = !deliveryLogsCursor;
+      return stats;
+    }
+
+    async function fetchDeliveryLogsPage(before) {
+      let url = '/api/admin/delivery-logs?limit=200';
+      if (before) url += `&before=${encodeURIComponent(before)}`;
+      const { data, next_cursor } = await fetchWithAuth(url);
+      deliveryLogsRaw = deliveryLogsRaw.concat(data);
+      deliveryLogsCursor = next_cursor;
+    }
+
+    // reset=false is the "Load older" path — keeps everything already loaded
+    // and appends the next page instead of replacing the table.
+    async function loadDeliveryLogs(reset = true) {
       try {
-        const channel = document.getElementById('filter-channel').value;
-        const status = document.getElementById('filter-status').value;
-        let url = '/api/admin/delivery-logs?limit=200';
-        if (channel) url += `&channel=${channel}`;
-        if (status) url += `&status=${status}`;
-        const { data, stats } = await fetchWithAuth(url);
-        document.getElementById('delivery-stats').innerHTML = `<div class="stat-card"><div class="stat-value">${stats.total}</div><div class="stat-label">Total</div></div><div class="stat-card"><div class="stat-value">${stats.sent}</div><div class="stat-label">Sent</div></div><div class="stat-card"><div class="stat-value">${stats.failed}</div><div class="stat-label">Failed</div></div><div class="stat-card"><div class="stat-value">${stats.by_channel.email}</div><div class="stat-label">Email</div></div><div class="stat-card"><div class="stat-value">${stats.by_channel.sms}</div><div class="stat-label">SMS</div></div><div class="stat-card"><div class="stat-value">${stats.by_channel.discord}</div><div class="stat-label">Discord</div></div>`;
-        const html = `<div class="table-wrap"><table class="admin-table"><thead><tr><th>Timestamp</th><th>Channel</th><th>Recipient</th><th>Status</th><th>Message ID</th><th>Error</th></tr></thead><tbody>${data.map(l => `<tr><td>${l.timestamp ? new Date(l.timestamp).toLocaleString() : '-'}</td><td>${l.channel || '-'}</td><td>${l.recipient || '-'}</td><td><span class="status-badge ${l.status}">${l.status}</span></td><td style="font-size:11px;">${l.provider_message_id || '-'}</td><td style="font-size:11px;color:#c00;">${l.error_message || '-'}</td></tr>`).join('')}</tbody></table></div>`;
-        document.getElementById('logs-content').innerHTML = html || '<p>No logs found.</p>';
-        return stats;
+        if (reset) { deliveryLogsRaw = []; deliveryLogsCursor = null; }
+        await fetchDeliveryLogsPage(reset ? null : deliveryLogsCursor);
+        return renderDeliveryLogs();
       } catch (e) { console.error('Load delivery logs error:', e); document.getElementById('logs-content').innerHTML = '<p>Something went wrong. Please try again.</p>'; return null; }
     }
 
@@ -806,7 +841,11 @@
       document.getElementById('add-resource-btn').onclick = showResourceForm;
       document.getElementById('cancel-resource-btn').onclick = hideResourceForm;
       document.getElementById('save-resource-btn').onclick = saveResource;
-      document.getElementById('apply-filters-btn').onclick = loadDeliveryLogs;
+      // Filtering is client-side over whatever's already loaded, so Apply just
+      // re-renders instantly — no refetch, and it doesn't throw away pages
+      // brought in via "Load older".
+      document.getElementById('apply-filters-btn').onclick = renderDeliveryLogs;
+      document.getElementById('load-older-logs-btn').onclick = () => loadDeliveryLogs(false);
 
       document.getElementById('add-deadline-btn').onclick = () => openDeadlineForm();
       document.getElementById('cancel-deadline-btn').onclick = hideDeadlineForm;
