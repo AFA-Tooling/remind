@@ -882,11 +882,15 @@
         document.getElementById('canvas-pat-form').style.display = 'block';
       }
 
-      // Connect button (OAuth mode)
-      document.getElementById('canvas-connect-btn').addEventListener('click', () => {
+      // Connect button (OAuth mode). This is a full navigation, not a fetch,
+      // so it can't carry an Authorization header — pass a verified ID token
+      // as a query param instead, checked server-side the same way.
+      document.getElementById('canvas-connect-btn').addEventListener('click', async () => {
         const email = window.auth?.user?.email;
         if (!email) { window.location.href = './login.html'; return; }
-        window.location.href = `/api/canvas/auth?user_email=${encodeURIComponent(email)}`;
+        const token = await window.auth?.getToken();
+        if (!token) { window.location.href = './login.html'; return; }
+        window.location.href = `/api/canvas/auth?id_token=${encodeURIComponent(token)}`;
       });
 
       // PAT form submit
@@ -905,10 +909,11 @@
         status.style.color = 'var(--muted)';
 
         try {
+          const token = await window.auth?.getToken();
           const res = await fetch('/api/canvas/pat', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ user_email: email, pat }),
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+            body: JSON.stringify({ pat }),
           });
           const json = await res.json();
           if (res.ok) {
@@ -943,10 +948,10 @@
         status.textContent = 'Syncing assignments from bCourses...';
         status.style.color = 'var(--muted)';
         try {
+          const token = await window.auth?.getToken();
           const res = await fetch('/api/canvas/sync', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ user_email: email })
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
           });
           const json = await res.json();
           if (res.ok) {
@@ -974,10 +979,10 @@
         const email = window.auth?.user?.email;
         if (!email) return;
         try {
+          const token = await window.auth?.getToken();
           await fetch('/api/canvas/disconnect', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ user_email: email })
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
           });
           updateCanvasUI(false);
           showMessage('bCourses has been disconnected.', 'Disconnected');

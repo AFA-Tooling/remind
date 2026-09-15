@@ -430,7 +430,12 @@
       resourceModal.classList.add('active');
 
       try {
-        const res = await fetch(`/api/resources?assignment_name=${encodeURIComponent(assignmentName)}`);
+        // course_code scopes the lookup — assignment names like "Lab 2" or
+        // "Midterm 1" aren't unique across courses, so without it a student
+        // would see (and get wrong links from) every course's same-named
+        // assignment mixed together.
+        const courseParam = courseCode ? `&course_code=${encodeURIComponent(courseCode)}` : '';
+        const res = await fetch(`/api/resources?assignment_name=${encodeURIComponent(assignmentName)}${courseParam}`);
         const json = await res.json();
         const resources = json.data || [];
 

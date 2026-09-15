@@ -447,7 +447,7 @@ const server = http.createServer(async (req, res) => {
     req.on('data', chunk => { body += chunk.toString(); });
     req.on('end', async () => {
       try {
-        await canvasDisconnectHandler({ method: req.method, body: body ? JSON.parse(body) : {} }, mockRes);
+        await canvasDisconnectHandler({ method: req.method, body: body ? JSON.parse(body) : {}, headers: { authorization: req.headers.authorization } }, mockRes);
       } catch (error) {
         res.writeHead(500, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ error: 'Internal server error', details: error.message }));
@@ -462,7 +462,7 @@ const server = http.createServer(async (req, res) => {
     req.on('data', chunk => { body += chunk.toString(); });
     req.on('end', async () => {
       try {
-        await canvasSyncHandler({ method: req.method, body: body ? JSON.parse(body) : {} }, mockRes);
+        await canvasSyncHandler({ method: req.method, body: body ? JSON.parse(body) : {}, headers: { authorization: req.headers.authorization } }, mockRes);
       } catch (error) {
         res.writeHead(500, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ error: 'Internal server error', details: error.message }));
@@ -477,7 +477,7 @@ const server = http.createServer(async (req, res) => {
     req.on('data', chunk => { body += chunk.toString(); });
     req.on('end', async () => {
       try {
-        await canvasPatHandler({ method: req.method, body: body ? JSON.parse(body) : {} }, mockRes);
+        await canvasPatHandler({ method: req.method, body: body ? JSON.parse(body) : {}, headers: { authorization: req.headers.authorization } }, mockRes);
       } catch (error) {
         res.writeHead(500, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ error: 'Internal server error', details: error.message }));
@@ -496,7 +496,7 @@ const server = http.createServer(async (req, res) => {
       });
     }
     try {
-      await canvasDeadlinesHandler({ method: req.method, query: queryParams }, mockRes);
+      await canvasDeadlinesHandler({ method: req.method, query: queryParams, headers: { authorization: req.headers.authorization } }, mockRes);
     } catch (error) {
       res.writeHead(500, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: 'Internal server error', details: error.message }));

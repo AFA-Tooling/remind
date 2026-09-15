@@ -1,5 +1,6 @@
 import { getDb } from '../firestore.js';
 import { getValidToken, canvasFetch } from './canvasClient.js';
+import { verifyUserAuth } from '../auth/verifyUser.js';
 
 /**
  * Sync Canvas assignments for a single user into Firestore.
@@ -95,26 +96,36 @@ export async function syncCanvasAssignments(db, email) {
 /**
  * POST /api/canvas/sync handler - on-demand sync from frontend.
  */
-export default async function handler(req, res) {
+// deps is overridable only for tests — production always uses the real
+// verifyUserAuth/getDb/syncCanvasAssignments via the defaults below.
+export default async function handler(req, res, deps = {}) {
+  const verifyAuth = deps.verifyUserAuth || verifyUserAuth;
+  const dbFactory = deps.getDb || getDb;
+  const syncFn = deps.syncCanvasAssignments || syncCanvasAssignments;
+
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const email = (req.body.user_email || '').trim().toLowerCase();
-  if (!email) {
-    return res.status(400).json({ error: 'user_email is required' });
+  // The email comes from the verified token, never the request body, so a
+  // request can only ever sync the account belonging to whoever is actually
+  // logged in.
+  const authResult = await verifyAuth(req);
+  if (!authResult.authorized) {
+    return res.status(401).json({ error: authResult.error });
   }
+  const email = authResult.email;
 
   try {
-    const db = getDb();
-    const result = await syncCanvasAssignments(db, email);
+    const db = dbFactory();
+    const result = await syncFn(db, email);
     return res.status(200).json({ success: true, ...result });
   } catch (err) {
     console.error('Canvas sync error:', err);
 
     // Update sync_error in Firestore
     try {
-      const db = getDb();
+      const db = dbFactory();
       await db.collection('canvas_tokens').doc(email).update({
         sync_error: err.message,
       });
