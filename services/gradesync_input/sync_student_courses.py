@@ -39,11 +39,22 @@ def decide_student_course_update(
 ) -> Optional[Dict[str, Any]]:
     """Return Firestore merge fields if the student should be updated, else None.
 
+    - Pinned (course_code_pinned: true): never touched by roster sync, no
+      matter what the roster says. For a student genuinely on more than one
+      course's real roster (class_roster is one doc per email, so it can
+      only ever hold one course at a time — see decide_course_code_clear's
+      docstring), the roster alone can't express "always treat this person
+      as course X." An admin sets the pin once via this field directly; it
+      survives every future roster sync, daily batch or on-login alike,
+      until explicitly unset.
     - On roster: course_code must match the roster entry.
     - Not on roster: leave course_code alone (staff / late adds keep their value).
     - When course_code changes, reshape category_prefs to the new course's
       categories (existing on/off preserved where keys still apply).
     """
+    if student.get("course_code_pinned"):
+        return None
+
     email = (student.get("email") or "").strip().lower()
     if not email:
         return None
@@ -83,7 +94,12 @@ def decide_course_code_clear(
     Clears course_code only if it still points at that course, so this never
     touches a student whose course_code was set by other means (staff, or a
     consent-enrolled participant who was never on a roster to begin with).
+    A pinned student is never touched either way — a pin means no automated
+    roster change at all, not just no automated course *switch*.
     """
+    if student.get("course_code_pinned"):
+        return None
+
     current = (student.get("course_code") or "").strip()
     if current != dropped_course_code:
         return None

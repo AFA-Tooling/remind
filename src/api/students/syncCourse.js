@@ -50,6 +50,22 @@ export async function syncStudentCourseFromRoster(db, email, existingData = null
   }
 
   const current = String(data.course_code || '').trim();
+
+  // A pinned student is never touched by roster sync — mirrors
+  // decide_student_course_update in the Python daily sync (see
+  // sync_student_courses.py). Without this, a student genuinely on more
+  // than one course's real roster would get flipped back the moment they
+  // load or save their own settings page, undoing an admin's pin within
+  // seconds rather than a day.
+  if (data.course_code_pinned) {
+    return {
+      data,
+      patched: false,
+      onRoster: true,
+      courseCode: current || rosterCourse,
+    };
+  }
+
   if (current === rosterCourse) {
     return {
       data,

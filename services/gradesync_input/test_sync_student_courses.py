@@ -78,6 +78,41 @@ def test_leaves_unset_course_code_alone():
     )
 
 
+def test_pinned_student_ignores_a_conflicting_roster():
+    # A student genuinely on more than one course's real roster can't be
+    # represented by class_roster (one doc per email) — an admin pin is the
+    # only way to hold them on a specific course regardless of what the
+    # roster says.
+    assert (
+        decide_student_course_update(
+            {"email": "a@berkeley.edu", "course_code": "CS61A", "course_code_pinned": True},
+            {"a@berkeley.edu": "CS61C"},
+        )
+        is None
+    )
+
+
+def test_unpinned_student_still_updates_normally():
+    # The pin field itself must not silently gate every student — only
+    # those explicitly marked.
+    patch = decide_student_course_update(
+        {"email": "a@berkeley.edu", "course_code": "CS61A", "course_code_pinned": False},
+        {"a@berkeley.edu": "CS61C"},
+    )
+    assert patch is not None
+    assert patch["course_code"] == "CS61C"
+
+
+def test_pinned_student_is_never_cleared_even_if_dropped_from_that_course():
+    assert (
+        decide_course_code_clear(
+            {"email": "a@berkeley.edu", "course_code": "CS61A", "course_code_pinned": True},
+            "CS61A",
+        )
+        is None
+    )
+
+
 if __name__ == "__main__":
     import sys
 
