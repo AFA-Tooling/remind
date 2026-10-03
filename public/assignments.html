@@ -460,6 +460,7 @@
 
     const COMPLETED_ASSIGNMENTS_KEY = 'autoremind-completed-assignments';
     let currentUserEmail = null;
+    let showingPastAssignments = false;
 
     function getAssignmentKey(deadline) {
       return [
@@ -594,7 +595,7 @@
             e.stopPropagation();
             updateAssignmentCompletion(checkbox.dataset.assignmentKey, checkbox.checked);
             if (checkbox.checked) showCompletionToast();
-            if (currentUserEmail) loadAssignments(currentUserEmail);
+            if (currentUserEmail) loadAssignments(currentUserEmail, true);
           });
         }
 
@@ -618,8 +619,9 @@
       listEl.style.display = 'grid';
     }
 
-    async function loadAssignments(email) {
+    async function loadAssignments(email, preservePastView = false) {
       currentUserEmail = email;
+      if (!preservePastView) showingPastAssignments = false;
       const loadingEl = document.getElementById('assignments-loading');
       const listEl = document.getElementById('assignments-list');
       const emptyEl = document.getElementById('assignments-empty');
@@ -679,21 +681,22 @@
           return;
         }
 
-        // Show upcoming by default
-        if (upcoming.length === 0) {
+        // Keep the selected list visible when a checkbox causes a reload.
+        if (showingPastAssignments) {
+          renderDeadlines(allDeadlines);
+        } else if (upcoming.length === 0) {
           emptyEl.style.display = 'block';
         } else {
           renderDeadlines(upcoming);
         }
 
         // Wire up toggle if there are past assignments or completed ones
-        if (hasPast) {
+        if (hasPast || showingPastAssignments) {
           toggleWrap.style.display = 'block';
-          let showingAll = false;
           toggleBtn.onclick = () => {
-            showingAll = !showingAll;
+            showingPastAssignments = !showingPastAssignments;
             emptyEl.style.display = 'none';
-            if (showingAll) {
+            if (showingPastAssignments) {
               renderDeadlines(allDeadlines);
               toggleBtn.textContent = 'Hide past assignments';
             } else {
@@ -706,7 +709,7 @@
               toggleBtn.textContent = 'Show past assignments';
             }
           };
-          toggleBtn.textContent = 'Show past assignments';
+          toggleBtn.textContent = showingPastAssignments ? 'Hide past assignments' : 'Show past assignments';
         }
       } catch (e) {
         loadingEl.style.display = 'none';
