@@ -81,6 +81,11 @@
       transition: border-color 0.15s, background 0.15s;
     }
 
+    .assignment-card.completed {
+      border-color: #80b88a;
+      background: #e8f5e9;
+    }
+
     .assignment-card:hover,
     .assignment-card:focus-visible {
       border-color: #a8c4e0;
@@ -88,9 +93,53 @@
       outline: none;
     }
 
+    .assignment-card.completed:hover,
+    .assignment-card.completed:focus-visible {
+      border-color: #80b88a;
+      background: #e8f5e9;
+    }
+
+    .completion-toast {
+      position: fixed;
+      z-index: 1100;
+      left: 50%;
+      top: 100px;
+      transform: translate(-50%, 12px);
+      padding: 12px 20px;
+      border-radius: 8px;
+      background: #256d3b;
+      color: #fff;
+      font-size: 14px;
+      font-weight: 600;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.18s, transform 0.18s;
+    }
+
+    .completion-toast.visible {
+      opacity: 1;
+      transform: translate(-50%, 0);
+    }
+
     .assignment-info {
       flex: 1;
       min-width: 0;
+    }
+
+    .assignment-main {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 0;
+    }
+
+    .assignment-check {
+      width: 16px;
+      height: 16px;
+      accent-color: var(--olive);
+      cursor: pointer;
+      flex-shrink: 0;
+      margin: 0;
     }
 
     .assignment-name {
@@ -99,6 +148,7 @@
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
+      min-width: 0;
     }
 
     .assignment-course {
@@ -371,6 +421,7 @@
     <div id="assignments-empty" class="assignments-empty" style="display:none;">No upcoming assignments found.</div>
     <div id="assignments-not-enrolled" class="assignments-not-enrolled" style="display:none;">Your email was not found in the course roster.</div>
   </div>
+  <div id="completion-toast" class="completion-toast" role="status" aria-live="polite">Complete!</div>
 
   <!-- Resource Modal -->
   <div id="resource-modal" class="resource-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="resource-modal-title">
@@ -405,6 +456,54 @@
       return String(str)
         .replace(/&/g, '&amp;').replace(/</g, '&lt;')
         .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    const COMPLETED_ASSIGNMENTS_KEY = 'autoremind-completed-assignments';
+    let currentUserEmail = null;
+    let showingPastAssignments = false;
+
+    function getAssignmentKey(deadline) {
+      return [
+        deadline.assignment_name || '',
+        deadline.course_code || '',
+        deadline.due || '',
+        deadline.source || ''
+      ].join('|');
+    }
+
+    function getCompletedAssignments() {
+      try {
+        const raw = localStorage.getItem(COMPLETED_ASSIGNMENTS_KEY);
+        if (!raw) return new Set();
+        const parsed = JSON.parse(raw);
+        if (!Array.isArray(parsed)) return new Set();
+        return new Set(parsed);
+      } catch (error) {
+        return new Set();
+      }
+    }
+
+    function persistCompletedAssignments(set) {
+      localStorage.setItem(COMPLETED_ASSIGNMENTS_KEY, JSON.stringify([...set]));
+    }
+
+    function isAssignmentCompleted(deadline) {
+      return getCompletedAssignments().has(getAssignmentKey(deadline));
+    }
+
+    function updateAssignmentCompletion(key, completed) {
+      const set = getCompletedAssignments();
+      if (completed) set.add(key);
+      else set.delete(key);
+      persistCompletedAssignments(set);
+    }
+
+    let completionToastTimeout;
+    function showCompletionToast() {
+      const toast = document.getElementById('completion-toast');
+      toast.classList.add('visible');
+      clearTimeout(completionToastTimeout);
+      completionToastTimeout = setTimeout(() => toast.classList.remove('visible'), 1800);
     }
 
     // Resource modal
@@ -461,16 +560,24 @@
       listEl.innerHTML = deadlines.map(d => {
         const overdue = isOverdue(d.due);
         const sourceBadge = d.source === 'canvas' ? '<span class="source-badge canvas">bCourses</span>' : '';
+        const key = getAssignmentKey(d);
+        const checked = isAssignmentCompleted(d);
         return `
-          <div class="assignment-card"
+          <div class="assignment-card${checked ? ' completed' : ''}"
             tabindex="0"
             role="button"
             data-name="${escapeHtml(d.assignment_name || '')}"
             data-due="${escapeHtml(d.due || '')}"
             data-course="${escapeHtml(d.course_code || '')}"
-            data-url="${escapeHtml(d.html_url || '')}">
+            data-url="${escapeHtml(d.html_url || '')}"
+            data-key="${escapeHtml(key)}">
             <div class="assignment-info">
-              <div class="assignment-name" title="${escapeHtml(d.assignment_name || 'Untitled')}">${escapeHtml(d.assignment_name || 'Untitled')}${sourceBadge}</div>
+              <div class="assignment-main">
+                <label class="assignment-complete" aria-label="Mark ${escapeHtml(d.assignment_name || 'assignment')} as completed">
+                  <input class="assignment-check" type="checkbox" data-assignment-key="${escapeHtml(key)}" ${checked ? 'checked' : ''}>
+                </label>
+                <div class="assignment-name" title="${escapeHtml(d.assignment_name || 'Untitled')}">${escapeHtml(d.assignment_name || 'Untitled')}${sourceBadge}</div>
+              </div>
               <div class="assignment-course">${escapeHtml(d.course_code || '')}</div>
             </div>
             <div class="assignment-due${overdue ? ' overdue' : ''}">
@@ -482,6 +589,16 @@
       }).join('');
 
       listEl.querySelectorAll('.assignment-card').forEach(card => {
+        const checkbox = card.querySelector('.assignment-check');
+        if (checkbox) {
+          checkbox.addEventListener('change', (e) => {
+            e.stopPropagation();
+            updateAssignmentCompletion(checkbox.dataset.assignmentKey, checkbox.checked);
+            if (checkbox.checked) showCompletionToast();
+            if (currentUserEmail) loadAssignments(currentUserEmail, true);
+          });
+        }
+
         const open = () => {
           if (card.dataset.url) {
             window.open(card.dataset.url, '_blank', 'noopener');
@@ -489,14 +606,22 @@
             openResourceModal(card.dataset.name, card.dataset.due, card.dataset.course);
           }
         };
-        card.addEventListener('click', open);
-        card.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); } });
+        card.addEventListener('click', (e) => {
+          if (e.target.closest('.assignment-check')) return;
+          open();
+        });
+        card.addEventListener('keydown', (e) => {
+          if (e.target.closest('.assignment-check')) return;
+          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); }
+        });
       });
 
       listEl.style.display = 'grid';
     }
 
-    async function loadAssignments(email) {
+    async function loadAssignments(email, preservePastView = false) {
+      currentUserEmail = email;
+      if (!preservePastView) showingPastAssignments = false;
       const loadingEl = document.getElementById('assignments-loading');
       const listEl = document.getElementById('assignments-list');
       const emptyEl = document.getElementById('assignments-empty');
@@ -547,29 +672,31 @@
         }
 
         const now = new Date();
-        const upcoming = allDeadlines.filter(d => !d.due || new Date(d.due) >= now);
-        const hasPast = allDeadlines.length > upcoming.length;
+        const upcoming = allDeadlines.filter(d => !isAssignmentCompleted(d) && (!d.due || new Date(d.due) >= now));
+        const past = allDeadlines.filter(d => isAssignmentCompleted(d) || (d.due && new Date(d.due) < now));
+        const hasPast = past.length > 0;
 
         if (upcoming.length === 0 && allDeadlines.length === 0) {
           emptyEl.style.display = 'block';
           return;
         }
 
-        // Show upcoming by default
-        if (upcoming.length === 0) {
+        // Keep the selected list visible when a checkbox causes a reload.
+        if (showingPastAssignments) {
+          renderDeadlines(allDeadlines);
+        } else if (upcoming.length === 0) {
           emptyEl.style.display = 'block';
         } else {
           renderDeadlines(upcoming);
         }
 
-        // Wire up toggle if there are past assignments
-        if (hasPast) {
+        // Wire up toggle if there are past assignments or completed ones
+        if (hasPast || showingPastAssignments) {
           toggleWrap.style.display = 'block';
-          let showingAll = false;
-          toggleBtn.addEventListener('click', () => {
-            showingAll = !showingAll;
+          toggleBtn.onclick = () => {
+            showingPastAssignments = !showingPastAssignments;
             emptyEl.style.display = 'none';
-            if (showingAll) {
+            if (showingPastAssignments) {
               renderDeadlines(allDeadlines);
               toggleBtn.textContent = 'Hide past assignments';
             } else {
@@ -581,7 +708,8 @@
               }
               toggleBtn.textContent = 'Show past assignments';
             }
-          });
+          };
+          toggleBtn.textContent = showingPastAssignments ? 'Hide past assignments' : 'Show past assignments';
         }
       } catch (e) {
         loadingEl.style.display = 'none';
