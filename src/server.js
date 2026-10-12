@@ -21,6 +21,7 @@ import registerHandler from './api/reminders/register.js';
 import syncCourseHandler from './api/reminders/syncCourse.js';
 import deadlinesGetHandler from './api/deadlines/get.js';
 import resourcesGetHandler from './api/resources/get.js';
+import completedAssignmentsHandler from './api/assignments/completed.js';
 
 // Canvas integration handlers
 import canvasAuthHandler from './api/canvas/auth.js';
@@ -219,6 +220,42 @@ const server = http.createServer(async (req, res) => {
         res.end(JSON.stringify({ error: 'Internal server error', details: error.message }));
       }
     });
+    return;
+  }
+
+  if (urlPath === '/api/assignments/completed' && ['GET', 'POST'].includes(req.method)) {
+    const handleRequest = async (body = {}) => {
+      const mockReq = {
+        method: req.method,
+        body,
+        headers: { authorization: req.headers.authorization },
+      };
+      const mockRes = {
+        status: (code) => { res.statusCode = code; return mockRes; },
+        json: (data) => { res.setHeader('Content-Type', 'application/json'); res.end(JSON.stringify(data)); },
+      };
+      await completedAssignmentsHandler(mockReq, mockRes);
+    };
+
+    if (req.method === 'GET') {
+      try {
+        await handleRequest();
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Internal server error', details: error.message }));
+      }
+    } else {
+      let body = '';
+      req.on('data', chunk => { body += chunk.toString(); });
+      req.on('end', async () => {
+        try {
+          await handleRequest(body ? JSON.parse(body) : {});
+        } catch (error) {
+          res.writeHead(500, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'Internal server error', details: error.message }));
+        }
+      });
+    }
     return;
   }
 
