@@ -458,9 +458,9 @@
         .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     }
 
-    const COMPLETED_ASSIGNMENTS_KEY = 'autoremind-completed-assignments';
     let currentUserEmail = null;
     let showingPastAssignments = false;
+    let completedAssignments = new Set();
 
     function getAssignmentKey(deadline) {
       return [
@@ -471,36 +471,29 @@
       ].join('|');
     }
 
-    function getCompletedAssignments() {
-      try {
-        const raw = localStorage.getItem(COMPLETED_ASSIGNMENTS_KEY);
-        if (!raw) return new Set();
-        const parsed = JSON.parse(raw);
-        if (!Array.isArray(parsed)) return new Set();
-        return new Set(parsed);
-      } catch (error) {
-        return new Set();
-      }
-    }
-
-    function persistCompletedAssignments(set) {
-      localStorage.setItem(COMPLETED_ASSIGNMENTS_KEY, JSON.stringify([...set]));
-    }
-
     function isAssignmentCompleted(deadline) {
-      return getCompletedAssignments().has(getAssignmentKey(deadline));
+      return completedAssignments.has(getAssignmentKey(deadline));
     }
 
-    function updateAssignmentCompletion(key, completed) {
-      const set = getCompletedAssignments();
-      if (completed) set.add(key);
-      else set.delete(key);
-      persistCompletedAssignments(set);
+    async function updateAssignmentCompletion(key, completed) {
+      const token = await window.auth?.getToken();
+      const response = await fetch('/api/assignments/completed', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ assignment_key: key, completed }),
+      });
+      if (!response.ok) throw new Error('Failed to save assignment completion');
+      if (completed) completedAssignments.add(key);
+      else completedAssignments.delete(key);
     }
 
     let completionToastTimeout;
-    function showCompletionToast() {
+    function showCompletionToast(message = 'Complete!') {
       const toast = document.getElementById('completion-toast');
+      toast.textContent = message;
       toast.classList.add('visible');
       clearTimeout(completionToastTimeout);
       completionToastTimeout = setTimeout(() => toast.classList.remove('visible'), 1800);
@@ -591,11 +584,23 @@
       listEl.querySelectorAll('.assignment-card').forEach(card => {
         const checkbox = card.querySelector('.assignment-check');
         if (checkbox) {
-          checkbox.addEventListener('change', (e) => {
+          checkbox.addEventListener('change', async (e) => {
             e.stopPropagation();
-            updateAssignmentCompletion(checkbox.dataset.assignmentKey, checkbox.checked);
-            if (checkbox.checked) showCompletionToast();
-            if (currentUserEmail) loadAssignments(currentUserEmail, true);
+            const completed = checkbox.checked;
+            const card = checkbox.closest('.assignment-card');
+            checkbox.disabled = true;
+            card.classList.toggle('completed', completed);
+            try {
+              await updateAssignmentCompletion(checkbox.dataset.assignmentKey, completed);
+              if (completed) showCompletionToast('Complete!');
+              if (currentUserEmail) await loadAssignments(currentUserEmail, true);
+            } catch (error) {
+              checkbox.checked = !completed;
+              card.classList.toggle('completed', !completed);
+              showCompletionToast('Could not save completion');
+            } finally {
+              if (checkbox.isConnected) checkbox.disabled = false;
+            }
           });
         }
 
@@ -638,16 +643,22 @@
       try {
         const token = await window.auth?.getToken();
         const authHeader = token ? { 'Authorization': `Bearer ${token}` } : {};
-        const [gradesyncRes, canvasRes] = await Promise.all([
-          fetch(`/api/deadlines?user_email=${encodeURIComponent(email)}`, { headers: authHeader }),
-          fetch(`/api/canvas/deadlines?user_email=${encodeURIComponent(email)}`, { headers: authHeader }).catch(() => null)
+        const [gradesyncRes, canvasRes, completedRes] = await Promise.all([
+          fetch(`/api/deadlines?user_email=${encodeURIComponent(email)}`, { headers: authHeader }).catch(() => null),
+          fetch(`/api/canvas/deadlines?user_email=${encodeURIComponent(email)}`, { headers: authHeader }).catch(() => null),
+          fetch('/api/assignments/completed', { headers: authHeader }).catch(() => null)
         ]);
+
+        if (completedRes && completedRes.ok) {
+          const completedJson = await completedRes.json();
+          completedAssignments = new Set(completedJson.data || []);
+        }
 
         loadingEl.style.display = 'none';
 
         let gradesyncDeadlines = [];
         let enrolled = false;
-        if (gradesyncRes.ok) {
+        if (gradesyncRes && gradesyncRes.ok) {
           const json = await gradesyncRes.json();
           enrolled = !!json.enrolled;
           gradesyncDeadlines = (json.data || []).map(d => ({ ...d, source: 'gradesync' }));
