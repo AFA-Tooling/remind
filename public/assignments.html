@@ -644,20 +644,21 @@
         const token = await window.auth?.getToken();
         const authHeader = token ? { 'Authorization': `Bearer ${token}` } : {};
         const [gradesyncRes, canvasRes, completedRes] = await Promise.all([
-          fetch(`/api/deadlines?user_email=${encodeURIComponent(email)}`, { headers: authHeader }),
+          fetch(`/api/deadlines?user_email=${encodeURIComponent(email)}`, { headers: authHeader }).catch(() => null),
           fetch(`/api/canvas/deadlines?user_email=${encodeURIComponent(email)}`, { headers: authHeader }).catch(() => null),
-          fetch('/api/assignments/completed', { headers: authHeader })
+          fetch('/api/assignments/completed', { headers: authHeader }).catch(() => null)
         ]);
 
-        if (!completedRes.ok) throw new Error('Failed to load completed assignments');
-        const completedJson = await completedRes.json();
-        completedAssignments = new Set(completedJson.data || []);
+        if (completedRes && completedRes.ok) {
+          const completedJson = await completedRes.json();
+          completedAssignments = new Set(completedJson.data || []);
+        }
 
         loadingEl.style.display = 'none';
 
         let gradesyncDeadlines = [];
         let enrolled = false;
-        if (gradesyncRes.ok) {
+        if (gradesyncRes && gradesyncRes.ok) {
           const json = await gradesyncRes.json();
           enrolled = !!json.enrolled;
           gradesyncDeadlines = (json.data || []).map(d => ({ ...d, source: 'gradesync' }));
