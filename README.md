@@ -35,7 +35,7 @@ cp .env.example .env.local
 npm run dev        # Web server at http://localhost:3000
 ```
 
-### 4. Run the reminder pipeline manually
+### 4. Run the reminder pipeline manually (optional)
 
 ```bash
 python3 services/gradesync_input/main.py
