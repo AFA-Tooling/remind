@@ -26,6 +26,48 @@ FIREBASE_PROJECT_ID = os.getenv("FIREBASE_PROJECT_ID")
 _sa_env = os.getenv("FIREBASE_SERVICE_ACCOUNT_PATH")
 FIREBASE_SERVICE_ACCOUNT_PATH = Path(_sa_env) if _sa_env else SERVICE_ACCOUNT_PATH
 
+# Local Firestore emulator (see docs/local-testing.md).
+# Put USE_FIRESTORE_EMULATOR=true in your local .env.local and every script that
+# imports this module talks to the emulator instead of production, even in a
+# terminal where you forgot to set FIRESTORE_EMULATOR_HOST. The Firestore SDKs
+# read FIRESTORE_EMULATOR_HOST when the client is created, so setting it here
+# (at import time, before any client exists) is enough. If the emulator isn't
+# running, scripts fail to connect rather than falling through to production.
+# Deploys never set this flag: the deploy scripts copy only named keys out of
+# .env.local, and .env.local itself is excluded from the Cloud images.
+DEFAULT_FIRESTORE_EMULATOR_HOST = "127.0.0.1:8080"
+USE_FIRESTORE_EMULATOR = os.getenv("USE_FIRESTORE_EMULATOR", "").strip().lower() in ("1", "true", "yes")
+if USE_FIRESTORE_EMULATOR and not os.getenv("FIRESTORE_EMULATOR_HOST"):
+    os.environ["FIRESTORE_EMULATOR_HOST"] = DEFAULT_FIRESTORE_EMULATOR_HOST
+FIRESTORE_EMULATOR_HOST = os.getenv("FIRESTORE_EMULATOR_HOST") or None
+
+
+def refuse_if_emulator(action: str) -> None:
+    """Exit before an action with real-world side effects runs against emulator data.
+
+    Emulator data can contain real student contact info (gradesync_to_db.py copies
+    the real rosters in), so sending messages from it would reach real students.
+    """
+    if FIRESTORE_EMULATOR_HOST:
+        sys.exit(
+            f"Refusing to {action}: Firestore emulator mode is on "
+            f"(FIRESTORE_EMULATOR_HOST={FIRESTORE_EMULATOR_HOST}). "
+            "Emulator runs are for generating and inspecting CSVs only."
+        )
+
+
+def require_emulator(action: str) -> str:
+    """Exit unless Firestore points at a local emulator. Returns the emulator host."""
+    host = FIRESTORE_EMULATOR_HOST or ""
+    hostname = host.rsplit(":", 1)[0].strip("[]")
+    if hostname not in ("127.0.0.1", "localhost", "::1", "0.0.0.0"):
+        sys.exit(
+            f"Refusing to {action}: this only runs against a local Firestore emulator. "
+            "Set USE_FIRESTORE_EMULATOR=true in .env.local (or FIRESTORE_EMULATOR_HOST) "
+            "and start it with `npm run emulator`."
+        )
+    return host
+
 # Student-facing dashboard. Linked from every reminder email so students who were
 # auto-enrolled at consent time know where to change their preferences.
 AUTOREMIND_SITE_URL = os.getenv("AUTOREMIND_SITE_URL", "https://autoremind.eecs.berkeley.edu")

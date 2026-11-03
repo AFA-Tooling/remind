@@ -162,4 +162,5 @@ def dm_to_all():
 
 
 if __name__ == "__main__":
+    settings.refuse_if_emulator("send Discord reminders")
     dm_to_all()

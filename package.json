@@ -6,7 +6,8 @@
     "start": "node src/server.js",
     "dev": "node src/server.js",
     "test-server": "node src/server.js",
-    "test": "node --test src"
+    "test": "node --test src",
+    "emulator": "node scripts/start-emulator.mjs"
   },
   "dependencies": {
     "dotenv": "^16.0.0",

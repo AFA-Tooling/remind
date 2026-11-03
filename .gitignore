@@ -58,8 +58,14 @@ build/
 
 CLAUDE.md
 
-# Analysis output contains real student SID/email - keep out of git
+# Analysis data contains real student names/emails/SIDs - keep out of git.
+# (anonymized/ still has real SIDs, so it is blocked too.)
 Analysis/output/
+Analysis/inputs/
+Analysis/anonymized/
+
+# Generated message requests contain real student emails/phone numbers
+services/*/message_requests/*.csv
 
 # gradesync_input outputs contain real student names/emails - keep out of git
 gradesync_input/output/

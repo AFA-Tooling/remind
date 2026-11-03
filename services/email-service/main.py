@@ -481,7 +481,9 @@ def main():
     )
     
     args = parser.parse_args()
-    
+
+    settings.refuse_if_emulator("send email reminders")
+
     logger.info("=" * 60)
     logger.info("Starting Gmail Reminder Service for AutoRemind")
     logger.info("=" * 60)

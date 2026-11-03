@@ -82,4 +82,5 @@ def send_text_messages():
 
 
 if __name__ == "__main__":
+    settings.refuse_if_emulator("send SMS reminders")
     send_text_messages()

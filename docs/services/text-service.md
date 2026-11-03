@@ -15,7 +15,6 @@ Required environment variables in `.env.local`:
 ```bash
 TWILIO_ACCOUNT_SID="your-account-sid"
 TWILIO_AUTH_TOKEN="your-auth-token"
-TWILIO_MESSAGING_SERVICE_SID="your-messaging-service-sid"
 ```
 
 ## Usage
