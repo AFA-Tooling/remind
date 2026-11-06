@@ -7,8 +7,12 @@ const TASK_LIST_TITLE = 'AutoRemind Assignments';
 
 function getAssignmentDue(value) {
   if (typeof value !== 'string' || !value.trim()) return null;
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? null : date.toISOString();
+  const dateMatch = value.match(/^(\d{4}-\d{2}-\d{2})(?:T.*)?$/);
+  if (!dateMatch) return null;
+  const datePart = dateMatch[1];
+  const date = new Date(`${datePart}T00:00:00.000Z`);
+  if (Number.isNaN(date.getTime()) || date.toISOString().slice(0, 10) !== datePart) return null;
+  return `${datePart}T00:00:00.000Z`;
 }
 
 function assignmentIdentity(assignment) {

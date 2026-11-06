@@ -130,6 +130,24 @@ test('sync creates tasks once, skips unchanged tasks, and updates changed due da
   assert.equal(calls.at(-1).body.due, '2026-11-02T00:00:00.000Z');
 });
 
+test('sync preserves the assignment due date from timestamps with timezone offsets', async () => {
+  const calls = [];
+  await syncGoogleTasks(makeDb(), 'student@example.com', [
+    assignment('2026-11-09T23:59:59-08:00'),
+  ], {
+    getAccessToken: async () => ({
+      accessToken: 'access-token',
+      tokenData: { task_list_id: 'task-list' },
+      ref: { async update() {} },
+    }),
+    tasksRequest: async (_token, method, _path, body) => {
+      calls.push({ method, body });
+      return { id: 'task-1' };
+    },
+  });
+  assert.equal(calls[0].body.due, '2026-11-09T00:00:00.000Z');
+});
+
 test('sync skips assignments without due dates', async () => {
   const result = await syncGoogleTasks(makeDb(), 'student@example.com', [assignment(null)], {
     getAccessToken: async () => ({
