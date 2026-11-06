@@ -30,6 +30,7 @@ if str(SERVICES_DIR) not in sys.path:
 
 from shared import settings  # noqa: E402  (sets FIRESTORE_EMULATOR_HOST in emulator mode)
 from shared.courses import categorize_assignment, default_category_prefs  # noqa: E402
+from shared.submissions import submission_doc_id  # noqa: E402
 
 PROJECT_TZ = ZoneInfo("America/Los_Angeles")
 TODAY = datetime.now(PROJECT_TZ).date()
@@ -133,15 +134,14 @@ STUDENTS: List[Dict[str, Any]] = [
 ]
 
 
-def submission_doc_id(assignment_name: str, name: str) -> str:
-    # Matches upsert_submissions_to_firestore in gradesync_to_db.py (current shape).
-    # This ID has no course in it, so Alice's CS61A and CS61C "Lab 1" rows land on
-    # the same doc and the second overwrites the first: the same collision the real
-    # sync has. Note: a student with NO submission row counts as "missing".
+def old_submission_doc_id(assignment_name: str, name: str) -> str:
+    # The ID production used before the course was added (still on its old docs).
+    # It has no course in it, so Alice's CS61A and CS61C "Lab 1" rows land on the
+    # same doc and the second overwrites the first.
     return f"{assignment_name}__{name}".replace("/", "_").replace(" ", "_")
 
 
-def build_docs(me: Optional[str]) -> Dict[str, Dict[str, Dict[str, Any]]]:
+def build_docs(me: Optional[str], old_submissions: bool = False) -> Dict[str, Dict[str, Dict[str, Any]]]:
     now = datetime.now(PROJECT_TZ).isoformat()
     docs: Dict[str, Dict[str, Dict[str, Any]]] = {
         "deadlines": {},
@@ -242,21 +242,29 @@ def build_docs(me: Optional[str]) -> Dict[str, Dict[str, Dict[str, Any]]]:
         }
 
         # Production status values are "Missing", "Graded" and "Ungraded"; only
-        # "Missing" counts as not submitted.
+        # "Missing" counts as not submitted. A student with NO row counts as missing.
         rows = [(c, a, "Missing") for c, a in s.get("missing", [])]
         rows += [(entry[0], entry[1], entry[2] if len(entry) > 2 else "Graded")
                  for entry in s.get("submitted", [])]
         for course_code, assignment, status in rows:
-            docs["assignment_submissions"][submission_doc_id(assignment, s["name"])] = {
+            record = {
                 "assignment_name": assignment,
                 "category": categorize_assignment(course_code, assignment, mode="ingest"),
                 "sid": s["sid"],
                 "name": s["name"],
                 "email": email,
                 "status": status,
-                "_seed_course_code": course_code,
                 "updated_at": now,
             }
+            if old_submissions:
+                # What production holds before the new sync runs: no course_code.
+                doc_id = old_submission_doc_id(assignment, s["name"])
+                record["_seed_course_code"] = course_code
+            else:
+                # What gradesync_to_db.py writes now.
+                doc_id = submission_doc_id(course_code, assignment, email, s["name"])
+                record["course_code"] = course_code
+            docs["assignment_submissions"][doc_id] = record
 
     # Production has access open for every course. CS10 stays closed here so the
     # study gate (Dev, and Erin's CS10 side) still gets exercised.
@@ -279,6 +287,12 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--me", help="Also seed your own login email so you can use the dashboard")
     parser.add_argument("--no-reset", action="store_true", help="Don't wipe the emulator first")
+    parser.add_argument(
+        "--old-submissions",
+        action="store_true",
+        help="Write assignment_submissions with the old course-less IDs, like production "
+             "before the new sync runs (tests db_fetch's fallback to old docs)",
+    )
     args = parser.parse_args()
 
     host = settings.require_emulator("seed Firestore")
@@ -296,7 +310,7 @@ def main() -> None:
         reset_emulator(host, project_id)
         print(f"Wiped emulator data for project '{project_id}' at {host}")
 
-    docs = build_docs(args.me)
+    docs = build_docs(args.me, old_submissions=args.old_submissions)
     batch = db.batch()
     count = 0
     for collection, by_id in docs.items():

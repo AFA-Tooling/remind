@@ -39,6 +39,11 @@ On Windows, if a script crashes with `UnicodeEncodeError`, run
 
 Emulator data is wiped when the emulator stops; re-run the seed script.
 
+Seed flags: `--no-reset` keeps the existing data. `--old-submissions` writes
+`assignment_submissions` with the old course-less IDs (`{assignment}__{name}`),
+like production before the new GradeSync sync runs, so you can check that
+`db_fetch.py` still reads them. The reminders should come out the same either way.
+
 ## Web app
 
 `npm start` with the flag set. Sign-in still uses real Firebase Auth, but all

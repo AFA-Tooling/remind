@@ -33,6 +33,7 @@ if str(SERVICES_DIR) not in sys.path:
 
 from shared import settings
 from shared.courses import categorize_assignment, get_course, list_course_codes
+from shared.submissions import submission_doc_id
 from sync_student_courses import decide_course_code_clear
 
 # Credentials config — each course's spreadsheet_id comes from courses.json,
@@ -203,9 +204,10 @@ def upsert_submissions_to_firestore(
         collection_name: Name of the Firestore collection
 
     Note:
-        Document ID is derived from (assignment_name, name) to ensure
-        idempotent upserts. Uses set(merge=True) to update existing docs
-        or create new ones.
+        Document ID is {course}__{assignment}__{email} (name if no email),
+        see shared/submissions.py. Uses set(merge=True) so reruns update the
+        same docs. Old docs keyed by {assignment}__{name} are left in place;
+        db_fetch only falls back to them when no new doc exists.
     """
     if df.empty:
         logging.warning("DataFrame is empty, nothing to upsert")
@@ -241,8 +243,9 @@ def upsert_submissions_to_firestore(
 
         raw_name = str(row.get('assignment', ''))
         assignment_name = re.sub(r'(x[0-9a-f]{2})+', lambda m: bytes.fromhex(m.group().replace('x', '')).decode('utf-8', errors='replace'), raw_name)
-        # Composite key: assignment_name + name (underscore-joined, url-safe)
-        doc_id = f"{assignment_name}__{name_value}".replace('/', '_').replace(' ', '_')
+        # Keyed by course too, so the same assignment name in two courses
+        # (e.g. "Lab 1") no longer lands on one doc.
+        doc_id = submission_doc_id(course_code, assignment_name, email_value, name_value)
 
         category_value = row.get('category', '')
         if pd.isna(category_value) or (isinstance(category_value, str) and category_value.strip() == ''):
@@ -251,6 +254,7 @@ def upsert_submissions_to_firestore(
             category_value = str(category_value).strip()
 
         record = {
+            'course_code': course_code,
             'assignment_name': assignment_name,
             'category': category_value,
             'sid': sid_value,

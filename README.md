@@ -89,7 +89,7 @@ Orchestrated by `services/gradesync_input/main.py`:
 | `students` | email | Student preferences and channel settings |
 | `deadlines` | `{course}__{assignment}` | Shared GradeSync deadlines |
 | `assignment_resources` | auto-id | Study resources linked to assignments |
-| `assignment_submissions` | `{assignment}__{student}` | Submission status from GradeSync |
+| `assignment_submissions` | `{course}__{assignment}__{email}` (older docs: `{assignment}__{student}`) | Submission status from GradeSync |
 | `canvas_tokens` | email | bCourses OAuth tokens (server-side only) |
 | `canvas_deadlines` | `{email}__{assignment_id}` | Per-student synced bCourses assignments |
 | `message_delivery_logs` | auto-id | Record of every sent/failed reminder |

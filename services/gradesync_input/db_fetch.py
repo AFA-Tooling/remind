@@ -27,6 +27,7 @@ from shared.courses import (
     categorize_assignment,
     should_apply_project_early,
 )
+from shared.submissions import build_submission_lookup, submission_status
 
 
 # Berkeley-local time. Naive datetimes (manually-uploaded CSV deadlines) are
@@ -756,6 +757,7 @@ def build_assignment_payload(
         print(f"   ✅ MATCH ({reason})! Will send reminder for {code}")
 
     return {
+        "course_code": course_code,
         "assignment_code": code,
         "assignment_name": entry.get("assignment_name", code),
         "base_deadline": entry.get("deadline"),
@@ -1063,26 +1065,14 @@ def write_gmail_csv(reminders: List[Dict[str, Any]], output_dir: Path) -> None:
         print(f"✅ No students with email reminders. Wrote empty CSV to {output_path}")
 
 
-def build_submission_lookup(submission_rows: List[Dict[str, Any]]) -> Dict[str, str]:
-    """Build a lookup of (email, assignment_name) -> status from assignment_submissions."""
-    lookup: Dict[str, str] = {}
-    for row in submission_rows:
-        email = (row.get("email") or "").strip().lower()
-        assignment_name = (row.get("assignment_name") or "").strip()
-        status = (row.get("status") or "").strip()
-        if email and assignment_name:
-            lookup[(email, assignment_name)] = status
-    return lookup
-
-
 def is_missing_submission(
     student_email: str,
     assignment_name: str,
-    submission_lookup: Dict[str, str],
+    submission_lookup: Dict[Any, str],
+    course_code: Optional[str] = None,
 ) -> bool:
-    """Return True if the student has not submitted the assignment."""
-    key = (student_email.strip().lower(), assignment_name.strip())
-    status = submission_lookup.get(key)
+    """Return True if the student has not submitted the assignment in this course."""
+    status = submission_status(submission_lookup, course_code, student_email, assignment_name)
     # No row yet — the assignment is newer than the latest GradeSync sync, which is
     # exactly the case on release day. Absence of a row is not evidence of a
     # submission, so treat it as not submitted and let the reminder through.
@@ -1221,7 +1211,9 @@ def _build_reminder_for_student(
         )
         if payload:
             assignment_name = payload["assignment_name"]
-            if not is_missing_submission(student_email, assignment_name, submission_lookup):
+            if not is_missing_submission(
+                student_email, assignment_name, submission_lookup, payload.get("course_code")
+            ):
                 if is_target or args.debug:
                     print(f"   ⏭️  Skipping {code}: already submitted")
                 continue
