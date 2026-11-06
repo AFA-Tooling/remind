@@ -31,6 +31,14 @@ import canvasSyncHandler from './api/canvas/sync.js';
 import canvasDeadlinesHandler from './api/canvas/deadlines.js';
 import canvasPatHandler from './api/canvas/pat.js';
 
+// Google Tasks integration handlers
+import googleCalendarAuthHandler from './api/google-calendar/auth.js';
+import googleCalendarCallbackHandler from './api/google-calendar/callback.js';
+import googleCalendarStatusHandler from './api/google-calendar/status.js';
+import googleCalendarSyncHandler from './api/google-calendar/sync.js';
+import googleCalendarDisconnectHandler from './api/google-calendar/disconnect.js';
+import { isGoogleCalendarConfigured } from './api/google-calendar/googleClient.js';
+
 // Admin handlers
 import adminStudentsHandler from './api/admin/students.js';
 import adminDeadlinesHandler from './api/admin/deadlines.js';
@@ -441,6 +449,60 @@ const server = http.createServer(async (req, res) => {
     redirect: (code, url) => { res.writeHead(code, { Location: url }); res.end(); },
   };
 
+  // Google Tasks integration routes
+  if (urlPath.startsWith('/api/google-calendar/')) {
+    const queryParams = Object.fromEntries(new URLSearchParams(queryString));
+    const headers = { authorization: req.headers.authorization };
+    const routeReq = { method: req.method, query: queryParams, headers };
+
+    try {
+      if (urlPath === '/api/google-calendar/auth' && req.method === 'GET') {
+        res.writeHead(405, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Method not allowed' }));
+        return;
+      }
+      if (urlPath === '/api/google-calendar/callback' && req.method === 'GET') {
+        await googleCalendarCallbackHandler(routeReq, mockRes);
+        return;
+      }
+      if (urlPath === '/api/google-calendar/status' && req.method === 'GET') {
+        await googleCalendarStatusHandler(routeReq, mockRes);
+        return;
+      }
+      if (['/api/google-calendar/auth', '/api/google-calendar/sync', '/api/google-calendar/disconnect'].includes(urlPath) && req.method === 'POST') {
+        let body = '';
+        req.on('data', chunk => { body += chunk.toString(); });
+        req.on('end', async () => {
+          try {
+            const parsedBody = body ? JSON.parse(body) : {};
+            const postReq = { ...routeReq, body: parsedBody };
+            const handler = urlPath.endsWith('/auth')
+              ? googleCalendarAuthHandler
+              : (urlPath.endsWith('/sync') ? googleCalendarSyncHandler : googleCalendarDisconnectHandler);
+            await handler(postReq, mockRes);
+          } catch (error) {
+            console.error('Google Tasks route error:', error);
+            res.writeHead(500, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'Internal server error' }));
+          }
+        });
+        return;
+      }
+      res.writeHead(404, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Not found' }));
+    } catch (error) {
+      console.error('Google Tasks route error:', error);
+      if (req.method === 'GET' && urlPath.endsWith('/callback')) {
+        res.writeHead(302, { Location: '/index.html?calendar=error&reason=callback_failed' });
+        res.end();
+      } else {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Internal server error' }));
+      }
+    }
+    return;
+  }
+
   // GET /api/canvas/auth - Initiate Canvas OAuth
   if (urlPath === '/api/canvas/auth' && req.method === 'GET') {
     const queryParams = {};
@@ -588,6 +650,7 @@ const server = http.createServer(async (req, res) => {
         const firebaseAuthDomain = process.env.FIREBASE_AUTH_DOMAIN || '';
         const firebaseProjectId = process.env.FIREBASE_PROJECT_ID || '';
         const canvasPatMode = !process.env.CANVAS_CLIENT_ID;
+        const googleCalendarConfigured = isGoogleCalendarConfigured();
 
         let htmlContent = content.toString();
 
@@ -604,6 +667,7 @@ const server = http.createServer(async (req, res) => {
         window.FIREBASE_AUTH_DOMAIN = '${firebaseAuthDomain}';
         window.FIREBASE_PROJECT_ID = '${firebaseProjectId}';
         window.CANVAS_PAT_MODE = ${canvasPatMode};
+        window.GOOGLE_CALENDAR_CONFIGURED = ${googleCalendarConfigured};
         window.COURSES = ${JSON.stringify(listCourseCodes())};
       })();
     </script>`;
