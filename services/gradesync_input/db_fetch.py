@@ -531,6 +531,38 @@ def get_notification_frequency(student: Dict[str, Any], assignment_code: str) ->
     return max(freq_values[position], 0)
 
 
+# Extra reminders a student adds under "Advanced options" dropdown in the dashboard.
+# The slider day (days_before_deadline) functions is the same,
+# remaining exactly as the primary reminder; these only ADD days on top of it. Assignments with no
+# course category (bCourses-synced ones) use the OTHER_REMINDER_KEY row.
+# Default reminder time for all assignments is 3 days
+
+EXTRA_REMINDER_DAYS_FIELD = "extra_reminder_days"
+OTHER_REMINDER_KEY = "other"
+MAX_REMINDER_DAYS = 5
+
+
+def get_reminder_days(student: Dict[str, Any], main_days: int, category_id: str) -> set:
+    """Return set of every days-before-deadline value a reminder should fire on.
+    'Other' is for bCourse assignments 
+    Always includes the main (slider) day. 
+    """
+    days = {main_days}
+    extras_by_category = student.get(EXTRA_REMINDER_DAYS_FIELD)
+    if not isinstance(extras_by_category, dict):
+        return days
+    extras = extras_by_category.get(category_id)
+    if not isinstance(extras, list):
+        return days
+    for value in extras:
+        # bool is a subclass of int; True/False are not day counts.
+        if isinstance(value, bool) or not isinstance(value, int):
+            continue
+        if 0 <= value <= MAX_REMINDER_DAYS:
+            days.add(value)
+    return days
+
+
 def determine_channels(student: Dict[str, Any]) -> List[Dict[str, str]]:
     channels: List[Dict[str, str]] = []
     if student.get("phone_pref") and student.get("phone_number"):
@@ -639,11 +671,11 @@ def build_assignment_payload(
 
     # Category gate — roster-enrolled students can opt out of categories.
     # Students without category_prefs (non-roster) get legacy behavior (all on).
+    category = derive_assignment_category(
+        entry.get("assignment_name"), code, course_code=course_code
+    )
     category_prefs = student.get("category_prefs")
     if isinstance(category_prefs, dict):
-        category = derive_assignment_category(
-            entry.get("assignment_name"), code, course_code=course_code
-        )
         if not category_prefs.get(category.lower(), True):
             msg = f"Skipping {code}: category '{category}' disabled in student prefs"
             if is_target_student or debug:
@@ -692,9 +724,6 @@ def build_assignment_payload(
     # (and message) still surfaces the real personal deadline.
     effective_deadline = personal_deadline
     if student.get("project_early_reminder"):
-        category = derive_assignment_category(
-            entry.get("assignment_name"), code, course_code=course_code
-        )
         # Checkpoints and other exclude_contains patterns come from courses.json.
         if should_apply_project_early(
             course_code,
@@ -707,12 +736,14 @@ def build_assignment_payload(
                 print(f"   📌 Project early-reminder ON for {code}: effective deadline shifted back 1 day")
 
     freq_days = get_notification_frequency(student, code)
+    reminder_days = get_reminder_days(student, freq_days, category.lower())
     deadline_local = local_date(effective_deadline)
     today_local = today.date() if today.tzinfo is None else today.astimezone(PROJECT_TZ).date()
     delta_days = (deadline_local - today_local).days
 
     if is_target_student or debug:
         print(f"   Notification frequency (days_before_deadline): {freq_days} days")
+        print(f"   All reminder days for {category}: {sorted(reminder_days, reverse=True)}")
         print(f"   Days until deadline (delta_days): {delta_days} days")
         print(f"   Personal deadline date (local): {deadline_local}")
         print(f"   Today date (local): {today_local}")
@@ -722,11 +753,12 @@ def build_assignment_payload(
         f"Student {student.get('id')} {code}: freq={freq_days}d, delta={delta_days}d",
     )
 
-    # Two independent reasons an assignment can fire. The due match is the original
-    # rule: an exact match on the notification frequency, against the (possibly
-    # early-reminder-shifted) deadline. The release match is an OR against a
-    # different date entirely, so it cannot be folded into the chain above.
-    due_match = delta_days >= 0 and delta_days == freq_days
+    # Two independent reasons an assignment can fire. The due match is an exact
+    # match on any of the student's reminder days (the slider day plus any extras
+    # for this category), against the (possibly early-reminder-shifted) deadline.
+    # The release match is an OR against a different date entirely, so it cannot
+    # be folded into the chain above.
+    due_match = delta_days >= 0 and delta_days in reminder_days
 
     # Release reminders are opt-out: a missing field counts as opted in, and only
     # an explicit False (student unchecked it in the portal) suppresses them.
@@ -741,7 +773,10 @@ def build_assignment_payload(
         if delta_days < 0:
             msg = f"Skipping {code}: past due (delta_days={delta_days})"
         else:
-            msg = f"Skipping {code}: delta {delta_days} != freq {freq_days} and not release day"
+            msg = (
+                f"Skipping {code}: delta {delta_days} not in reminder days "
+                f"{sorted(reminder_days, reverse=True)} and not release day"
+            )
         if is_target_student or debug:
             print(f"   ❌ {msg}")
         debug_print(debug, msg)
@@ -1329,6 +1364,9 @@ def _build_canvas_reminder_for_student(
         except (TypeError, ValueError):
             freq_days = 0
 
+    # bCourses assignments carry no course category, so they use the "Other" row.
+    reminder_days = get_reminder_days(student, freq_days, OTHER_REMINDER_KEY)
+
     assignments_to_notify: List[Dict[str, Any]] = []
 
     for dl in canvas_deadlines:
@@ -1349,10 +1387,11 @@ def _build_canvas_reminder_for_student(
         if delta_days < 0:
             continue
 
-        if delta_days != freq_days:
+        if delta_days not in reminder_days:
             debug_print(
                 args.debug,
-                f"Canvas skip {dl.get('assignment_name')}: delta {delta_days} != freq {freq_days}",
+                f"Canvas skip {dl.get('assignment_name')}: delta {delta_days} "
+                f"not in reminder days {sorted(reminder_days, reverse=True)}",
             )
             continue
 
