@@ -168,6 +168,25 @@
               </label>
             </li>
           </ul>
+
+          <div class="divider" style="margin-top: 24px;"><span class="pill">Google Calendar</span></div>
+          <div style="padding:14px 16px; border:1px solid var(--line); border-radius:12px;">
+            <p style="font-size:13px; color:var(--muted); margin:0 0 12px;">
+              Sync upcoming assignments as Google Tasks with their due dates. Tasks appear in Google Calendar.
+            </p>
+            <div id="google-tasks-not-connected">
+              <button id="google-tasks-connect-btn" class="btn btn--primary" type="button">Connect Google Calendar</button>
+            </div>
+            <div id="google-tasks-connected" style="display:none;">
+              <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+                <span style="color:var(--olive); font-size:13px; font-weight:600;">Google Calendar connected</span>
+                <button id="google-tasks-sync-btn" class="btn btn--outline" type="button" style="font-size:13px; padding:6px 14px;">Sync Now</button>
+                <button id="google-tasks-disconnect-btn" type="button" style="background:none; border:none; color:#c0392b; font-size:13px; cursor:pointer; text-decoration:underline;">Disconnect</button>
+              </div>
+            </div>
+            <div id="google-tasks-status" role="status" aria-live="polite" style="font-size:12px; margin-top:8px; color:var(--muted);"></div>
+            <p style="font-size:11px; color:var(--muted); margin:8px 0 0;">Disconnecting stops future syncing. Tasks already created in Google will remain there.</p>
+          </div>
         </div>
 
         <!-- Right column -->
@@ -684,6 +703,151 @@
 
     // --- Auth Logic & Data Population ---
     (function () {
+      let googleTasksConnected = false;
+      let googleTasksSyncing = false;
+      let googleTasksSyncRequested = false;
+      let calendarAssignmentsLoaded = false;
+      let calendarAssignments = [];
+
+      function updateGoogleTasksUI(connected) {
+        googleTasksConnected = connected;
+        document.getElementById('google-tasks-not-connected').style.display = connected ? 'none' : 'block';
+        document.getElementById('google-tasks-connected').style.display = connected ? 'block' : 'none';
+        if (connected) syncGoogleTasks();
+      }
+
+      async function checkGoogleTasksConnection() {
+        const status = document.getElementById('google-tasks-status');
+        try {
+          const token = await window.auth?.getToken();
+          const response = await fetch('/api/google-calendar/status', {
+            headers: token ? { 'Authorization': 'Be' + 'arer ' + token } : {},
+          });
+          const result = await response.json();
+          if (!response.ok) throw new Error(result.error || 'Could not check Google Tasks connection');
+          updateGoogleTasksUI(!!result.connected);
+        } catch (error) {
+          status.textContent = error.message || 'Could not check Google Tasks connection.';
+          status.style.color = '#c0392b';
+        }
+      }
+
+      async function syncGoogleTasks() {
+        if (!googleTasksConnected || !calendarAssignmentsLoaded) return;
+        if (googleTasksSyncing) {
+          googleTasksSyncRequested = true;
+          return;
+        }
+
+        googleTasksSyncing = true;
+        const button = document.getElementById('google-tasks-sync-btn');
+        const status = document.getElementById('google-tasks-status');
+        do {
+          googleTasksSyncRequested = false;
+          button.disabled = true;
+          button.textContent = 'Syncing...';
+          status.textContent = 'Syncing upcoming assignments to Google Tasks...';
+          status.style.color = 'var(--muted)';
+          try {
+            const token = await window.auth?.getToken();
+            const assignments = calendarAssignments.map(assignment => ({
+              assignment_name: assignment.assignment_name || 'Untitled',
+              course_code: assignment.course_code || '',
+              due: assignment.due || null,
+              source: assignment.source,
+              html_url: assignment.html_url || '',
+              completed: false,
+            }));
+            const response = await fetch('/api/google-calendar/sync', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                ...(token ? { 'Authorization': 'Be' + 'arer ' + token } : {}),
+              },
+              body: JSON.stringify({ assignments }),
+            });
+            const result = await response.json();
+            if (!response.ok) throw new Error(result.details || result.error || 'Google Tasks sync failed');
+            status.textContent = `Synced to Google Tasks: ${result.created} created, ${result.updated} updated, ${result.unchanged} unchanged${result.skippedWithoutDueDate ? `, ${result.skippedWithoutDueDate} without a due date` : ''}.`;
+            status.style.color = 'var(--olive)';
+          } catch (error) {
+            status.textContent = error.message || 'Google Tasks sync failed. Please try again.';
+            status.style.color = '#c0392b';
+            googleTasksSyncRequested = false;
+          } finally {
+            button.disabled = false;
+            button.textContent = 'Sync Now';
+          }
+        } while (googleTasksSyncRequested && googleTasksConnected);
+        googleTasksSyncing = false;
+      }
+
+      document.getElementById('google-tasks-connect-btn').addEventListener('click', async () => {
+        const status = document.getElementById('google-tasks-status');
+        if (!window.GOOGLE_CALENDAR_CONFIGURED) {
+          status.textContent = 'Google Tasks integration is not configured yet.';
+          status.style.color = '#c0392b';
+          return;
+        }
+        const token = await window.auth?.getToken();
+        if (!token) {
+          window.location.href = './login.html';
+          return;
+        }
+        try {
+          const response = await fetch('/api/google-calendar/auth', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Be' + 'arer ' + token,
+            },
+            body: JSON.stringify({}),
+          });
+          const result = await response.json();
+          if (!response.ok) throw new Error(result.error || 'Could not connect Google Tasks');
+          window.location.href = result.authorization_url;
+        } catch (error) {
+          status.textContent = error.message || 'Could not connect Google Tasks.';
+          status.style.color = '#c0392b';
+        }
+      });
+
+      document.getElementById('google-tasks-sync-btn').addEventListener('click', syncGoogleTasks);
+
+      document.getElementById('google-tasks-disconnect-btn').addEventListener('click', async () => {
+        if (!confirm('Disconnect Google Tasks? Existing Google Tasks will remain in your account.')) return;
+        const status = document.getElementById('google-tasks-status');
+        const token = await window.auth?.getToken();
+        try {
+          const response = await fetch('/api/google-calendar/disconnect', {
+            method: 'POST',
+            headers: token ? { 'Authorization': 'Be' + 'arer ' + token } : {},
+          });
+          const result = await response.json();
+          if (!response.ok) throw new Error(result.error || 'Could not disconnect Google Tasks');
+          updateGoogleTasksUI(false);
+          status.textContent = result.revocationWarning
+            ? 'Disconnected locally, but Google could not revoke access. You can also remove AutoRemind in your Google Account security settings.'
+            : 'Google Tasks disconnected.';
+          status.style.color = result.revocationWarning ? '#c0392b' : 'var(--muted)';
+        } catch (error) {
+          status.textContent = error.message || 'Could not disconnect Google Tasks.';
+          status.style.color = '#c0392b';
+        }
+      });
+
+      (function showGoogleTasksOAuthResult() {
+        const params = new URLSearchParams(window.location.search);
+        const result = params.get('calendar');
+        if (!result) return;
+        const status = document.getElementById('google-tasks-status');
+        status.textContent = result === 'connected'
+          ? 'Google Calendar connected. Your upcoming assignments are syncing.'
+          : `Could not connect Google Calendar (${params.get('reason') || 'unknown error'}).`;
+        status.style.color = result === 'connected' ? 'var(--olive)' : '#c0392b';
+        window.history.replaceState({}, '', window.location.pathname);
+      })();
+
       function waitForAuth(callback) {
         let attempts = 0;
         const check = () => {
@@ -766,6 +930,7 @@
             if (guard) guard.remove();
 
             loadAssignmentsPreview(user.email);
+            checkGoogleTasksConnection();
           } else {
             // Auth resolved with no user — bounce to landing
             window.location.replace('/');
@@ -777,9 +942,10 @@
           try {
             const token = await window.auth?.getToken();
             const authHeader = token ? { 'Authorization': `Bearer ${token}` } : {};
-            const [gradesyncRes, canvasRes] = await Promise.all([
+            const [gradesyncRes, canvasRes, completedRes] = await Promise.all([
               fetch(`/api/deadlines?user_email=${encodeURIComponent(email)}`, { headers: authHeader }).catch(() => null),
               fetch(`/api/canvas/deadlines?user_email=${encodeURIComponent(email)}`, { headers: authHeader }).catch(() => null),
+              fetch('/api/assignments/completed', { headers: authHeader }).catch(() => null),
             ]);
 
             let gradesyncDeadlines = [];
@@ -796,14 +962,32 @@
               canvasDeadlines = (json.data || []);
             }
 
+            let completedAssignments = new Set();
+            if (completedRes && completedRes.ok) {
+              const json = await completedRes.json();
+              completedAssignments = new Set(json.data || []);
+            }
+
             const now = new Date();
-            const upcoming = [...gradesyncDeadlines, ...canvasDeadlines]
-              .filter(d => !d.due || new Date(d.due) >= now)
+            const allAssignments = [
+              ...gradesyncDeadlines.map(d => ({ ...d, source: 'gradesync' })),
+              ...canvasDeadlines.map(d => ({ ...d, source: 'canvas' })),
+            ];
+            const upcoming = allAssignments
+              .filter(d => !completedAssignments.has([
+                d.assignment_name || '',
+                d.course_code || '',
+                d.due || '',
+                d.source || '',
+              ].join('|')) && (!d.due || new Date(d.due) >= now))
               .sort((a, b) => {
                 if (!a.due) return 1;
                 if (!b.due) return -1;
                 return new Date(a.due) - new Date(b.due);
               });
+            calendarAssignments = upcoming;
+            calendarAssignmentsLoaded = true;
+            syncGoogleTasks();
 
             if (!upcoming.length && !enrolled && !canvasDeadlines.length) return;
 
