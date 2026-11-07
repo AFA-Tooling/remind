@@ -2,7 +2,7 @@ import { getDb } from '../firestore.js';
 import { verifyUserAuth } from '../auth/verifyUser.js';
 import { getStudyStatus } from '../study/studyStatus.js';
 import { LOCKOUT_MESSAGE } from '../study/messages.js';
-import { buildNewStudent, resolveCourseCode } from '../students/defaults.js';
+import { buildNewStudent, resolveCourseCode, resolveCourseCodes } from '../students/defaults.js';
 
 // Creates a minimal student document on first login (idempotent — no-op if already
 // exists, so a doc already created at consent time keeps its preferences).
@@ -37,7 +37,7 @@ export default async function handler(req, res) {
     const existing = await docRef.get();
 
     if (existing.exists) {
-      // Keep course_code fresh from roster for returning users.
+      // Keep courses fresh from roster for returning users.
       const { syncStudentCourseFromRoster } = await import('../students/syncCourse.js');
       const synced = await syncStudentCourseFromRoster(db, loginEmail, existing.data());
       return res.status(200).json({
@@ -49,10 +49,12 @@ export default async function handler(req, res) {
     }
 
     const rosterSnap = await db.collection('class_roster').doc(loginEmail.toLowerCase()).get();
+    const rosterEntry = rosterSnap.exists ? rosterSnap.data() : null;
     const newStudent = buildNewStudent({
       email: loginEmail,
       displayName: display_name,
-      courseCode: resolveCourseCode(rosterSnap.exists ? rosterSnap.data() : null),
+      courseCode: resolveCourseCode(rosterEntry),
+      courseCodes: resolveCourseCodes(rosterEntry),
       enrolledVia: 'signup',
     });
 

@@ -64,21 +64,21 @@ export function mergeCategoryPrefs(courseCode, existingPrefs) {
 }
 
 // ---------------------------------------------------------------------------
-// Reading a student's courses and per-course prefs.
+// Reading a student's courses and their reminder settings.
 //
 // Student docs are moving from one course per student to several:
 //
 //   old shape:  course_code: "CS61A"
-//               category_prefs: {...}, project_early_reminder, release_reminder
-//   new shape:  course_codes: ["CS61A", "CS61C"]
-//               course_prefs: { CS61A: { category_prefs, project_early_reminder,
-//                                        release_reminder }, ... }
+//   new shape:  course_codes: ["CS61A", "CS61C"]   (course_code is still kept,
+//                                                  set to one of the courses)
 //
-// Production holds the old shape until the migration runs, and a mix of both
-// while it runs. Every reader goes through these helpers, which accept both, so
-// new code can deploy before the migration and survive a rollback. Once
-// production is fully migrated, the old-shape branches can be deleted.
-// Mirrors services/shared/courses.py — keep the two in sync.
+// Reminder settings stay a single set per student (category_prefs,
+// project_early_reminder, release_reminder at the top level of the doc) and
+// apply to every course they're in. There is no per-course settings UI.
+//
+// Production holds the old shape until every student has synced, so readers go
+// through these helpers, which accept both. Mirrors services/shared/courses.py -
+// keep the two in sync.
 // ---------------------------------------------------------------------------
 
 function normalizeCode(code) {
@@ -103,41 +103,17 @@ export function studentCourseCodes(student) {
 }
 
 /**
- * Prefs for a course the student has never customized: every category on,
- * release reminders on (opt-out), project early reminder off (opt-in).
- */
-export function defaultCoursePrefs(courseCode) {
-  return {
-    category_prefs: defaultCategoryPrefs(courseCode),
-    project_early_reminder: false,
-    release_reminder: true,
-  };
-}
-
-/**
- * The student's prefs for one course, always in the full new shape.
- * Reads `course_prefs[courseCode]` (new shape) if present, otherwise the legacy
- * top-level fields if that course is the student's legacy `course_code`,
- * otherwise the defaults.
+ * The student's reminder settings, applied to one of their courses. Every
+ * course uses the same settings; category prefs are reshaped onto this
+ * course's categories (off stays off where the category exists, anything
+ * unmentioned is on).
  */
 export function studentCoursePrefs(student, courseCode) {
   const s = student || {};
-  const code = normalizeCode(courseCode);
-  let source = null;
-
-  const entry = s.course_prefs && typeof s.course_prefs === 'object' ? s.course_prefs[code] : null;
-  if (entry && typeof entry === 'object') {
-    source = entry;
-  } else if (code && normalizeCode(s.course_code) === code) {
-    source = s; // legacy top-level fields
-  }
-
-  if (!source) return defaultCoursePrefs(code);
-
   return {
-    category_prefs: mergeCategoryPrefs(code, source.category_prefs),
-    project_early_reminder: source.project_early_reminder === true,
-    release_reminder: source.release_reminder !== false,
+    category_prefs: mergeCategoryPrefs(normalizeCode(courseCode), s.category_prefs),
+    project_early_reminder: s.project_early_reminder === true,
+    release_reminder: s.release_reminder !== false,
   };
 }
 

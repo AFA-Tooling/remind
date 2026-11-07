@@ -76,3 +76,34 @@ test('a student not on any roster is left alone regardless of the pin', async ()
   assert.equal(result.onRoster, false);
   assert.equal(result.courseCode, 'CS61A');
 });
+
+// --- multi-course (class_roster.course_codes) --------------------------------
+
+test('a student on two rosters gets both courses and keeps their legacy course', async () => {
+  const db = makeDb({
+    class_roster: { 's@berkeley.edu': { course_code: 'CS61A', course_codes: ['CS61A', 'CS61C'] } },
+    students: { 's@berkeley.edu': { course_code: 'CS61C', category_prefs: { lab: false } } },
+  });
+  const result = await syncStudentCourseFromRoster(db, 's@berkeley.edu');
+  const saved = db._data.get('students/s@berkeley.edu');
+  assert.equal(result.patched, true);
+  assert.deepEqual(result.courseCodes, ['CS61A', 'CS61C']);
+  assert.deepEqual(saved.course_codes, ['CS61A', 'CS61C']);
+  // CS61C is still one of their courses, so the legacy field and its prefs stay.
+  assert.equal(saved.course_code, 'CS61C');
+  assert.deepEqual(saved.category_prefs, { lab: false });
+});
+
+test('an old-shape student matching the roster gets the list written once, then is a no-op', async () => {
+  const db = makeDb({
+    class_roster: { 's@berkeley.edu': { course_code: 'CS61A' } },
+    students: { 's@berkeley.edu': { course_code: 'CS61A', category_prefs: {} } },
+  });
+  const first = await syncStudentCourseFromRoster(db, 's@berkeley.edu');
+  assert.equal(first.patched, true);
+  assert.deepEqual(db._data.get('students/s@berkeley.edu').course_codes, ['CS61A']);
+  assert.equal(db._data.get('students/s@berkeley.edu').course_code, 'CS61A');
+
+  const second = await syncStudentCourseFromRoster(db, 's@berkeley.edu');
+  assert.equal(second.patched, false);
+});

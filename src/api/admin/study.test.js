@@ -105,6 +105,23 @@ test('enrollment takes course_code from the roster so the pipeline can route it'
   assert.equal(student.preferred_first_name, 'Jo');
 });
 
+test('enrollment takes every roster course for a student in two courses', async () => {
+  const db = makeDb({
+    class_roster: { 'jo@berkeley.edu': { name: 'Jo', course_code: 'CS61A', course_codes: ['CS61A', 'CS61C'] } },
+  });
+  await consent(db, ['jo@berkeley.edu'], 'csv', 'CS61C');
+
+  const student = db.read('students', 'jo@berkeley.edu');
+  assert.equal(student.course_code, 'CS61A');
+  assert.deepEqual(student.course_codes, ['CS61A', 'CS61C']);
+});
+
+test('enrollment without a roster entry lists just the course consented under', async () => {
+  const db = makeDb();
+  await consent(db, ['staff@berkeley.edu'], 'csv', 'CS10');
+  assert.deepEqual(db.read('students', 'staff@berkeley.edu').course_codes, ['CS10']);
+});
+
 // Staff and late adds consent without being on the roster; they still need a
 // course_code or they match no assignment catalog and are silently dropped.
 // They fall back to whichever course they were consented under (the admin's

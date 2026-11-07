@@ -4,7 +4,6 @@ from shared.courses import (
     categorize_assignment,
     default_category_prefs,
     default_course_code,
-    default_course_prefs,
     merge_category_prefs,
     should_apply_project_early,
     student_course_codes,
@@ -92,7 +91,7 @@ def test_course_codes_empty_list_wins_over_stale_legacy_field():
 
 # --- student_course_prefs ---------------------------------------------------
 
-def test_prefs_legacy_doc_for_its_own_course():
+def test_prefs_for_the_students_own_course():
     student = {
         "course_code": "CS61A",
         "category_prefs": {"lab": False},
@@ -106,44 +105,26 @@ def test_prefs_legacy_doc_for_its_own_course():
     }
 
 
-def test_prefs_legacy_doc_for_another_course_are_defaults():
-    student = {"course_code": "CS61A", "category_prefs": {"lab": False}, "release_reminder": False}
-    assert student_course_prefs(student, "CS61C") == default_course_prefs("CS61C")
-
-
-def test_prefs_new_doc_reads_per_course_entry_not_legacy_fields():
+def test_same_settings_apply_to_every_course():
+    # One set of settings per student: turning labs off in the dashboard turns
+    # them off in CS61C too, and the other switches carry over.
     student = {
         "course_code": "CS61A",
-        "category_prefs": {"lab": False},  # stale legacy value, must be ignored
         "course_codes": ["CS61A", "CS61C"],
-        "course_prefs": {
-            "CS61A": {"category_prefs": {"homework": False}, "release_reminder": True},
-            "CS61C": {"category_prefs": {"project": False}, "project_early_reminder": True},
-        },
-    }
-    assert student_course_prefs(student, "CS61A")["category_prefs"] == {**ALL_ON_61A, "homework": False}
-    assert student_course_prefs(student, "cs61c") == {
-        "category_prefs": {**ALL_ON_61C, "project": False},
+        "category_prefs": {"lab": False, "quiz": False},
         "project_early_reminder": True,
-        "release_reminder": True,
+        "release_reminder": False,
     }
-
-
-def test_prefs_mixed_doc_falls_back_to_legacy_for_unmigrated_course():
-    # Mid-migration: the list exists but this course's entry hasn't been written yet.
-    student = {
-        "course_code": "CS61A",
-        "category_prefs": {"lab": False},
-        "course_codes": ["CS61A", "CS61C"],
-        "course_prefs": {"CS61C": {}},
+    assert student_course_prefs(student, "cs61c") == {
+        "category_prefs": {**ALL_ON_61C, "lab": False},  # CS61C has no quiz category
+        "project_early_reminder": True,
+        "release_reminder": False,
     }
-    assert student_course_prefs(student, "CS61A")["category_prefs"]["lab"] is False
 
 
 def test_prefs_missing_fields_follow_pipeline_defaults():
     # Release reminders are opt-out, early reminders opt-in, categories default on.
-    assert student_course_prefs({"course_prefs": {"CS61C": {}}}, "CS61C") == default_course_prefs("CS61C")
-    assert default_course_prefs("CS61C") == {
+    assert student_course_prefs({}, "CS61C") == {
         "category_prefs": ALL_ON_61C,
         "project_early_reminder": False,
         "release_reminder": True,

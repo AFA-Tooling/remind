@@ -28,6 +28,7 @@ import {
 } from '../study/studyStatus.js';
 import { assignBalanced } from '../study/randomize.js';
 import { buildNewStudent } from '../students/defaults.js';
+import { studentCourseCodes } from '../../shared/courses.js';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -112,10 +113,12 @@ async function enrollMissingStudents(db, emails, courseCode) {
     // The roster is authoritative when the student is on one; otherwise fall back
     // to the course they're being consented under (the admin's active course tab),
     // not the global default — a CS10 consent shouldn't silently enroll as CS61A.
+    const rosterCodes = studentCourseCodes(roster);
     const student = buildNewStudent({
       email,
       displayName: roster?.name || null,
       courseCode: roster?.course_code || courseCode,
+      courseCodes: rosterCodes.length ? rosterCodes : [courseCode],
       enrolledVia: 'consent',
     });
     ops.push((batch) => batch.set(db.collection(STUDENTS).doc(email), student));

@@ -34,7 +34,7 @@ if str(SERVICES_DIR) not in sys.path:
 from shared import settings
 from shared.courses import categorize_assignment, get_course, list_course_codes
 from shared.submissions import submission_doc_id
-from sync_student_courses import decide_course_code_clear
+from sync_student_courses import decide_course_code_clear, decide_roster_entry, decide_roster_prune
 
 # Credentials config — each course's spreadsheet_id comes from courses.json,
 # looked up per-course in sync_course() below since a run now covers every
@@ -291,9 +291,12 @@ def sync_roster_to_firestore(
     Sync the Roster tab to a Firestore collection of enrolled students.
 
     Roster tab columns: Name, SID, Email, Role. Only Name + Email are used.
-    Documents are keyed by lowercased email. Prior roster docs for this
-    course_code that are no longer in the sheet are deleted so dropped
-    students don't keep getting category-gated reminders.
+    Documents are keyed by lowercased email, one per student across all
+    courses: `course_codes` lists every course whose roster they're on, and
+    the legacy `course_code` is one of those. This course is added to each
+    listed student, and removed from students no longer on this sheet; the
+    doc is deleted only when no course is left. Dropped students then stop
+    getting this course's reminders.
     """
     if not raw_data or len(raw_data) < 2:
         print("⚠️  Roster tab is empty or missing — skipping roster sync")
@@ -306,6 +309,13 @@ def sync_roster_to_firestore(
     except ValueError:
         print(f"❌ Roster tab missing 'Name' or 'Email' column (got {headers}). Skipping.")
         return
+
+    roster_ref = db.collection(collection_name)
+    # Read every roster doc once: each write needs the student's other courses,
+    # and pruning needs the old-shape docs that have no course_codes list yet.
+    existing: Dict[str, Dict[str, Any]] = {
+        doc.id: (doc.to_dict() or {}) for doc in roster_ref.stream()
+    }
 
     current_emails: set = set()
     batch = db.batch()
@@ -322,13 +332,8 @@ def sync_roster_to_firestore(
         email_lower = email_raw.lower()
         current_emails.add(email_lower)
 
-        doc_ref = db.collection(collection_name).document(email_lower)
-        batch.set(doc_ref, {
-            "name": name,
-            "email": email_raw,
-            "course_code": course_code,
-            "updated_at": datetime.now().isoformat(),
-        }, merge=True)
+        record = decide_roster_entry(existing.get(email_lower), course_code, name, email_raw)
+        batch.set(roster_ref.document(email_lower), record, merge=True)
         batch_size += 1
         total_written += 1
 
@@ -340,39 +345,46 @@ def sync_roster_to_firestore(
     if batch_size > 0:
         batch.commit()
 
-    # Prune stale roster entries for this course
-    existing_docs = db.collection(collection_name).where("course_code", "==", course_code).stream()
+    # Drop this course from students no longer on its roster
     prune_batch = db.batch()
     prune_size = 0
     pruned = 0
     cleared = 0
-    for doc in existing_docs:
-        if doc.id not in current_emails:
-            prune_batch.delete(doc.reference)
-            prune_size += 1
-            pruned += 1
+    for doc_id, data in existing.items():
+        if doc_id in current_emails:
+            continue
+        action, patch = decide_roster_prune(data, course_code)
+        if action == "keep":
+            continue
+        doc_ref = roster_ref.document(doc_id)
+        if action == "delete":
+            prune_batch.delete(doc_ref)
+        else:
+            prune_batch.set(doc_ref, patch, merge=True)
+        prune_size += 1
+        pruned += 1
 
-            # Also stop this student from matching this course's assignments —
-            # otherwise they keep getting reminded for a class they dropped.
-            student_ref = db.collection(STUDENTS_COLLECTION).document(doc.id)
-            student_snap = student_ref.get()
-            if student_snap.exists:
-                patch = decide_course_code_clear(student_snap.to_dict() or {}, course_code)
-                if patch:
-                    prune_batch.set(student_ref, patch, merge=True)
-                    prune_size += 1
-                    cleared += 1
+        # Also stop this student from matching this course's assignments —
+        # otherwise they keep getting reminded for a class they dropped.
+        student_ref = db.collection(STUDENTS_COLLECTION).document(doc_id)
+        student_snap = student_ref.get()
+        if student_snap.exists:
+            student_patch = decide_course_code_clear(student_snap.to_dict() or {}, course_code)
+            if student_patch:
+                prune_batch.set(student_ref, student_patch, merge=True)
+                prune_size += 1
+                cleared += 1
 
-            if prune_size >= 499:
-                prune_batch.commit()
-                prune_batch = db.batch()
-                prune_size = 0
+        if prune_size >= 498:
+            prune_batch.commit()
+            prune_batch = db.batch()
+            prune_size = 0
     if prune_size > 0:
         prune_batch.commit()
 
     print(
-        f"✅ Roster synced: {total_written} enrolled, {pruned} pruned, "
-        f"{cleared} course_code cleared (course={course_code})"
+        f"✅ Roster synced: {total_written} enrolled, {pruned} dropped from {course_code}, "
+        f"{cleared} student doc(s) updated (course={course_code})"
     )
 
 

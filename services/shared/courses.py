@@ -71,21 +71,21 @@ def merge_category_prefs(course_code: Optional[str], existing: Any) -> Dict[str,
 
 
 # ---------------------------------------------------------------------------
-# Reading a student's courses and per-course prefs.
+# Reading a student's courses and their reminder settings.
 #
 # Student docs are moving from one course per student to several:
 #
 #   old shape:  course_code: "CS61A"
-#               category_prefs: {...}, project_early_reminder, release_reminder
-#   new shape:  course_codes: ["CS61A", "CS61C"]
-#               course_prefs: {"CS61A": {category_prefs, project_early_reminder,
-#                                        release_reminder}, ...}
+#   new shape:  course_codes: ["CS61A", "CS61C"]   (course_code is still kept,
+#                                                  set to one of the courses)
 #
-# Production holds the old shape until the migration runs, and a mix of both
-# while it runs. Every reader goes through these helpers, which accept both, so
-# new code can deploy before the migration and survive a rollback. Once
-# production is fully migrated, the old-shape branches can be deleted.
-# Mirrored in src/shared/courses.js — keep the two in sync.
+# Reminder settings stay a single set per student (category_prefs,
+# project_early_reminder, release_reminder at the top level of the doc) and
+# apply to every course they're in. There is no per-course settings UI.
+#
+# Production holds the old shape until every student has synced, so readers go
+# through these helpers, which accept both. Mirrored in src/shared/courses.js -
+# keep the two in sync.
 # ---------------------------------------------------------------------------
 
 
@@ -111,47 +111,20 @@ def student_course_codes(student: Dict[str, Any]) -> List[str]:
     return result
 
 
-def default_course_prefs(course_code: Optional[str]) -> Dict[str, Any]:
-    """Prefs for a course the student has never customized.
-
-    Same defaults new students get today: every category on, release reminders
-    on (opt-out), project early reminder off (opt-in).
-    """
-    return {
-        "category_prefs": default_category_prefs(course_code),
-        "project_early_reminder": False,
-        "release_reminder": True,
-    }
-
-
 def student_course_prefs(student: Dict[str, Any], course_code: Optional[str]) -> Dict[str, Any]:
-    """The student's prefs for one course, always in the full new shape.
+    """The student's reminder settings, applied to one of their courses.
 
-    Reads `course_prefs[course_code]` (new shape) if present, otherwise the
-    legacy top-level fields if that course is the student's legacy
-    `course_code`, otherwise the defaults. Missing values follow the rules the
-    reminder pipeline has always used: categories default on, release
-    reminders are on unless explicitly False, early reminders only if True.
+    Every course uses the same settings. Category prefs are reshaped onto this
+    course's categories: a category the student turned off stays off wherever
+    it exists, and a category their settings don't mention is on. Release
+    reminders are on unless explicitly False, early reminders only if True:
+    the rules the reminder pipeline has always used.
     """
     code = _normalize_code(course_code)
-    source: Optional[Dict[str, Any]] = None
-
-    course_prefs = student.get("course_prefs")
-    if isinstance(course_prefs, dict):
-        entry = course_prefs.get(code)
-        if isinstance(entry, dict):
-            source = entry
-
-    if source is None and code and _normalize_code(student.get("course_code")) == code:
-        source = student  # legacy top-level fields
-
-    if source is None:
-        return default_course_prefs(code)
-
     return {
-        "category_prefs": merge_category_prefs(code, source.get("category_prefs")),
-        "project_early_reminder": source.get("project_early_reminder") is True,
-        "release_reminder": source.get("release_reminder") is not False,
+        "category_prefs": merge_category_prefs(code, student.get("category_prefs")),
+        "project_early_reminder": student.get("project_early_reminder") is True,
+        "release_reminder": student.get("release_reminder") is not False,
     }
 
 

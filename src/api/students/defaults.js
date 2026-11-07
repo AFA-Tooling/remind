@@ -11,6 +11,7 @@
 import {
   defaultCategoryPrefs as prefsForCourse,
   defaultCourseCode,
+  studentCourseCodes,
 } from '../../shared/courses.js';
 
 // The daily pipeline routes each student to an assignment catalog by course_code.
@@ -35,21 +36,32 @@ export function resolveCourseCode(rosterEntry) {
   return rosterEntry?.course_code || DEFAULT_COURSE_CODE;
 }
 
+// Every course the roster lists for the student (a student can be on several
+// courses' rosters), with the same fallback as resolveCourseCode.
+export function resolveCourseCodes(rosterEntry) {
+  const codes = studentCourseCodes(rosterEntry);
+  return codes.length ? codes : [String(DEFAULT_COURSE_CODE).trim().toUpperCase()];
+}
+
 /**
  * Build a new student document.
  *
  * @param {object}  args
  * @param {string}  args.email        document id and contact address
  * @param {string} [args.displayName] full name, from the auth profile or roster
- * @param {string}  args.courseCode   already resolved via resolveCourseCode
+ * @param {string}  args.courseCode   already resolved via resolveCourseCode; the
+ *                                    legacy single course, also used for the prefs
+ * @param {string[]} [args.courseCodes] every course (resolveCourseCodes); courseCode
+ *                                    is added if missing
  * @param {'consent'|'signup'} [args.enrolledVia] provenance, for study analysis
  */
-export function buildNewStudent({ email, displayName, courseCode, enrolledVia = 'signup' }) {
+export function buildNewStudent({ email, displayName, courseCode, courseCodes = [], enrolledVia = 'signup' }) {
   const now = new Date().toISOString();
   return {
     email,
     preferred_first_name: displayName ? displayName.split(' ')[0] : null,
     course_code: courseCode,
+    course_codes: studentCourseCodes({ course_codes: [...courseCodes, courseCode] }),
     phone_number: null,
     discord_id: null,
     days_before_deadline: DEFAULT_DAYS_BEFORE_DEADLINE,

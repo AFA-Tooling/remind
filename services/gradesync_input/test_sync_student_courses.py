@@ -1,6 +1,11 @@
-"""Unit tests for roster → student course_code sync decisions."""
+"""Unit tests for roster → student course sync decisions."""
 
-from sync_student_courses import decide_course_code_clear, decide_student_course_update
+from sync_student_courses import (
+    decide_course_code_clear,
+    decide_roster_entry,
+    decide_roster_prune,
+    decide_student_course_update,
+)
 
 
 def test_updates_when_roster_course_differs():
@@ -21,11 +26,22 @@ def test_updates_when_roster_course_differs():
 def test_no_op_when_already_matching():
     assert (
         decide_student_course_update(
-            {"email": "a@berkeley.edu", "course_code": "CS61A"},
-            {"a@berkeley.edu": "CS61A"},
+            {"email": "a@berkeley.edu", "course_code": "CS61A", "course_codes": ["CS61A"]},
+            {"a@berkeley.edu": ["CS61A"]},
         )
         is None
     )
+
+
+def test_old_shape_doc_gets_its_course_list_without_changing_course():
+    # Every existing student doc takes this path once, on the first sync.
+    patch = decide_student_course_update(
+        {"email": "a@berkeley.edu", "course_code": "CS61A", "category_prefs": {"lab": False}},
+        {"a@berkeley.edu": ["CS61A"]},
+    )
+    assert patch["course_codes"] == ["CS61A"]
+    assert "course_code" not in patch
+    assert "category_prefs" not in patch
 
 
 def test_leaves_non_roster_students_alone():
@@ -111,6 +127,100 @@ def test_pinned_student_is_never_cleared_even_if_dropped_from_that_course():
         )
         is None
     )
+
+
+# --- multi-course students ----------------------------------------------------
+
+def test_student_on_two_rosters_gets_both_and_keeps_legacy_course():
+    patch = decide_student_course_update(
+        {"email": "a@berkeley.edu", "course_code": "CS61C", "category_prefs": {"lab": False}},
+        {"a@berkeley.edu": ["CS61A", "CS61C"]},
+    )
+    assert patch["course_codes"] == ["CS61A", "CS61C"]
+    # The legacy field already names one of their courses, so it (and the
+    # prefs that go with it) stays put.
+    assert "course_code" not in patch
+    assert "category_prefs" not in patch
+
+
+def test_legacy_course_moves_only_when_no_longer_in_the_list():
+    patch = decide_student_course_update(
+        {"email": "a@berkeley.edu", "course_code": "CS10", "course_codes": ["CS10"]},
+        {"a@berkeley.edu": ["CS61A", "CS61C"]},
+    )
+    assert patch["course_codes"] == ["CS61A", "CS61C"]
+    assert patch["course_code"] == "CS61A"
+
+
+def test_dropping_one_of_two_courses_keeps_the_other():
+    patch = decide_course_code_clear(
+        {"email": "a@berkeley.edu", "course_code": "CS61A", "course_codes": ["CS61A", "CS61C"],
+         "category_prefs": {"lab": False}},
+        "CS61A",
+    )
+    assert patch["course_codes"] == ["CS61C"]
+    assert patch["course_code"] == "CS61C"
+    assert patch["category_prefs"] == {"lab": False, "homework": True, "project": True}
+
+
+def test_dropping_the_non_legacy_course_leaves_course_code_alone():
+    patch = decide_course_code_clear(
+        {"email": "a@berkeley.edu", "course_code": "CS61A", "course_codes": ["CS61A", "CS61C"]},
+        "CS61C",
+    )
+    assert patch["course_codes"] == ["CS61A"]
+    assert "course_code" not in patch
+
+
+def test_dropping_last_course_empties_both_fields():
+    patch = decide_course_code_clear(
+        {"email": "a@berkeley.edu", "course_code": "CS61A", "course_codes": ["CS61A"]},
+        "CS61A",
+    )
+    assert patch["course_codes"] == []
+    assert patch["course_code"] == ""
+
+
+# --- class_roster ---------------------------------------------------------------
+
+def test_roster_entry_new_student():
+    rec = decide_roster_entry(None, "CS61C", "Al Ice", "Al@berkeley.edu")
+    assert rec["course_codes"] == ["CS61C"]
+    assert rec["course_code"] == "CS61C"
+    assert rec["email"] == "Al@berkeley.edu"
+
+
+def test_roster_entry_adds_course_to_old_shape_doc():
+    # Production today: one course, whichever course synced last.
+    rec = decide_roster_entry({"course_code": "CS61C"}, "CS61A", "Al", "al@berkeley.edu")
+    assert rec["course_codes"] == ["CS61C", "CS61A"]
+    assert rec["course_code"] == "CS61C"  # legacy field no longer flips each sync
+
+
+def test_roster_entry_is_idempotent():
+    existing = {"course_code": "CS61A", "course_codes": ["CS61A", "CS61C"]}
+    rec = decide_roster_entry(existing, "CS61C", "Al", "al@berkeley.edu")
+    assert rec["course_codes"] == ["CS61A", "CS61C"]
+    assert rec["course_code"] == "CS61A"
+
+
+def test_roster_prune_keeps_doc_not_in_that_course():
+    assert decide_roster_prune({"course_codes": ["CS61C"], "course_code": "CS61C"}, "CS61A") == ("keep", None)
+
+
+def test_roster_prune_drops_only_that_course():
+    action, patch = decide_roster_prune(
+        {"course_codes": ["CS61A", "CS61C"], "course_code": "CS61A"}, "CS61A"
+    )
+    assert action == "update"
+    assert patch["course_codes"] == ["CS61C"]
+    assert patch["course_code"] == "CS61C"
+
+
+def test_roster_prune_deletes_when_no_course_left():
+    assert decide_roster_prune({"course_codes": ["CS61A"]}, "CS61A") == ("delete", None)
+    # Old-shape doc, as before this change.
+    assert decide_roster_prune({"course_code": "CS61A"}, "CS61A") == ("delete", None)
 
 
 if __name__ == "__main__":

@@ -141,7 +141,7 @@ def old_submission_doc_id(assignment_name: str, name: str) -> str:
     return f"{assignment_name}__{name}".replace("/", "_").replace(" ", "_")
 
 
-def build_docs(me: Optional[str], old_submissions: bool = False) -> Dict[str, Dict[str, Dict[str, Any]]]:
+def build_docs(me: Optional[str], old_shape: bool = False) -> Dict[str, Dict[str, Dict[str, Any]]]:
     now = datetime.now(PROJECT_TZ).isoformat()
     docs: Dict[str, Dict[str, Dict[str, Any]]] = {
         "deadlines": {},
@@ -190,7 +190,9 @@ def build_docs(me: Optional[str], old_submissions: bool = False) -> Dict[str, Di
     for s in students:
         email = s["email"]
         courses = s["intended_courses"]
-        course = courses[0] if courses else ""  # today's shape holds only one course
+        # Old shape: one course per doc. New shape: every course in course_codes,
+        # plus the legacy course_code (the first) that older code still reads.
+        course = courses[0] if courses else ""
         prefs = default_category_prefs(course) if course else {}
         for cat in s.get("category_prefs_off", []):
             prefs[cat] = False
@@ -201,6 +203,7 @@ def build_docs(me: Optional[str], old_submissions: bool = False) -> Dict[str, Di
             "email": email,
             "preferred_first_name": s["name"].split(" ")[0],
             "course_code": course,
+            **({} if old_shape else {"course_codes": list(courses)}),
             "phone_number": None,
             "discord_id": None,
             "days_before_deadline": DAYS_BEFORE,
@@ -219,11 +222,14 @@ def build_docs(me: Optional[str], old_submissions: bool = False) -> Dict[str, Di
         }
 
         if course:
-            # Today: one roster doc per email, so the last course synced wins.
+            # One roster doc per email. Old shape: a single course_code (in
+            # production, whichever course synced last). New shape: course_codes
+            # lists all of them.
             docs["class_roster"][email] = {
                 "name": s["name"],
                 "email": email,
                 "course_code": course,
+                **({} if old_shape else {"course_codes": list(courses)}),
                 "updated_at": now,
             }
 
@@ -256,7 +262,7 @@ def build_docs(me: Optional[str], old_submissions: bool = False) -> Dict[str, Di
                 "status": status,
                 "updated_at": now,
             }
-            if old_submissions:
+            if old_shape:
                 # What production holds before the new sync runs: no course_code.
                 doc_id = old_submission_doc_id(assignment, s["name"])
                 record["_seed_course_code"] = course_code
@@ -288,10 +294,10 @@ def main() -> None:
     parser.add_argument("--me", help="Also seed your own login email so you can use the dashboard")
     parser.add_argument("--no-reset", action="store_true", help="Don't wipe the emulator first")
     parser.add_argument(
-        "--old-submissions",
+        "--old-shape",
         action="store_true",
-        help="Write assignment_submissions with the old course-less IDs, like production "
-             "before the new sync runs (tests db_fetch's fallback to old docs)",
+        help="Write the old single-course shape production holds today: no course_codes "
+             "on class_roster/students, course-less assignment_submissions IDs",
     )
     args = parser.parse_args()
 
@@ -310,7 +316,7 @@ def main() -> None:
         reset_emulator(host, project_id)
         print(f"Wiped emulator data for project '{project_id}' at {host}")
 
-    docs = build_docs(args.me, old_submissions=args.old_submissions)
+    docs = build_docs(args.me, old_shape=args.old_shape)
     batch = db.batch()
     count = 0
     for collection, by_id in docs.items():

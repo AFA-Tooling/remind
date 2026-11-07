@@ -10,7 +10,6 @@ import {
   listCourseCodes,
   studentCourseCodes,
   studentCoursePrefs,
-  defaultCoursePrefs,
 } from './courses.js';
 
 const ALL_ON_61A = { lab: true, homework: true, midterm: true, quiz: true, project: true };
@@ -91,7 +90,7 @@ test('course codes: an empty list wins over a stale legacy field', () => {
 
 // --- studentCoursePrefs -----------------------------------------------------
 
-test('prefs: legacy doc, for its own course', () => {
+test("prefs: the student's own course", () => {
   const student = {
     course_code: 'CS61A',
     category_prefs: { lab: false },
@@ -105,42 +104,23 @@ test('prefs: legacy doc, for its own course', () => {
   });
 });
 
-test('prefs: legacy doc, for another course, are the defaults', () => {
-  const student = { course_code: 'CS61A', category_prefs: { lab: false }, release_reminder: false };
-  assert.deepEqual(studentCoursePrefs(student, 'CS61C'), defaultCoursePrefs('CS61C'));
-});
-
-test('prefs: new doc reads the per-course entry, not legacy fields', () => {
+test('prefs: the same settings apply to every course', () => {
   const student = {
     course_code: 'CS61A',
-    category_prefs: { lab: false }, // stale legacy value, must be ignored
     course_codes: ['CS61A', 'CS61C'],
-    course_prefs: {
-      CS61A: { category_prefs: { homework: false }, release_reminder: true },
-      CS61C: { category_prefs: { project: false }, project_early_reminder: true },
-    },
-  };
-  assert.deepEqual(studentCoursePrefs(student, 'CS61A').category_prefs, { ...ALL_ON_61A, homework: false });
-  assert.deepEqual(studentCoursePrefs(student, 'cs61c'), {
-    category_prefs: { ...ALL_ON_61C, project: false },
+    category_prefs: { lab: false, quiz: false },
     project_early_reminder: true,
-    release_reminder: true,
+    release_reminder: false,
+  };
+  assert.deepEqual(studentCoursePrefs(student, 'cs61c'), {
+    category_prefs: { ...ALL_ON_61C, lab: false }, // CS61C has no quiz category
+    project_early_reminder: true,
+    release_reminder: false,
   });
 });
 
-test('prefs: mixed doc falls back to legacy fields for an unmigrated course', () => {
-  const student = {
-    course_code: 'CS61A',
-    category_prefs: { lab: false },
-    course_codes: ['CS61A', 'CS61C'],
-    course_prefs: { CS61C: {} },
-  };
-  assert.equal(studentCoursePrefs(student, 'CS61A').category_prefs.lab, false);
-});
-
 test('prefs: missing fields follow the pipeline defaults', () => {
-  assert.deepEqual(studentCoursePrefs({ course_prefs: { CS61C: {} } }, 'CS61C'), defaultCoursePrefs('CS61C'));
-  assert.deepEqual(defaultCoursePrefs('CS61C'), {
+  assert.deepEqual(studentCoursePrefs({}, 'CS61C'), {
     category_prefs: ALL_ON_61C,
     project_early_reminder: false,
     release_reminder: true,

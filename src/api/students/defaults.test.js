@@ -5,6 +5,7 @@ import {
   DEFAULT_COURSE_CODE,
   DEFAULT_DAYS_BEFORE_DEADLINE,
   resolveCourseCode,
+  resolveCourseCodes,
   buildNewStudent,
 } from './defaults.js';
 
@@ -88,4 +89,18 @@ test('enrolled_via records provenance and defaults to signup', () => {
 test('a missing display name leaves preferred_first_name null rather than crashing', () => {
   const student = buildNewStudent({ email: 'a@berkeley.edu', courseCode: 'CS61A' });
   assert.equal(student.preferred_first_name, null);
+});
+
+test('resolveCourseCodes returns every roster course, or the default', () => {
+  assert.deepEqual(resolveCourseCodes({ course_code: 'CS61A', course_codes: ['CS61A', 'CS61C'] }), ['CS61A', 'CS61C']);
+  assert.deepEqual(resolveCourseCodes({ course_code: 'CS61C' }), ['CS61C']); // old-shape roster doc
+  assert.deepEqual(resolveCourseCodes(null), [DEFAULT_COURSE_CODE]);
+});
+
+test('new student doc lists every course, including the legacy one', () => {
+  assert.deepEqual(buildNewStudent({ email: 'a@b.edu', courseCode: 'CS61A' }).course_codes, ['CS61A']);
+  assert.deepEqual(
+    buildNewStudent({ email: 'a@b.edu', courseCode: 'CS61A', courseCodes: ['CS61A', 'CS61C'] }).course_codes,
+    ['CS61A', 'CS61C'],
+  );
 });

@@ -39,10 +39,13 @@ On Windows, if a script crashes with `UnicodeEncodeError`, run
 
 Emulator data is wiped when the emulator stops; re-run the seed script.
 
-Seed flags: `--no-reset` keeps the existing data. `--old-submissions` writes
-`assignment_submissions` with the old course-less IDs (`{assignment}__{name}`),
-like production before the new GradeSync sync runs, so you can check that
-`db_fetch.py` still reads them. The reminders should come out the same either way.
+Seed flags: `--no-reset` keeps the existing data. `--old-shape` writes the
+single-course shape production holds today (no `course_codes` lists on
+`class_roster` / `students`, and course-less `assignment_submissions` IDs), so you
+can check the new code still reads it. The reminders should come out the same
+either way. After `--old-shape`, run
+`python services/gradesync_input/sync_student_courses_cli.py --apply` to watch the
+students get their `course_codes` lists filled in from the roster.
 
 ## Web app
 

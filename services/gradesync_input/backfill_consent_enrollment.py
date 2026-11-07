@@ -29,7 +29,7 @@ from typing import Any, Dict, List
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from shared.courses import default_category_prefs, default_course_code
+from shared.courses import default_category_prefs, default_course_code, student_course_codes
 
 DEFAULT_COURSE_CODE = default_course_code()
 STUDENTS_COLLECTION = "students"
@@ -52,6 +52,7 @@ def build_student_doc(email: str, roster_entry: Dict[str, Any], now: str) -> Dic
         "email": email,
         "preferred_first_name": name.split(" ")[0] if name else None,
         "course_code": course_code,
+        "course_codes": student_course_codes(roster_entry) or [course_code],
         "phone_number": None,
         "discord_id": None,
         "days_before_deadline": DEFAULT_DAYS_BEFORE_DEADLINE,
