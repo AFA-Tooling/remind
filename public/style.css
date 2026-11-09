@@ -494,6 +494,147 @@ h1, h2 {
     border-color: #a8c4e0;
 }
 
+/* --- Advanced options: extra reminder days grid --- */
+.extra-reminders {
+    margin-top: 18px;
+}
+
+.extra-reminders summary {
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--olive);
+    user-select: none;
+}
+
+.extra-reminders-help {
+    font-size: 12px;
+    color: var(--muted);
+    line-height: 1.5;
+    margin: 8px 0 10px;
+}
+
+.extra-locked-key {
+    background: var(--pale);
+    padding: 0 4px;
+    border-radius: 3px;
+}
+
+.extra-grid-wrap {
+    overflow-x: auto;
+}
+
+.extra-grid {
+    border-collapse: collapse;
+    font-size: 13px;
+    width: 100%;
+}
+
+.extra-grid th,
+.extra-grid td {
+    padding: 6px 4px;
+    text-align: center;
+    border-bottom: 1px solid var(--line);
+}
+
+.extra-grid thead th {
+    font-weight: 600;
+    color: var(--muted);
+    font-size: 12px;
+}
+
+.extra-grid th[scope="row"] {
+    text-align: left;
+    font-weight: 500;
+    padding-right: 10px;
+    white-space: nowrap;
+}
+
+.extra-grid td.is-locked,
+.extra-grid thead th.is-locked {
+    background: var(--pale);
+}
+
+.extra-grid label {
+    display: inline-flex;
+    cursor: pointer;
+}
+
+.extra-grid input[type="checkbox"] {
+    position: absolute;
+    opacity: 0;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+}
+
+.extra-grid input[type="checkbox"]:focus-visible+.dot {
+    outline: 2px solid #a8c4e0;
+    outline-offset: 2px;
+}
+
+.extra-grid input[type="checkbox"]:checked+.dot {
+    background: var(--gold);
+    border-color: var(--gold);
+}
+
+.extra-grid input[type="checkbox"]:checked+.dot::after {
+    content: "✓";
+    position: absolute;
+    color: #1a1a1a;
+    font-size: 12px;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+}
+
+/* Main (slider) reminder: always on, can't be unticked here */
+.extra-grid td.is-locked label {
+    cursor: not-allowed;
+}
+
+.extra-grid td.is-locked input:checked+.dot {
+    background: var(--gold-dark);
+    border-color: var(--gold-dark);
+}
+
+/* Assignment type switched off under "Send reminders for" */
+.extra-grid tr.is-off {
+    opacity: 0.4;
+}
+
+.extra-grid tr.is-off label {
+    cursor: not-allowed;
+}
+
+.extra-save-row {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 10px;
+}
+
+.extra-save-row .btn {
+    padding: 8px 18px;
+    font-size: 14px;
+}
+
+.extra-save-row .btn:disabled {
+    opacity: 0.6;
+    cursor: wait;
+}
+
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
 /* --- Sliders & Inputs --- */
 .slider-row {
     display: flex;

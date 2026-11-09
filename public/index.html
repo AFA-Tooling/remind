@@ -190,6 +190,26 @@
             Setting 0 days will remind you on the day the assignment is due.
           </p>
 
+          <!-- Extra reminder days per assignment type. The slider stays the main
+               reminder; this grid only adds days on top of it. -->
+          <details id="extra-reminders" class="extra-reminders">
+            <summary>Advanced options</summary>
+            <p class="extra-reminders-help">
+              Want more than one reminder? Tick extra days for each assignment type.
+              The <span class="extra-locked-key">locked</span> column is your main reminder from the slider above.
+            </p>
+            <div class="extra-grid-wrap">
+              <table class="extra-grid" id="extra-grid">
+                <!-- Rendered by renderExtraReminderGrid() -->
+              </table>
+            </div>
+            <!-- Inside <details>, so it folds away with the grid. Saves the whole
+                 form, same as the main Save Settings button. -->
+            <div class="extra-save-row">
+              <button type="button" id="extra-save-btn" class="btn btn--primary btn-small">Save</button>
+            </div>
+          </details>
+
           <!-- Course assignment types (revealed for students on the roster) -->
           <div id="course-categories-section" style="display: none; margin-top: 28px;">
             <div class="divider"><span class="pill" id="course-categories-title">Assignment Types</span></div>
@@ -358,7 +378,112 @@
     });
     rng.addEventListener('input', () => {
       updateDaysNote(Number(rng.value));
+      refreshExtraReminderGrid();
     });
+    num.addEventListener('input', () => refreshExtraReminderGrid());
+
+    // --- Advanced options: extra reminder days ---
+    // The slider is the main reminder; this grid only ADDS days on top of it.
+    // extraDays mirrors extra_reminder_days in Firestore, e.g. {project: [1]}.
+    // The slider's day shows as locked-on in every row but is never written into
+    // extraDays, so a ticked extra survives the slider moving onto it and away.
+    const OTHER_EXTRA_KEY = 'other';
+    const EXTRA_DAY_COLUMNS = [0, 1, 2, 3, 4, 5];
+    const extraGrid = document.getElementById('extra-grid');
+    let extraDays = {};
+    let extraRows = [{ id: OTHER_EXTRA_KEY, label: 'Other / bCourses' }];
+    // Only send extra_reminder_days once the saved value has loaded or the
+    // student has changed the grid — otherwise a failed load would wipe it.
+    let extraDaysReady = false;
+
+    function escText(str) {
+      return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    function dayLabel(d) {
+      return d === 0 ? 'Due day' : `${d} day${d === 1 ? '' : 's'} before`;
+    }
+
+    function renderExtraReminderGrid() {
+      const head = `<thead><tr>
+        <th scope="col"><span class="sr-only">Assignment type</span></th>
+        ${EXTRA_DAY_COLUMNS.map((d) =>
+          `<th scope="col" data-day="${d}">${d === 0 ? 'Due day' : d}</th>`).join('')}
+      </tr></thead>`;
+      const body = extraRows.map((row) => {
+        const id = escText(row.id);
+        const label = escText(row.label);
+        const cells = EXTRA_DAY_COLUMNS.map((d) => `<td data-day="${d}">
+          <label>
+            <input type="checkbox" data-extra-type="${id}" data-day="${d}"
+              aria-label="${label}: ${dayLabel(d)}" />
+            <span class="dot" aria-hidden="true"></span>
+          </label>
+        </td>`).join('');
+        return `<tr data-extra-type="${id}"><th scope="row">${label}</th>${cells}</tr>`;
+      }).join('');
+      extraGrid.innerHTML = `${head}<tbody>${body}</tbody>`;
+      refreshExtraReminderGrid();
+    }
+
+    // Re-apply locked column (slider day) and greyed rows (type switched off)
+    // without rebuilding the table.
+    function refreshExtraReminderGrid() {
+      const locked = Math.min(5, Math.max(0, Number(num.value)));
+      extraGrid.querySelectorAll('th[data-day], td[data-day]').forEach((cell) => {
+        cell.classList.toggle('is-locked', Number(cell.dataset.day) === locked);
+      });
+      extraGrid.querySelectorAll('tbody tr').forEach((tr) => {
+        const type = tr.dataset.extraType;
+        // "Send reminders for" checkbox; "other" has none and is never off.
+        const typeBox = document.getElementById(`cat-${type}`);
+        const off = !!typeBox && !typeBox.checked;
+        tr.classList.toggle('is-off', off);
+        tr.querySelectorAll('input[data-day]').forEach((input) => {
+          const d = Number(input.dataset.day);
+          const isLocked = d === locked;
+          input.checked = isLocked || (extraDays[type] || []).includes(d);
+          input.disabled = isLocked || off;
+        });
+      });
+    }
+
+    // Rows follow the same course the "Send reminders for" list shows.
+    function loadExtraReminderGrid(data) {
+      const categories = data.on_roster && data.course ? (data.course.categories || []) : [];
+      extraRows = [
+        ...categories.map((cat) => ({ id: cat.id, label: cat.label || cat.id })),
+        { id: OTHER_EXTRA_KEY, label: 'Other / bCourses' },
+      ];
+      const saved = data.extra_reminder_days;
+      extraDays = {};
+      if (saved && typeof saved === 'object') {
+        for (const [type, days] of Object.entries(saved)) {
+          if (Array.isArray(days)) extraDays[type] = days.slice();
+        }
+        extraDaysReady = true;
+      }
+      renderExtraReminderGrid();
+    }
+
+    extraGrid.addEventListener('change', (e) => {
+      const input = e.target.closest('input[data-extra-type]');
+      if (!input) return;
+      const type = input.dataset.extraType;
+      const d = Number(input.dataset.day);
+      const days = new Set(extraDays[type] || []);
+      if (input.checked) days.add(d); else days.delete(d);
+      extraDays[type] = [...days].sort((a, b) => b - a);
+      extraDaysReady = true;
+    });
+
+    // Ticking/unticking a type under "Send reminders for" greys its grid row.
+    document.getElementById('course-category-list')
+      .addEventListener('change', () => refreshExtraReminderGrid());
+
+    // Before settings load (or for brand-new students) show just the "Other" row.
+    renderExtraReminderGrid();
 
     // --- Toggle Fields ---
     function bindToggle(checkboxId, fieldId, extraIds = []) {
@@ -493,6 +618,9 @@
         if (releaseReminder) payload.release_reminder = releaseReminder.checked;
       }
 
+      // Advanced options grid. Omitted → server leaves stored extras untouched.
+      if (extraDaysReady) payload.extra_reminder_days = extraDays;
+
       return payload;
     }
 
@@ -554,22 +682,28 @@
       features.innerHTML = rows.join('');
     }
 
-    mainCtaBtn.addEventListener('click', async function (e) {
+    // Two buttons save the same full settings form: the main one at the bottom
+    // and a shortcut inside "Advanced options" (easy to miss the bottom one).
+    const extraSaveBtn = document.getElementById('extra-save-btn');
+    const saveButtons = [mainCtaBtn, extraSaveBtn].filter(Boolean);
+
+    async function saveSettings(e) {
       e.preventDefault();
       if (!window.auth || !window.auth.user) {
         window.location.href = './login.html';
         return;
       }
-      if (mainCtaBtn.disabled) return;
+      const clickedBtn = e.currentTarget;
+      if (saveButtons.some((btn) => btn.disabled)) return;
 
       let payload;
       try {
         payload = await collectSettingsPayload();
       } catch (e) { return; }
 
-      const originalLabel = mainCtaBtn.textContent;
-      mainCtaBtn.disabled = true;
-      mainCtaBtn.textContent = 'Saving...';
+      const originalLabel = clickedBtn.textContent;
+      saveButtons.forEach((btn) => { btn.disabled = true; });
+      clickedBtn.textContent = 'Saving...';
 
       try {
         const email = window.auth?.user?.email;
@@ -603,10 +737,11 @@
         console.error(err);
         showMessage('Error saving settings. Please try again.', 'Error');
       } finally {
-        mainCtaBtn.disabled = false;
-        mainCtaBtn.textContent = originalLabel;
+        saveButtons.forEach((btn) => { btn.disabled = false; });
+        clickedBtn.textContent = originalLabel;
       }
-    });
+    }
+    saveButtons.forEach((btn) => btn.addEventListener('click', saveSettings));
 
     document.getElementById('success-ok-btn').addEventListener('click', function () {
       document.getElementById('success-modal').style.display = 'none';
@@ -1052,6 +1187,8 @@
 
         // Course category prefs — driven by courses.json for the student's roster course
         renderCourseCategories(data);
+        // After the category checkboxes exist, so greyed-out rows are correct.
+        loadExtraReminderGrid(data);
       }
     })();
 
@@ -1081,6 +1218,7 @@
           const getJson = await getRes.json();
           if (getJson.success && getJson.data) {
             renderCourseCategories(getJson.data);
+            loadExtraReminderGrid(getJson.data);
           }
           showMessage(
             json.patched
