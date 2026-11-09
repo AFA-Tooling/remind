@@ -3,7 +3,7 @@ import { sendWelcomeEmail } from '../../services/welcomeEmail.js';
 import { verifyUserAuth } from '../auth/verifyUser.js';
 import { getStudyStatus } from '../study/studyStatus.js';
 import { LOCKOUT_MESSAGE, WAITLIST_MESSAGE } from '../study/messages.js';
-import { sanitizeCategoryPrefs, getCourse } from '../../shared/courses.js';
+import { sanitizeCategoryPrefs, sanitizeExtraReminderDays, getCourse } from '../../shared/courses.js';
 import { syncStudentCourseFromRoster } from '../students/syncCourse.js';
 
 export default async function handler(req, res) {
@@ -28,7 +28,15 @@ export default async function handler(req, res) {
 
     let body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
 
-    const { channels = {}, days_before, preferred_first_name, category_prefs, project_early_reminder, release_reminder } = body;
+    const {
+      channels = {},
+      days_before,
+      preferred_first_name,
+      category_prefs,
+      project_early_reminder,
+      release_reminder,
+      extra_reminder_days,
+    } = body;
 
     const loginEmail = authResult.email;
 
@@ -77,6 +85,17 @@ export default async function handler(req, res) {
       if (features.release_reminder?.enabled) {
         studentData.release_reminder = !!release_reminder;
       }
+    }
+
+    // Extra reminder days ("Advanced options"). Not roster-gated: every student
+    // has at least the "other" row for bCourses / uncategorized assignments.
+    // Omitted from the request → leave whatever is stored untouched.
+    if (extra_reminder_days !== undefined) {
+      const cleanExtras = sanitizeExtraReminderDays(courseCode, extra_reminder_days);
+      if (cleanExtras === null) {
+        return res.status(400).json({ error: 'extra_reminder_days must be an object' });
+      }
+      studentData.extra_reminder_days = cleanExtras;
     }
 
     // Document ID = email — set(merge:true) acts as upsert

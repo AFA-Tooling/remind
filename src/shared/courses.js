@@ -76,6 +76,52 @@ export function sanitizeCategoryPrefs(courseCode, incoming) {
   return out;
 }
 
+// Extra reminder days from the dashboard's "Advanced options" grid. The slider
+// (days_before_deadline) is the main reminder; these only add days on top of it.
+// Mirrors EXTRA_REMINDER_DAYS_FIELD / OTHER_REMINDER_KEY / MAX_REMINDER_DAYS in
+// services/gradesync_input/db_fetch.py — keep the two in sync.
+export const OTHER_REMINDER_KEY = 'other';
+export const MAX_REMINDER_DAYS = 5;
+
+/**
+ * Clean an incoming extra_reminder_days object before saving.
+ *
+ * Keeps only the course's own category ids plus "other" (bCourses / uncategorized),
+ * and only whole days in 0..MAX_REMINDER_DAYS, de-duplicated and sorted
+ * high-to-low. Students with no known course get only the "other" row. Every
+ * allowed row is present in the result, as [] when it has no extras.
+ *
+ * The slider day is deliberately NOT removed: extras are stored independently of
+ * the slider, so a ticked extra survives the slider moving onto it and back off.
+ * The daily job collapses an extra that equals the slider day into one reminder.
+ *
+ * Returns null when the input isn't a plain object, so callers can skip the write.
+ */
+export function sanitizeExtraReminderDays(courseCode, incoming) {
+  if (!incoming || typeof incoming !== 'object' || Array.isArray(incoming)) {
+    return null;
+  }
+  const course = getCourse(courseCode);
+  const allowed = new Set([OTHER_REMINDER_KEY]);
+  for (const cat of course?.categories || []) {
+    const id = String(cat.id || '').trim().toLowerCase();
+    if (id) allowed.add(id);
+  }
+
+  const out = {};
+  for (const id of allowed) {
+    const days = Array.isArray(incoming[id]) ? incoming[id] : [];
+    const clean = [...new Set(
+      days.filter((d) => Number.isInteger(d) && d >= 0 && d <= MAX_REMINDER_DAYS),
+    )].sort((a, b) => b - a);
+    // Every allowed row is written, empty or not: settings.js saves with
+    // set({merge: true}), which merges nested maps key-by-key, so a row left
+    // out here would keep its old stored value instead of being cleared.
+    out[id] = clean;
+  }
+  return out;
+}
+
 export function publicCourseConfig(courseCode) {
   const course = getCourse(courseCode);
   if (!course) return null;
