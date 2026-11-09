@@ -78,8 +78,9 @@ STUDENTS: List[Dict[str, Any]] = [
         "intended_courses": ["CS61A", "CS61C"],
         "group": 1,
         "missing": [("CS61A", "Lab 1"), ("CS61A", "Lab 2"), ("CS61C", "Lab 1"), ("CS61C", "Project 1")],
-        "note": "THE multi-course case. Today: only CS61A reminders. "
-                "After the change: CS61A Lab 1 + Lab 2 + Homework 3 (release) AND CS61C Lab 1 + Project 1.",
+        "note": "THE multi-course case. Expect one message with CS61A Lab 1 + Lab 2 + Homework 3 "
+                "(release) AND CS61C Lab 1 + Project 1, each labeled with its course. "
+                "With --old-shape: CS61A only.",
     },
     {
         "email": "ben.61a@example.com",
@@ -119,8 +120,9 @@ STUDENTS: List[Dict[str, Any]] = [
         "group_by_course": {"CS61C": 1, "CS10": 2},
         "missing": [("CS61C", "Lab 1"), ("CS10", "Project 2: Spelling Bee")],
         "submitted": [("CS61C", "Project 1", "Ungraded")],  # submitted, not graded yet
-        "note": "Multi-course, different study groups. After the change: CS61C Lab 1 only "
-                "(group 1 there), NOT CS10 (group 2, access closed).",
+        "note": "Multi-course, different study groups. Expect CS61C Lab 1 + CS10 Project 2 for now; "
+                "once the study gate is per course, CS61C Lab 1 only (CS10: group 2, access closed). "
+                "With --old-shape: CS61C Lab 1.",
     },
     {
         "email": "finn.nocourse@example.com",
@@ -183,8 +185,8 @@ def build_docs(me: Optional[str], old_shape: bool = False) -> Dict[str, Dict[str
             "group": 1,
             "missing": [("CS61A", "Lab 2"), ("CS61C", "Project 1")],
             "note": "Your login, so you can open the dashboard against the emulator. "
-                    "Today: CS61A Lab 1 + Lab 2 + Homework 3 (release). After the change: "
-                    "also CS61C Lab 1 + Project 1.",
+                    "Expect CS61A Lab 1 + Lab 2 + Homework 3 (release) and CS61C Lab 1 + "
+                    "Project 1. With --old-shape: CS61A only.",
         })
 
     for s in students:

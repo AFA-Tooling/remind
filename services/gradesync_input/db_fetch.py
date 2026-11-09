@@ -25,7 +25,9 @@ if str(SERVICES_DIR) not in sys.path:
 from shared import settings
 from shared.courses import (
     categorize_assignment,
+    get_course,
     should_apply_project_early,
+    student_course_codes,
 )
 from shared.submissions import build_submission_lookup, submission_status
 
@@ -553,6 +555,21 @@ def collect_assignment_codes(student: Dict[str, Any], assignment_lookup: Dict) -
     return list(set(all_codes))
 
 
+def find_course_lookup(
+    assignment_lookup: Dict[str, Dict[str, Dict[str, Any]]], course_code: str
+) -> Optional[Dict[str, Dict[str, Any]]]:
+    """One course's assignment catalog, matching the course code case-insensitively."""
+    if not course_code:
+        return None
+    if course_code in assignment_lookup:
+        return assignment_lookup[course_code]
+    wanted = course_code.strip().upper()
+    for key, course_lookup in assignment_lookup.items():
+        if str(key).strip().upper() == wanted:
+            return course_lookup
+    return None
+
+
 def compute_personal_deadline(
     base_deadline: Optional[datetime], offset_days: int
 ) -> Optional[datetime]:
@@ -569,12 +586,12 @@ _UNROUTABLE_STUDENTS_WARNED: set = set()
 
 
 def _warn_unroutable_student(student_email: Any, course_code: str) -> None:
-    """Surface students whose course_code matches no catalog, once each per run.
+    """Surface students whose course matches no catalog, once per student and course per run.
 
-    These students silently receive nothing, so a run that drops people must say so
-    rather than reporting a clean summary.
+    These students silently receive nothing for that course, so a run that drops
+    people must say so rather than reporting a clean summary.
     """
-    key = str(student_email)
+    key = (str(student_email), course_code or "")
     if key in _UNROUTABLE_STUDENTS_WARNED:
         return
     _UNROUTABLE_STUDENTS_WARNED.add(key)
@@ -588,8 +605,15 @@ def build_assignment_payload(
     lookup: Dict[str, Dict[str, Dict[str, Any]]],
     today: datetime,
     *,
+    course_code: Optional[str] = None,
     debug: bool = False,
 ) -> Optional[Dict[str, Any]]:
+    """The reminder payload for one assignment in one of the student's courses, or None.
+
+    course_code picks the course; without it, the student's legacy course_code.
+    The student's reminder settings (days before, category prefs, early and
+    release reminders) are one set that applies to every course.
+    """
     student_email = student.get("email", "unknown")
     student_id = student.get("id", "unknown")
     
@@ -604,12 +628,14 @@ def build_assignment_payload(
         print(f"   Today: {today.strftime('%Y-%m-%d %H:%M:%S')}")
         print(f"{'='*80}")
     
-    course_code = (student.get("course_code") or "").strip()
+    if course_code is None:
+        course_code = student.get("course_code") or ""
+    course_code = str(course_code).strip()
     # No cross-course fallback: a student whose course_code is unset or unknown must
     # match nothing rather than silently inherit another course's catalog. The old
     # fallback pointed at CS10 and quietly evaluated every CS61A student against five
     # long-expired CS10 projects, so they never matched anything.
-    course_lookup = lookup.get(course_code) if course_code else None
+    course_lookup = find_course_lookup(lookup, course_code)
     if course_lookup is None:
         _warn_unroutable_student(student_email, course_code)
 
@@ -784,12 +810,40 @@ def _render_resources(lines: List[str], assignment: Dict[str, Any]) -> None:
         lines.append(resource_line)
 
 
+def course_display_name(course_code: Optional[str]) -> str:
+    course = get_course(course_code) or {}
+    return str(course.get("display_name") or course_code or "")
+
+
+def assignments_span_courses(assignments: List[Dict[str, Any]]) -> bool:
+    """True when the assignments come from more than one course."""
+    courses = {
+        str(a.get("course_code") or "").strip().upper()
+        for a in assignments
+        if a.get("course_code")
+    }
+    return len(courses) > 1
+
+
+def display_assignment_name(assignment: Dict[str, Any], with_course: bool) -> str:
+    """The assignment's name, prefixed with its course (e.g. "[CS 61C] Lab 1") if asked.
+
+    Used when one message lists assignments from several courses, where "Lab 1"
+    alone could mean either course. Single-course messages are unchanged.
+    """
+    name = assignment.get("assignment_name") or assignment.get("assignment_code") or ""
+    if with_course and assignment.get("course_code"):
+        return f"[{course_display_name(assignment['course_code'])}] {name}"
+    return name
+
+
 def _render_assignment_bullet(
     lines: List[str],
     assignment: Dict[str, Any],
     bullet: str,
     label: str,
     include_resources: bool = True,
+    with_course: bool = False,
 ) -> None:
     """Append one assignment's bullet line plus its offset-day note and resources.
 
@@ -797,9 +851,8 @@ def _render_assignment_bullet(
     reminders, a bare due date for release reminders); everything else about
     an assignment's rendering is identical between the two sections.
     """
-    lines.append(
-        f"{bullet} {assignment['assignment_name']} ({assignment['assignment_code']}): {label}"
-    )
+    name = display_assignment_name(assignment, with_course)
+    lines.append(f"{bullet} {name} ({assignment['assignment_code']}): {label}")
     if assignment.get("offset_days"):
         lines.append(
             f"  (Class deadline +{assignment['offset_days']} day offset for you.)"
@@ -829,6 +882,7 @@ def compose_message(
     due_soon = [a for a in renderable if a.get("reason", "due") != "release"]
 
     number_assignments = len(renderable) > 1
+    with_course = assignments_span_courses(renderable)
     bullet_index = 0
 
     def next_bullet() -> str:
@@ -844,7 +898,8 @@ def compose_message(
             due_dt = assignment["personal_deadline"]
             due_date_str = f"{due_dt.strftime('%B')} {due_dt.day}"
             _render_assignment_bullet(
-                lines, assignment, next_bullet(), f"due on {due_date_str}", include_resources
+                lines, assignment, next_bullet(), f"due on {due_date_str}", include_resources,
+                with_course,
             )
 
     if due_soon:
@@ -863,7 +918,8 @@ def compose_message(
             else:
                 days_label = f"due in {days_until} days"
             _render_assignment_bullet(
-                lines, assignment, next_bullet(), f"{days_label}, on {due_date_str}", include_resources
+                lines, assignment, next_bullet(), f"{days_label}, on {due_date_str}", include_resources,
+                with_course,
             )
 
     lines.append("")
@@ -1021,8 +1077,9 @@ def write_gmail_csv(reminders: List[Dict[str, Any]], output_dir: Path) -> None:
 
         # Summarize assignment names for the 'assignment' column. This drives the
         # subject line / logging only; the body comes from message_requests.
+        with_course = assignments_span_courses(assignments)
         assignment_names = [
-            a.get("assignment_name") or a.get("assignment_code", "")
+            display_assignment_name(a, with_course)
             for a in assignments
             if a.get("assignment_name") or a.get("assignment_code")
         ]
@@ -1124,6 +1181,7 @@ def gather_reminders(
             print(f"   email_pref: {student.get('email_pref')}")
             print(f"   days_before_deadline: {student.get('days_before_deadline')}")
             print(f"   course_code: {student.get('course_code')}")
+            print(f"   course_codes: {student_course_codes(student)}")
             print(f"   Assignment codes in student record: {[k for k in student.keys() if k.upper().startswith('PROJ')]}")
             print(f"   Note: All students in table are considered opted-in")
             print(f"{'='*80}\n")
@@ -1196,30 +1254,51 @@ def _build_reminder_for_student(
         print(f"   Note: All students in table are considered opted-in")
 
     assignments_to_notify: List[Dict[str, Any]] = []
-    assignment_codes = collect_assignment_codes(student, assignment_lookup)
 
-    if is_target or args.debug:
-        print(f"   Assignment codes found: {assignment_codes}")
+    # Every course the student is in, each against its own catalog, all with the
+    # student's one set of reminder settings, into one combined reminder.
+    course_codes = student_course_codes(student)
+    if not course_codes:
+        _warn_unroutable_student(student_email, "")
 
-    for code in assignment_codes:
-        payload = build_assignment_payload(
-            student,
-            code,
-            assignment_lookup,
-            today,
-            debug=args.debug or is_target,
-        )
-        if payload:
-            assignment_name = payload["assignment_name"]
+    for course_code in course_codes:
+        course_lookup = find_course_lookup(assignment_lookup, course_code)
+        if course_lookup is None:
+            _warn_unroutable_student(student_email, course_code)
+            continue
+
+        if is_target or args.debug:
+            print(f"   {course_code}: assignment codes {sorted(course_lookup)}")
+
+        for code in sorted(course_lookup):
+            payload = build_assignment_payload(
+                student,
+                code,
+                assignment_lookup,
+                today,
+                course_code=course_code,
+                debug=args.debug or is_target,
+            )
+            if not payload:
+                continue
             if not is_missing_submission(
-                student_email, assignment_name, submission_lookup, payload.get("course_code")
+                student_email, payload["assignment_name"], submission_lookup, course_code
             ):
                 if is_target or args.debug:
-                    print(f"   ⏭️  Skipping {code}: already submitted")
+                    print(f"   ⏭️  Skipping {course_code} {code}: already submitted")
                 continue
             assignments_to_notify.append(payload)
             if is_target or args.debug:
-                print(f"   ✅ Added assignment to notify: {code}")
+                print(f"   ✅ Added assignment to notify: {course_code} {code}")
+
+    # Soonest first; ties broken by course, then name, so the order is stable.
+    assignments_to_notify.sort(
+        key=lambda a: (
+            local_date(a["personal_deadline"]),
+            str(a.get("course_code") or ""),
+            str(a.get("assignment_name") or ""),
+        )
+    )
 
     if not assignments_to_notify:
         if is_target or args.debug:
@@ -1402,6 +1481,7 @@ def _assignment_signature(assignment: Dict[str, Any]) -> tuple:
     """Stable identity for an assignment, used to dedupe across sources."""
     deadline = assignment.get("personal_deadline")
     return (
+        assignment.get("course_code"),
         assignment.get("assignment_code"),
         assignment.get("assignment_name"),
         deadline.isoformat() if hasattr(deadline, "isoformat") else deadline,
@@ -1511,8 +1591,9 @@ def run_reminder_mode(db: firestore.Client, args: argparse.Namespace) -> None:
                 offset_note = (
                     f" (offset +{assignment['offset_days']}d)" if assignment["offset_days"] else ""
                 )
+                course_note = f" ({assignment['course_code']})" if assignment.get("course_code") else ""
                 print(
-                    f"  • {assignment['assignment_name']} [{assignment['assignment_code']}] → {due_text}{offset_note}"
+                    f"  • {assignment['assignment_name']} [{assignment['assignment_code']}]{course_note} → {due_text}{offset_note}"
                 )
             print("\nDraft message:\n")
             print(entry["message"])
