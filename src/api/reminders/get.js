@@ -1,6 +1,6 @@
 import { getDb } from '../firestore.js';
 import { verifyUserAuth } from '../auth/verifyUser.js';
-import { publicCourseConfig } from '../../shared/courses.js';
+import { publicCourseConfig, sanitizeExtraReminderDays } from '../../shared/courses.js';
 import {
   syncStudentCourseFromRoster,
   prefsForResponse,
@@ -34,6 +34,11 @@ export default async function handler(req, res) {
         const courseCode = synced.courseCode || data.course_code || null;
         const course = publicCourseConfig(courseCode);
         const categoryPrefs = prefsForResponse(courseCode, data.category_prefs);
+        // Same cleanup as on save, so the grid always gets one row per type
+        // (as [] when nothing is ticked), even if nothing has been saved yet.
+        const extraReminderDays =
+            sanitizeExtraReminderDays(courseCode, data.extra_reminder_days || {}) ||
+            sanitizeExtraReminderDays(courseCode, {});
 
         return res.status(200).json({
             success: true,
@@ -52,6 +57,7 @@ export default async function handler(req, res) {
                 course_code: courseCode,
                 course,
                 category_prefs: categoryPrefs,
+                extra_reminder_days: extraReminderDays,
                 project_early_reminder: data.project_early_reminder === true,
                 // Opt-out: release-day notifications are on unless explicitly disabled.
                 release_reminder: data.release_reminder !== false,
