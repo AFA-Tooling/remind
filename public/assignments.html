@@ -477,7 +477,7 @@
 
     async function updateAssignmentCompletion(key, completed) {
       const token = await window.auth?.getToken();
-      const response = await fetch('/api/assignments/completed', {
+      const res = await fetch('/api/assignments/completed', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -485,7 +485,7 @@
         },
         body: JSON.stringify({ assignment_key: key, completed }),
       });
-      if (!response.ok) throw new Error('Failed to save assignment completion');
+      if (!res.ok) throw new Error('Failed to save assignment completion');
       if (completed) completedAssignments.add(key);
       else completedAssignments.delete(key);
     }

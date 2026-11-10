@@ -7,12 +7,25 @@ const TASK_LIST_TITLE = 'AutoRemind Assignments';
 
 function getAssignmentDue(value) {
   if (typeof value !== 'string' || !value.trim()) return null;
-  const dateMatch = value.match(/^(\d{4}-\d{2}-\d{2})(?:T.*)?$/);
+  const dateMatch = value.match(/^(\d{4}-\d{2}-\d{2})(?:T.+)?$/);
   if (!dateMatch) return null;
-  const datePart = dateMatch[1];
-  const date = new Date(`${datePart}T00:00:00.000Z`);
-  if (Number.isNaN(date.getTime()) || date.toISOString().slice(0, 10) !== datePart) return null;
-  return `${datePart}T00:00:00.000Z`;
+  const dateOnly = dateMatch[1];
+  const dateOnlyValue = new Date(`${dateOnly}T00:00:00.000Z`);
+  if (Number.isNaN(dateOnlyValue.getTime()) || dateOnlyValue.toISOString().slice(0, 10) !== dateOnly) return null;
+  if (value.length === 10) return `${dateOnly}T00:00:00.000Z`;
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+
+  const dateParts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/Los_Angeles',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(date);
+  const parts = Object.fromEntries(dateParts.map(part => [part.type, part.value]));
+  const pacificDate = `${parts.year}-${parts.month}-${parts.day}`;
+  return `${pacificDate}T00:00:00.000Z`;
 }
 
 function assignmentIdentity(assignment) {
@@ -42,15 +55,11 @@ async function getTaskList(accessToken, tokenData, tokenRef) {
   return taskList.id;
 }
 
-function makeTaskPayload(assignment, due, isUpdate = false) {
+function makeTaskPayload(assignment, due) {
   return {
     title: taskTitle(assignment),
     notes: assignment.html_url ? `Assignment link: ${assignment.html_url}` : undefined,
     due,
-    status: assignment.completed ? 'completed' : 'needsAction',
-    ...(assignment.completed
-      ? { completed: new Date().toISOString() }
-      : (isUpdate ? { completed: null } : {})),
   };
 }
 
@@ -74,16 +83,15 @@ export async function syncGoogleTasks(db, email, assignments, deps = {}) {
     }
     const key = assignmentIdentity(assignment);
     const title = taskTitle(assignment);
-    const completed = !!assignment.completed;
     const linkRef = db.collection('google_calendar_tasks').doc(taskLinkId(email, key));
     const link = existingLinks.get(key);
     const sameTaskList = link && link.task_list_id === taskListId;
-    if (sameTaskList && link.title === title && link.due === due && link.completed === completed) {
+    if (sameTaskList && link.title === title && link.due === due) {
       unchanged++;
       continue;
     }
 
-    const payload = makeTaskPayload(assignment, due, !!sameTaskList);
+    const payload = makeTaskPayload(assignment, due);
     let task;
     if (sameTaskList) {
       try {
@@ -94,7 +102,10 @@ export async function syncGoogleTasks(db, email, assignments, deps = {}) {
       }
     }
     if (!task) {
-      task = await request(accessToken, 'POST', `/lists/${encodeURIComponent(taskListId)}/tasks`, payload);
+      task = await request(accessToken, 'POST', `/lists/${encodeURIComponent(taskListId)}/tasks`, {
+        ...payload,
+        status: 'needsAction',
+      });
       created++;
     }
     await linkRef.set({
@@ -104,7 +115,6 @@ export async function syncGoogleTasks(db, email, assignments, deps = {}) {
       task_list_id: taskListId,
       title,
       due,
-      completed,
     });
     existingLinks.set(key, {
       email,
@@ -113,7 +123,6 @@ export async function syncGoogleTasks(db, email, assignments, deps = {}) {
       task_list_id: taskListId,
       title,
       due,
-      completed,
     });
   }
 
@@ -133,8 +142,7 @@ function validateAssignments(assignments) {
       typeof assignment.html_url === 'string' &&
       assignment.html_url.length <= 2048 &&
       (!assignment.html_url || /^https?:\/\//i.test(assignment.html_url))
-    )) &&
-    (assignment.completed === undefined || typeof assignment.completed === 'boolean')
+    ))
   );
 }
 

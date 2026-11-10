@@ -756,7 +756,6 @@
               due: assignment.due || null,
               source: assignment.source,
               html_url: assignment.html_url || '',
-              completed: false,
             }));
             const response = await fetch('/api/google-calendar/sync', {
               method: 'POST',

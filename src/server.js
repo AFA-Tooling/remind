@@ -445,6 +445,7 @@ const server = http.createServer(async (req, res) => {
   // Helper to build mock req/res with redirect support
   const mockRes = {
     status: (code) => { res.statusCode = code; return mockRes; },
+    setHeader: (name, value) => res.setHeader(name, value),
     json: (data) => { res.setHeader('Content-Type', 'application/json'); res.end(JSON.stringify(data)); },
     redirect: (code, url) => { res.writeHead(code, { Location: url }); res.end(); },
   };
@@ -452,7 +453,11 @@ const server = http.createServer(async (req, res) => {
   // Google Tasks integration routes
   if (urlPath.startsWith('/api/google-calendar/')) {
     const queryParams = Object.fromEntries(new URLSearchParams(queryString));
-    const headers = { authorization: req.headers.authorization };
+    const headers = {
+      authorization: req.headers.authorization,
+      cookie: req.headers.cookie,
+      'x-forwarded-proto': req.headers['x-forwarded-proto'],
+    };
     const routeReq = { method: req.method, query: queryParams, headers };
 
     try {

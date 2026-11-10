@@ -113,11 +113,11 @@ export async function tasksRequest(accessToken, method, path, body) {
   return data;
 }
 
-export async function revokeToken(accessToken) {
+export async function revokeToken(refreshToken) {
   const response = await fetch('https://oauth2.googleapis.com/revoke', {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({ token: accessToken }),
+    body: new URLSearchParams({ token: refreshToken }),
   });
   if (!response.ok) throw new Error(`Google token revocation failed (${response.status})`);
 }

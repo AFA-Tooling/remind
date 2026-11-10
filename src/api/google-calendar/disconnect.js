@@ -14,10 +14,15 @@ export default async function handler(req, res, deps = {}) {
     const tokenSnapshot = await tokenRef.get();
     let revocationWarning = null;
     if (tokenSnapshot.exists) {
-      try {
-        await (deps.revokeToken || revokeToken)(tokenSnapshot.data().access_token);
-      } catch (error) {
-        revocationWarning = error.message;
+      const refreshToken = tokenSnapshot.data().refresh_token;
+      if (!refreshToken) {
+        revocationWarning = 'No Google refresh token was found to revoke';
+      } else {
+        try {
+          await (deps.revokeToken || revokeToken)(refreshToken);
+        } catch (error) {
+          revocationWarning = error.message;
+        }
       }
     }
     await tokenRef.delete();
