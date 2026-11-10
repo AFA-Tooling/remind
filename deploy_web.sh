@@ -133,6 +133,10 @@ FIREBASE_PROJECT_ID="$(_env_get FIREBASE_PROJECT_ID)"
 FIREBASE_API_KEY="$(_env_get FIREBASE_API_KEY)"
 FIREBASE_AUTH_DOMAIN="$(_env_get FIREBASE_AUTH_DOMAIN)"
 ADMIN_EMAILS="$(_env_get ADMIN_EMAILS)"
+GOOGLE_CALENDAR_CLIENT_ID="$(_env_get GOOGLE_CALENDAR_CLIENT_ID)"
+GOOGLE_CALENDAR_CLIENT_SECRET="$(_env_get GOOGLE_CALENDAR_CLIENT_SECRET)"
+# .env.local holds the localhost callback, so production's is set here
+GOOGLE_CALENDAR_REDIRECT_URI="https://autoremind.eecs.berkeley.edu/api/google-calendar/callback"
 
 # FIREBASE_SERVICE_ACCOUNT_JSON is the full JSON file content as a string
 FIREBASE_SERVICE_ACCOUNT_JSON=$(cat services/config/firebase_service_account.json)
@@ -143,6 +147,9 @@ create_or_update_secret_from_value "FIREBASE_API_KEY"              "$FIREBASE_AP
 create_or_update_secret_from_value "FIREBASE_AUTH_DOMAIN"          "$FIREBASE_AUTH_DOMAIN"
 create_or_update_secret_from_value "FIREBASE_SERVICE_ACCOUNT_JSON" "$FIREBASE_SERVICE_ACCOUNT_JSON"
 create_or_update_secret_from_value "ADMIN_EMAILS"                  "$ADMIN_EMAILS"
+create_or_update_secret_from_value "GOOGLE_CALENDAR_CLIENT_ID"     "$GOOGLE_CALENDAR_CLIENT_ID"
+create_or_update_secret_from_value "GOOGLE_CALENDAR_CLIENT_SECRET" "$GOOGLE_CALENDAR_CLIENT_SECRET"
+create_or_update_secret_from_value "GOOGLE_CALENDAR_REDIRECT_URI"  "$GOOGLE_CALENDAR_REDIRECT_URI"
 
 # File-mounted secrets (for Python email service)
 create_or_update_secret_from_file "oauth_client_secret"     "services/config/oauth_client_secret.json"
@@ -165,6 +172,9 @@ SECRETS=(
     oauth_client_secret
     firebase_service_account
     gmail_token
+    GOOGLE_CALENDAR_CLIENT_ID
+    GOOGLE_CALENDAR_CLIENT_SECRET
+    GOOGLE_CALENDAR_REDIRECT_URI
 )
 for SECRET in "${SECRETS[@]}"; do
     gcloud secrets add-iam-policy-binding "$SECRET" \
@@ -200,6 +210,9 @@ FIREBASE_API_KEY=FIREBASE_API_KEY:latest,\
 FIREBASE_AUTH_DOMAIN=FIREBASE_AUTH_DOMAIN:latest,\
 FIREBASE_SERVICE_ACCOUNT_JSON=FIREBASE_SERVICE_ACCOUNT_JSON:latest,\
 ADMIN_EMAILS=ADMIN_EMAILS:latest,\
+GOOGLE_CALENDAR_CLIENT_ID=GOOGLE_CALENDAR_CLIENT_ID:latest,\
+GOOGLE_CALENDAR_CLIENT_SECRET=GOOGLE_CALENDAR_CLIENT_SECRET:latest,\
+GOOGLE_CALENDAR_REDIRECT_URI=GOOGLE_CALENDAR_REDIRECT_URI:latest,\
 /secrets/oauth/oauth_client_secret.json=oauth_client_secret:latest,\
 /secrets/firebase_sa/firebase_service_account.json=firebase_service_account:latest,\
 /secrets/gmail/token.json=gmail_token:latest" \
