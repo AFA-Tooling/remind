@@ -15,5 +15,8 @@
   },
   "overrides": {
     "jose": "4.15.9"
+  },
+  "devDependencies": {
+    "jsdom": "^24.1.3"
   }
 }
