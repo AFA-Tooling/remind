@@ -6,12 +6,20 @@ import { LOCKOUT_MESSAGE, WAITLIST_MESSAGE } from '../study/messages.js';
 import { sanitizeCategoryPrefs, sanitizeExtraReminderDays, getCourse } from '../../shared/courses.js';
 import { syncStudentCourseFromRoster } from '../students/syncCourse.js';
 
-export default async function handler(req, res) {
+// deps is overridable only for tests — production always uses the real
+// modules via the defaults below (same pattern as canvas/disconnect.js).
+export default async function handler(req, res, deps = {}) {
+  const verifyAuth = deps.verifyUserAuth || verifyUserAuth;
+  const dbFactory = deps.getDb || getDb;
+  const studyStatusFor = deps.getStudyStatus || getStudyStatus;
+  const syncCourse = deps.syncStudentCourseFromRoster || syncStudentCourseFromRoster;
+  const sendWelcome = deps.sendWelcomeEmail || sendWelcomeEmail;
+
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const authResult = await verifyUserAuth(req);
+  const authResult = await verifyAuth(req);
   if (!authResult.authorized) {
     return res.status(401).json({ error: authResult.error });
   }
@@ -20,7 +28,7 @@ export default async function handler(req, res) {
     // Study-gating: non-consented students may not save settings at all.
     // Waitlisted/pending students DO save (their prefs activate when access opens),
     // but the response flags them so the UI can show the waitlist popup.
-    const study = await getStudyStatus(getDb(), authResult.email);
+    const study = await studyStatusFor(dbFactory(), authResult.email);
     if (study.status === 'not_consented') {
       return res.status(403).json({ error: 'Not consented', code: 'NOT_CONSENTED', message: LOCKOUT_MESSAGE });
     }
@@ -51,7 +59,7 @@ export default async function handler(req, res) {
     const clampedDays = Math.max(0, Math.min(5, Math.round(days_before)));
     const preferredFirstName = preferred_first_name ? preferred_first_name.trim() : null;
 
-    const db = getDb();
+    const db = dbFactory();
     const docRef = db.collection('students').doc(loginEmail);
 
     // Check if user already exists (to detect new vs returning user)
@@ -60,7 +68,7 @@ export default async function handler(req, res) {
     const alreadySentWelcome = existingUser?.welcome_email_sent === true;
 
     // Refresh course from roster before validating category prefs.
-    const synced = await syncStudentCourseFromRoster(db, loginEmail, existingUser);
+    const synced = await syncCourse(db, loginEmail, existingUser);
     const courseCode = synced.courseCode || existingUser?.course_code || null;
     const course = getCourse(courseCode);
 
@@ -109,7 +117,7 @@ export default async function handler(req, res) {
       try {
         console.log(`[Settings] Sending welcome email to new user: ${loginEmail}`);
 
-        const welcomeResult = await sendWelcomeEmail({
+        const welcomeResult = await sendWelcome({
           email: loginEmail,
           preferred_name: preferredFirstName || 'there',
           channels: {

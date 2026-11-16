@@ -6,12 +6,18 @@ import {
   prefsForResponse,
 } from '../students/syncCourse.js';
 
-export default async function handler(req, res) {
+// deps is overridable only for tests — production always uses the real
+// modules via the defaults below (same pattern as canvas/disconnect.js).
+export default async function handler(req, res, deps = {}) {
+    const verifyAuth = deps.verifyUserAuth || verifyUserAuth;
+    const dbFactory = deps.getDb || getDb;
+    const syncCourse = deps.syncStudentCourseFromRoster || syncStudentCourseFromRoster;
+
     if (req.method !== 'GET') {
         return res.status(405).json({ error: 'Method not allowed' });
     }
 
-    const authResult = await verifyUserAuth(req);
+    const authResult = await verifyAuth(req);
     if (!authResult.authorized) {
         return res.status(401).json({ error: authResult.error });
     }
@@ -19,7 +25,7 @@ export default async function handler(req, res) {
     try {
         const loginEmail = authResult.email;
 
-        const db = getDb();
+        const db = dbFactory();
         // Documents in 'students' collection are keyed by email
         const docSnap = await db.collection('students').doc(loginEmail).get();
 
@@ -28,7 +34,7 @@ export default async function handler(req, res) {
         }
 
         // Roster is authoritative: refresh course_code before returning prefs.
-        const synced = await syncStudentCourseFromRoster(db, loginEmail, docSnap.data());
+        const synced = await syncCourse(db, loginEmail, docSnap.data());
         const data = synced.data;
 
         const courseCode = synced.courseCode || data.course_code || null;
