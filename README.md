@@ -8,6 +8,7 @@ AutoRemind is a modular notification system that sends personalized assignment r
 
 - **Multi-channel reminders** — Email, SMS (Twilio), and Discord DMs
 - **bCourses integration** — Students connect their bCourses account via OAuth; upcoming assignments are synced automatically
+- **Google Calendar Tasks integration** — Students can connect Google Tasks to sync assignments and due dates into a dedicated task list visible in Google Calendar
 - **GradeSync integration** — Shared class deadlines ingested from Google Sheets
 - **Student dashboard** — Configure reminder channels, preferred name, and how many days before a deadline to be notified
 - **Admin dashboard** — View all students, deadlines, resources, and message delivery logs; manage assignment resources via a CRUD interface
@@ -68,6 +69,11 @@ Serves the student dashboard and REST API. All Firestore access goes through `sr
 | `POST /api/canvas/sync` | POST | On-demand bCourses assignment sync |
 | `GET /api/canvas/deadlines` | GET | Student's synced bCourses assignments |
 | `POST /api/canvas/disconnect` | POST | Remove bCourses connection |
+| `POST /api/google-calendar/auth` | POST | Start Google Tasks OAuth |
+| `GET /api/google-calendar/callback` | GET | Google Tasks OAuth callback |
+| `GET /api/google-calendar/status` | GET | Check the current user's Google Tasks connection |
+| `POST /api/google-calendar/sync` | POST | Create or update Google Tasks for assignments |
+| `POST /api/google-calendar/disconnect` | POST | Disconnect Google Tasks |
 | `GET /api/admin/students` | GET | All registered students (admin only) |
 | `GET /api/admin/deadlines` | GET | All deadlines (admin only) |
 | `GET /api/admin/resources` | GET/POST/PUT/DELETE | Assignment resources CRUD (admin only) |
@@ -92,6 +98,9 @@ Orchestrated by `services/gradesync_input/main.py`:
 | `assignment_submissions` | `{assignment}__{student}` | Submission status from GradeSync |
 | `canvas_tokens` | email | bCourses OAuth tokens (server-side only) |
 | `canvas_deadlines` | `{email}__{assignment_id}` | Per-student synced bCourses assignments |
+| `google_calendar_tokens` | email | Google OAuth tokens and task-list ID (server-side only) |
+| `google_calendar_oauth_states` | hash | Short-lived, one-time OAuth state tied to the initiating student |
+| `google_calendar_tasks` | hash | Maps a student's assignment to its Google Task |
 | `message_delivery_logs` | auto-id | Record of every sent/failed reminder |
 
 ---
@@ -107,6 +116,12 @@ Students can connect their bCourses account from the dashboard settings page.
 5. The reminder pipeline sends notifications for bCourses assignments the same way it does for GradeSync deadlines
 
 **Setup:** Create a developer key in the bCourses admin panel, set the redirect URI to `https://your-domain/api/canvas/callback`, and add `CANVAS_CLIENT_ID`, `CANVAS_CLIENT_SECRET`, and `CANVAS_REDIRECT_URI` to `.env.local`.
+
+## Google Calendar Tasks Integration
+
+Students can opt in from the Assignments page by connecting Google Tasks. AutoRemind creates or updates tasks in a dedicated **AutoRemind Assignments** task list, including each assignment's due date; that list is visible from Google Calendar's Tasks view. Assignments without a due date are skipped. Sync runs when the assignments page loads and can also be started manually. Disconnecting revokes the app's Google authorization when possible and stops future syncing; tasks already created remain in the student's Google account.
+
+**Local setup:** Enable the Google Tasks API in the Google Cloud project and create an OAuth client ID. Add `http://localhost:3000/api/google-calendar/callback` as an authorized redirect URI in Google Cloud, then put the client ID and secret in `.env.local` and set `GOOGLE_CALENDAR_REDIRECT_URI=http://localhost:3000/api/google-calendar/callback`. Start the app with `npm run dev`. These credentials should stay in `.env.local`, not `.env.example`.
 
 ---
 
@@ -142,6 +157,9 @@ See `.env.example` for a full template. Key variables:
 | `CANVAS_CLIENT_SECRET` | Node + Python | bCourses OAuth developer key secret |
 | `CANVAS_REDIRECT_URI` | Node | OAuth callback URL |
 | `CANVAS_DEFAULT_DOMAIN` | Node + Python | Canvas domain (default: `bcourses.berkeley.edu`) |
+| `GOOGLE_CALENDAR_CLIENT_ID` | Node | Google OAuth client ID |
+| `GOOGLE_CALENDAR_CLIENT_SECRET` | Node | Google OAuth client secret |
+| `GOOGLE_CALENDAR_REDIRECT_URI` | Node | Google Tasks OAuth callback URL |
 | `ADMIN_EMAILS` | Node | Comma-separated admin email allowlist |
 
 ---

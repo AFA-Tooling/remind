@@ -477,7 +477,7 @@
 
     async function updateAssignmentCompletion(key, completed) {
       const token = await window.auth?.getToken();
-      const response = await fetch('/api/assignments/completed', {
+      const res = await fetch('/api/assignments/completed', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -485,7 +485,7 @@
         },
         body: JSON.stringify({ assignment_key: key, completed }),
       });
-      if (!response.ok) throw new Error('Failed to save assignment completion');
+      if (!res.ok) throw new Error('Failed to save assignment completion');
       if (completed) completedAssignments.add(key);
       else completedAssignments.delete(key);
     }
@@ -676,7 +676,6 @@
           if (!b.due) return -1;
           return new Date(a.due) - new Date(b.due);
         });
-
         if (allDeadlines.length === 0 && !enrolled && canvasDeadlines.length === 0) {
           notEnrolledEl.style.display = 'block';
           return;
@@ -686,7 +685,6 @@
         const upcoming = allDeadlines.filter(d => !isAssignmentCompleted(d) && (!d.due || new Date(d.due) >= now));
         const past = allDeadlines.filter(d => isAssignmentCompleted(d) || (d.due && new Date(d.due) < now));
         const hasPast = past.length > 0;
-
         if (upcoming.length === 0 && allDeadlines.length === 0) {
           emptyEl.style.display = 'block';
           return;
