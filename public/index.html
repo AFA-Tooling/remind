@@ -215,7 +215,8 @@
             <summary>Advanced options</summary>
             <p class="extra-reminders-help">
               Want more than one reminder? Tick extra days for each assignment type.
-              The <span class="extra-locked-key">locked</span> column is your main reminder from the slider above.
+              The <span class="extra-locked-key">highlighted</span> column is your main reminder from the slider above;
+              untick it to skip that reminder for a type.
             </p>
             <div class="extra-grid-wrap">
               <table class="extra-grid" id="extra-grid">
@@ -404,12 +405,15 @@
     // --- Advanced options: extra reminder days ---
     // The slider is the main reminder; this grid only ADDS days on top of it.
     // extraDays mirrors extra_reminder_days in Firestore, e.g. {project: [1]}.
-    // The slider's day shows as locked-on in every row but is never written into
-    // extraDays, so a ticked extra survives the slider moving onto it and away.
+    // The slider's day shows as a highlighted column, ticked in every row unless
+    // the student unticked it for that type (mainOff mirrors main_reminder_off,
+    // e.g. ['project']; it follows the slider). The slider day is never written
+    // into extraDays, so a ticked extra survives the slider moving onto it and away.
     const OTHER_EXTRA_KEY = 'other';
     const EXTRA_DAY_COLUMNS = [0, 1, 2, 3, 4, 5];
     const extraGrid = document.getElementById('extra-grid');
     let extraDays = {};
+    let mainOff = new Set();
     let extraRows = [{ id: OTHER_EXTRA_KEY, label: 'Other / bCourses' }];
     // Only send extra_reminder_days once the saved value has loaded or the
     // student has changed the grid — otherwise a failed load would wipe it.
@@ -462,8 +466,8 @@
         tr.querySelectorAll('input[data-day]').forEach((input) => {
           const d = Number(input.dataset.day);
           const isLocked = d === locked;
-          input.checked = isLocked || (extraDays[type] || []).includes(d);
-          input.disabled = isLocked || off;
+          input.checked = isLocked ? !mainOff.has(type) : (extraDays[type] || []).includes(d);
+          input.disabled = off;
         });
       });
     }
@@ -475,6 +479,7 @@
         ...categories.map((cat) => ({ id: cat.id, label: cat.label || cat.id })),
         { id: OTHER_EXTRA_KEY, label: 'Other / bCourses' },
       ];
+      mainOff = new Set(Array.isArray(data.main_reminder_off) ? data.main_reminder_off : []);
       const saved = data.extra_reminder_days;
       extraDays = {};
       if (saved && typeof saved === 'object') {
@@ -491,6 +496,12 @@
       if (!input) return;
       const type = input.dataset.extraType;
       const d = Number(input.dataset.day);
+      extraDaysReady = true;
+      // Highlighted (slider) column toggles the main reminder for this type.
+      if (input.closest('td').classList.contains('is-locked')) {
+        if (input.checked) mainOff.delete(type); else mainOff.add(type);
+        return;
+      }
       const days = new Set(extraDays[type] || []);
       if (input.checked) days.add(d); else days.delete(d);
       extraDays[type] = [...days].sort((a, b) => b - a);
@@ -638,7 +649,10 @@
       }
 
       // Advanced options grid. Omitted → server leaves stored extras untouched.
-      if (extraDaysReady) payload.extra_reminder_days = extraDays;
+      if (extraDaysReady) {
+        payload.extra_reminder_days = extraDays;
+        payload.main_reminder_off = [...mainOff];
+      }
 
       return payload;
     }

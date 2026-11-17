@@ -97,16 +97,21 @@ export const MAX_REMINDER_DAYS = 5;
  *
  * Returns null when the input isn't a plain object, so callers can skip the write.
  */
-export function sanitizeExtraReminderDays(courseCode, incoming) {
-  if (!incoming || typeof incoming !== 'object' || Array.isArray(incoming)) {
-    return null;
-  }
+function reminderRowIds(courseCode) {
   const course = getCourse(courseCode);
   const allowed = new Set([OTHER_REMINDER_KEY]);
   for (const cat of course?.categories || []) {
     const id = String(cat.id || '').trim().toLowerCase();
     if (id) allowed.add(id);
   }
+  return allowed;
+}
+
+export function sanitizeExtraReminderDays(courseCode, incoming) {
+  if (!incoming || typeof incoming !== 'object' || Array.isArray(incoming)) {
+    return null;
+  }
+  const allowed = reminderRowIds(courseCode);
 
   const out = {};
   for (const id of allowed) {
@@ -120,6 +125,24 @@ export function sanitizeExtraReminderDays(courseCode, incoming) {
     out[id] = clean;
   }
   return out;
+}
+
+/**
+ * Clean an incoming main_reminder_off list before saving: the assignment types
+ * whose main (slider) reminder the student unticked in the Advanced options
+ * grid, e.g. ["project"]. Keeps only the course's own category ids plus
+ * "other", de-duplicated and sorted. Returns null when the input isn't an
+ * array, so callers can skip the write.
+ */
+export function sanitizeMainReminderOff(courseCode, incoming) {
+  if (!Array.isArray(incoming)) return null;
+  const allowed = reminderRowIds(courseCode);
+  return [...new Set(
+    incoming
+      .filter((id) => typeof id === 'string')
+      .map((id) => id.trim().toLowerCase())
+      .filter((id) => allowed.has(id)),
+  )].sort();
 }
 
 export function publicCourseConfig(courseCode) {

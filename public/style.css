@@ -588,11 +588,8 @@ h1, h2 {
     transform: translate(-50%, -50%);
 }
 
-/* Main (slider) reminder: always on, can't be unticked here */
-.extra-grid td.is-locked label {
-    cursor: not-allowed;
-}
-
+/* Main (slider) reminder column. Ticked = darker gold; unticked falls back to
+   the plain white dot like any other unticked cell. */
 .extra-grid td.is-locked input:checked+.dot {
     background: var(--gold-dark);
     border-color: var(--gold-dark);

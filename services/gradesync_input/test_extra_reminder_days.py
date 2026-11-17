@@ -202,3 +202,31 @@ def test_canvas_uses_other_row():
 def test_canvas_ignores_course_category_extras():
     student = make_student(extra_reminder_days={"project": [1]})
     assert not canvas_fires(student, 1)
+
+
+# --- main_reminder_off (slider day unticked for a type) ----------------------
+
+def test_main_reminder_off_skips_slider_day_for_that_type():
+    student = make_student(main_reminder_off=["project"])
+    assert not fires(student, PROJECT, 3)
+    assert fires(student, HOMEWORK, 3), "other types keep the main reminder"
+
+
+def test_main_reminder_off_keeps_extras():
+    student = make_student(main_reminder_off=["project"], extra_reminder_days={"project": [1]})
+    assert not fires(student, PROJECT, 3)
+    assert fires(student, PROJECT, 1)
+
+
+def test_main_reminder_off_also_drops_extra_on_slider_day():
+    # Unticked means no reminder that day, even if an extra was stored for it
+    # back when the slider sat somewhere else.
+    student = make_student(main_reminder_off=["project"], extra_reminder_days={"project": [3, 1]})
+    assert db_fetch.get_reminder_days(student, 3, "project") == {1}
+
+
+def test_main_reminder_off_malformed_is_ignored():
+    for bad in ("project", {"project": True}, None):
+        student = make_student(main_reminder_off=bad)
+        assert db_fetch.get_reminder_days(student, 3, "project") == {3}, bad
+

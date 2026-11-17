@@ -1,6 +1,6 @@
 import { getDb } from '../firestore.js';
 import { verifyUserAuth } from '../auth/verifyUser.js';
-import { publicCourseConfig, sanitizeExtraReminderDays } from '../../shared/courses.js';
+import { publicCourseConfig, sanitizeExtraReminderDays, sanitizeMainReminderOff } from '../../shared/courses.js';
 import {
   syncStudentCourseFromRoster,
   prefsForResponse,
@@ -64,6 +64,7 @@ export default async function handler(req, res, deps = {}) {
                 course,
                 category_prefs: categoryPrefs,
                 extra_reminder_days: extraReminderDays,
+                main_reminder_off: sanitizeMainReminderOff(courseCode, data.main_reminder_off || []),
                 project_early_reminder: data.project_early_reminder === true,
                 // Opt-out: release-day notifications are on unless explicitly disabled.
                 release_reminder: data.release_reminder !== false,

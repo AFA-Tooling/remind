@@ -241,3 +241,30 @@ test('missing days_before is still rejected', async () => {
   assert.equal(res.statusCode, 400);
   assert.equal(db._writes.length, 0);
 });
+
+// --- main_reminder_off (slider day unticked per type) -------------------------
+
+test('saves main_reminder_off, keeping only real types', async () => {
+  const db = makeDb({ students: { [CALLER]: { welcome_email_sent: true } } });
+  const res = await save(db, body({ main_reminder_off: ['project', 'made_up_type', 'other'] }));
+  assert.equal(res.statusCode, 200);
+  assert.deepEqual(stored(db).main_reminder_off, ['other', 'project']);
+});
+
+test('an empty main_reminder_off turns every main reminder back on', async () => {
+  const db = makeDb({ students: { [CALLER]: { welcome_email_sent: true, main_reminder_off: ['lab'] } } });
+  await save(db, body({ main_reminder_off: [] }));
+  assert.deepEqual(stored(db).main_reminder_off, []);
+});
+
+test('omitting main_reminder_off leaves it untouched', async () => {
+  const db = makeDb({ students: { [CALLER]: { welcome_email_sent: true, main_reminder_off: ['lab'] } } });
+  await save(db, body());
+  assert.deepEqual(stored(db).main_reminder_off, ['lab']);
+});
+
+test('non-array main_reminder_off is rejected', async () => {
+  const db = makeDb({ students: { [CALLER]: { welcome_email_sent: true } } });
+  const res = await save(db, body({ main_reminder_off: { project: true } }));
+  assert.equal(res.statusCode, 400);
+});

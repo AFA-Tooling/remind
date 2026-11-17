@@ -538,28 +538,32 @@ def get_notification_frequency(student: Dict[str, Any], assignment_code: str) ->
 # Default reminder time for all assignments is 3 days
 
 EXTRA_REMINDER_DAYS_FIELD = "extra_reminder_days"
+# Types whose main (slider) reminder the student unticked in the grid, e.g. ["project"].
+MAIN_REMINDER_OFF_FIELD = "main_reminder_off"
 OTHER_REMINDER_KEY = "other"
 MAX_REMINDER_DAYS = 5
 
 
 def get_reminder_days(student: Dict[str, Any], main_days: int, category_id: str) -> set:
     """Return set of every days-before-deadline value a reminder should fire on.
-    'Other' is for bCourse assignments 
-    Always includes the main (slider) day. 
+    'Other' is for bCourse assignments.
+    Includes the main (slider) day unless the student unticked it for this
+    category (main_reminder_off). Unticked means no reminder on that day at
+    all, so an extra stored for the same day is dropped too.
     """
     days = {main_days}
     extras_by_category = student.get(EXTRA_REMINDER_DAYS_FIELD)
-    if not isinstance(extras_by_category, dict):
-        return days
-    extras = extras_by_category.get(category_id)
-    if not isinstance(extras, list):
-        return days
-    for value in extras:
-        # bool is a subclass of int; True/False are not day counts.
-        if isinstance(value, bool) or not isinstance(value, int):
-            continue
-        if 0 <= value <= MAX_REMINDER_DAYS:
-            days.add(value)
+    extras = extras_by_category.get(category_id) if isinstance(extras_by_category, dict) else None
+    if isinstance(extras, list):
+        for value in extras:
+            # bool is a subclass of int; True/False are not day counts.
+            if isinstance(value, bool) or not isinstance(value, int):
+                continue
+            if 0 <= value <= MAX_REMINDER_DAYS:
+                days.add(value)
+    main_off = student.get(MAIN_REMINDER_OFF_FIELD)
+    if isinstance(main_off, list) and category_id in main_off:
+        days.discard(main_days)
     return days
 
 

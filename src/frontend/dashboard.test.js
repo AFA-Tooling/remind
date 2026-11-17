@@ -144,14 +144,54 @@ test('grid shows one row per course type plus Other / bCourses', async (t) => {
   assert.equal(d.doc.querySelectorAll('#extra-grid thead th[data-day]').length, 6);
 });
 
-test('slider day is ticked and locked in every row', async (t) => {
+const isLocked = (input) => input.closest('td').classList.contains('is-locked');
+
+test('slider day is ticked and highlighted in every row', async (t) => {
   const d = await loadDashboard();
   t.after(d.close);
   for (const type of d.rowTypes()) {
     assert.equal(d.cell(type, 3).checked, true, `${type} day 3 ticked`);
-    assert.equal(d.cell(type, 3).disabled, true, `${type} day 3 locked`);
-    assert.ok(d.cell(type, 3).closest('td').classList.contains('is-locked'));
+    assert.ok(isLocked(d.cell(type, 3)), `${type} day 3 highlighted`);
   }
+  assert.equal(d.cell('lab', 3).disabled, false, 'slider-day cell can be clicked');
+  assert.equal(d.cell('homework', 3).disabled, true, 'but not in a row whose type is off');
+});
+
+// --- unticking the main (slider) reminder per type ---------------------------
+
+test('unticking a highlighted cell turns off only that row', async (t) => {
+  const d = await loadDashboard();
+  t.after(d.close);
+  d.cell('project', 3).click();
+  assert.equal(d.cell('project', 3).checked, false);
+  assert.equal(d.cell('lab', 3).checked, true, 'other rows keep their main reminder');
+  d.$('#main-cta-btn').click();
+  await waitFor(() => d.saves.length === 1, 'save request');
+  assert.deepEqual(d.saves[0].main_reminder_off, ['project']);
+  assert.equal(d.saves[0].days_before, 3, 'slider value unchanged');
+  assert.ok(!d.saves[0].extra_reminder_days.project.includes(3), 'not stored as an extra');
+});
+
+test('ticking it again turns the main reminder back on', async (t) => {
+  const d = await loadDashboard();
+  t.after(d.close);
+  d.cell('project', 3).click();
+  d.cell('project', 3).click();
+  assert.equal(d.cell('project', 3).checked, true);
+  d.$('#main-cta-btn').click();
+  await waitFor(() => d.saves.length === 1, 'save request');
+  assert.deepEqual(d.saves[0].main_reminder_off, []);
+});
+
+test('saved main_reminder_off loads unticked, and follows the slider', async (t) => {
+  const d = await loadDashboard({ data: studentData({ main_reminder_off: ['lab'] }) });
+  t.after(d.close);
+  assert.equal(d.cell('lab', 3).checked, false);
+  assert.equal(d.cell('project', 3).checked, true);
+  d.setSlider(5);
+  assert.equal(d.cell('lab', 5).checked, false, 'still off in the new highlighted column');
+  assert.equal(d.cell('lab', 3).checked, false, 'old column is a plain unticked extra');
+  assert.equal(d.cell('project', 5).checked, true);
 });
 
 test('saved extras load ticked and editable', async (t) => {
@@ -196,12 +236,12 @@ test('moving the slider moves the locked column; ticked extras survive', async (
   const d = await loadDashboard();
   t.after(d.close);
   d.setSlider(1);
-  assert.equal(d.cell('project', 1).disabled, true, 'project day 1 now the locked main reminder');
+  assert.ok(isLocked(d.cell('project', 1)), 'project day 1 now the highlighted main reminder');
   assert.equal(d.cell('lab', 3).checked, false, 'old slider day no longer ticked');
   assert.equal(d.cell('lab', 3).disabled, false);
   d.setSlider(3);
   assert.equal(d.cell('project', 1).checked, true, 'extra still ticked after slider moves away');
-  assert.equal(d.cell('project', 1).disabled, false);
+  assert.ok(!isLocked(d.cell('project', 1)));
 });
 
 test('typing in the number box also moves the locked column', async (t) => {
@@ -210,8 +250,8 @@ test('typing in the number box also moves the locked column', async (t) => {
   const num = d.$('#days');
   num.value = '5';
   num.dispatchEvent(new d.window.Event('input', { bubbles: true }));
-  assert.equal(d.cell('lab', 5).disabled, true);
-  assert.equal(d.cell('lab', 3).disabled, false);
+  assert.ok(isLocked(d.cell('lab', 5)));
+  assert.ok(!isLocked(d.cell('lab', 3)));
 });
 
 // --- saving -----------------------------------------------------------------

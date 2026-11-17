@@ -3,7 +3,7 @@ import { sendWelcomeEmail } from '../../services/welcomeEmail.js';
 import { verifyUserAuth } from '../auth/verifyUser.js';
 import { getStudyStatus } from '../study/studyStatus.js';
 import { LOCKOUT_MESSAGE, WAITLIST_MESSAGE } from '../study/messages.js';
-import { sanitizeCategoryPrefs, sanitizeExtraReminderDays, getCourse } from '../../shared/courses.js';
+import { sanitizeCategoryPrefs, sanitizeExtraReminderDays, sanitizeMainReminderOff, getCourse } from '../../shared/courses.js';
 import { syncStudentCourseFromRoster } from '../students/syncCourse.js';
 
 // deps is overridable only for tests — production always uses the real
@@ -44,6 +44,7 @@ export default async function handler(req, res, deps = {}) {
       project_early_reminder,
       release_reminder,
       extra_reminder_days,
+      main_reminder_off,
     } = body;
 
     const loginEmail = authResult.email;
@@ -104,6 +105,16 @@ export default async function handler(req, res, deps = {}) {
         return res.status(400).json({ error: 'extra_reminder_days must be an object' });
       }
       studentData.extra_reminder_days = cleanExtras;
+    }
+
+    // Types whose main (slider) reminder was unticked in the grid. Same
+    // omitted → untouched rule as extra_reminder_days.
+    if (main_reminder_off !== undefined) {
+      const cleanOff = sanitizeMainReminderOff(courseCode, main_reminder_off);
+      if (cleanOff === null) {
+        return res.status(400).json({ error: 'main_reminder_off must be an array' });
+      }
+      studentData.main_reminder_off = cleanOff;
     }
 
     // Document ID = email — set(merge:true) acts as upsert

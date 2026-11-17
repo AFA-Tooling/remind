@@ -7,6 +7,7 @@ import {
   publicCourseConfig,
   sanitizeCategoryPrefs,
   sanitizeExtraReminderDays,
+  sanitizeMainReminderOff,
   mergeCategoryPrefs,
   listCourseCodes,
 } from './courses.js';
@@ -116,4 +117,22 @@ test('extra reminder days: non-object input returns null', () => {
   assert.equal(sanitizeExtraReminderDays('CS61A', null), null);
   assert.equal(sanitizeExtraReminderDays('CS61A', [1, 2]), null);
   assert.equal(sanitizeExtraReminderDays('CS61A', 'project'), null);
+});
+
+test('main reminder off: keeps course types and other, lowercased, deduped, sorted', () => {
+  assert.deepEqual(
+    sanitizeMainReminderOff('CS61A', ['project', 'Other', 'project', ' lab ']),
+    ['lab', 'other', 'project'],
+  );
+});
+
+test('main reminder off: drops unknown types and non-strings', () => {
+  assert.deepEqual(sanitizeMainReminderOff('CS61A', ['nope', 3, null, 'quiz']), ['quiz']);
+  assert.deepEqual(sanitizeMainReminderOff('NOT_A_COURSE', ['project', 'other']), ['other']);
+});
+
+test('main reminder off: non-array input returns null', () => {
+  assert.equal(sanitizeMainReminderOff('CS61A', 'project'), null);
+  assert.equal(sanitizeMainReminderOff('CS61A', { project: true }), null);
+  assert.deepEqual(sanitizeMainReminderOff('CS61A', []), []);
 });

@@ -172,3 +172,10 @@ test('a second save that unticks everything loads back as all empty', async () =
   const res = await load(db);
   assert.deepEqual(res.body.data.extra_reminder_days, EMPTY_CS61A);
 });
+
+test('returns main_reminder_off, cleaned; [] when never saved', async () => {
+  let res = await load(makeDb({ students: { [CALLER]: { main_reminder_off: ['project', 'postterm'] } } }));
+  assert.deepEqual(res.body.data.main_reminder_off, ['project']);
+  res = await load(makeDb({ students: { [CALLER]: { days_before_deadline: 3 } } }));
+  assert.deepEqual(res.body.data.main_reminder_off, []);
+});
