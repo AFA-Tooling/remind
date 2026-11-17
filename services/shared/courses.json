@@ -9,7 +9,6 @@
       "categories": [
         { "id": "lab", "name": "Lab", "label": "Labs" },
         { "id": "homework", "name": "Homework", "label": "Homework" },
-        { "id": "midterm", "name": "Midterm", "label": "Midterms" },
         { "id": "quiz", "name": "Quiz", "label": "Quizzes" },
         { "id": "project", "name": "Project", "label": "Projects" }
       ],
@@ -34,6 +33,7 @@
       ],
       "ingest_unmatched": "skip",
       "reminder_unmatched": "project",
+      "no_reminder_categories": ["midterm"],
       "features": {
         "project_early_reminder": {
           "enabled": true,
@@ -54,7 +54,6 @@
       "drive_folder_id": "18D_CnazKGJ7F7nAZx0flFu9o2qVJeQUz",
       "categories": [
         { "id": "project", "name": "Project", "label": "Projects" },
-        { "id": "midterm", "name": "Midterm", "label": "Midterms" },
         { "id": "postterm", "name": "Postterm", "label": "Postterms" }
       ],
       "matchers": [
@@ -73,6 +72,7 @@
       ],
       "ingest_unmatched": "skip",
       "reminder_unmatched": "project",
+      "no_reminder_categories": ["midterm"],
       "features": {
         "release_reminder": {
           "enabled": true,

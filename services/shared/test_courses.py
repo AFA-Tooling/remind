@@ -16,7 +16,6 @@ def test_default_prefs_match_legacy_keys():
     assert default_category_prefs("CS61A") == {
         "lab": True,
         "homework": True,
-        "midterm": True,
         "quiz": True,
         "project": True,
     }
@@ -65,3 +64,15 @@ if __name__ == "__main__":
             print(f"FAIL {test.__name__}: {exc or 'assertion failed'}")
     print(f"\n{len(tests) - failures}/{len(tests)} passed")
     sys.exit(1 if failures else 0)
+
+
+def test_midterms_get_no_reminders_and_no_ui_row():
+    from shared.courses import reminders_off_for_category, public_course_config
+    for code in ("CS61A", "CS10"):
+        assert reminders_off_for_category(code, "Midterm")
+        assert not reminders_off_for_category(code, "Project")
+        ids = [c["id"] for c in public_course_config(code)["categories"]]
+        assert "midterm" not in ids, code
+    # Still matched as Midterm (not reminder_unmatched -> Project).
+    assert categorize_assignment("CS61A", "Midterm 1", mode="reminder") == "Midterm"
+    assert categorize_assignment("CS10", "Midterm 1", mode="reminder") == "Midterm"

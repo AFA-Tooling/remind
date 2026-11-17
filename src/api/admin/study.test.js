@@ -90,7 +90,7 @@ test('consenting enrolls the student for email without any sign-in', async () =>
   assert.equal(student.days_before_deadline, DEFAULT_DAYS_BEFORE_DEADLINE);
   assert.equal(student.enrolled_via, 'consent');
   assert.deepEqual(student.category_prefs, {
-    lab: true, homework: true, midterm: true, quiz: true, project: true,
+    lab: true, homework: true, quiz: true, project: true,
   });
 });
 

@@ -63,7 +63,6 @@ test('new student doc enables every assignment category', () => {
   assert.deepEqual(student.category_prefs, {
     lab: true,
     homework: true,
-    midterm: true,
     quiz: true,
     project: true,
   });

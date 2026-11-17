@@ -1,17 +1,23 @@
 import { getDb } from '../firestore.js';
 import { verifyUserAuth } from '../auth/verifyUser.js';
-import { publicCourseConfig } from '../../shared/courses.js';
+import { publicCourseConfig, sanitizeExtraReminderDays, sanitizeMainReminderOff } from '../../shared/courses.js';
 import {
   syncStudentCourseFromRoster,
   prefsForResponse,
 } from '../students/syncCourse.js';
 
-export default async function handler(req, res) {
+// deps is overridable only for tests — production always uses the real
+// modules via the defaults below (same pattern as canvas/disconnect.js).
+export default async function handler(req, res, deps = {}) {
+    const verifyAuth = deps.verifyUserAuth || verifyUserAuth;
+    const dbFactory = deps.getDb || getDb;
+    const syncCourse = deps.syncStudentCourseFromRoster || syncStudentCourseFromRoster;
+
     if (req.method !== 'GET') {
         return res.status(405).json({ error: 'Method not allowed' });
     }
 
-    const authResult = await verifyUserAuth(req);
+    const authResult = await verifyAuth(req);
     if (!authResult.authorized) {
         return res.status(401).json({ error: authResult.error });
     }
@@ -19,7 +25,7 @@ export default async function handler(req, res) {
     try {
         const loginEmail = authResult.email;
 
-        const db = getDb();
+        const db = dbFactory();
         // Documents in 'students' collection are keyed by email
         const docSnap = await db.collection('students').doc(loginEmail).get();
 
@@ -28,12 +34,17 @@ export default async function handler(req, res) {
         }
 
         // Roster is authoritative: refresh course_code before returning prefs.
-        const synced = await syncStudentCourseFromRoster(db, loginEmail, docSnap.data());
+        const synced = await syncCourse(db, loginEmail, docSnap.data());
         const data = synced.data;
 
         const courseCode = synced.courseCode || data.course_code || null;
         const course = publicCourseConfig(courseCode);
         const categoryPrefs = prefsForResponse(courseCode, data.category_prefs);
+        // Same cleanup as on save, so the grid always gets one row per type
+        // (as [] when nothing is ticked), even if nothing has been saved yet.
+        const extraReminderDays =
+            sanitizeExtraReminderDays(courseCode, data.extra_reminder_days || {}) ||
+            sanitizeExtraReminderDays(courseCode, {});
 
         return res.status(200).json({
             success: true,
@@ -52,6 +63,8 @@ export default async function handler(req, res) {
                 course_code: courseCode,
                 course,
                 category_prefs: categoryPrefs,
+                extra_reminder_days: extraReminderDays,
+                main_reminder_off: sanitizeMainReminderOff(courseCode, data.main_reminder_off || []),
                 project_early_reminder: data.project_early_reminder === true,
                 // Opt-out: release-day notifications are on unless explicitly disabled.
                 release_reminder: data.release_reminder !== false,

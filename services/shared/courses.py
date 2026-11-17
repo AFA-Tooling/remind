@@ -114,6 +114,17 @@ def categorize_assignment(
     return category_name(course, str(unmatched)) or str(unmatched).capitalize()
 
 
+def reminders_off_for_category(course_code: Optional[str], category: Optional[str]) -> bool:
+    """True for categories we never send reminders for (courses.json
+    no_reminder_categories, e.g. midterms). They are still matched so they
+    don't fall through to reminder_unmatched and get reminded as projects."""
+    course = get_course(course_code) or get_course(default_course_code())
+    if not course or not category:
+        return False
+    off = {str(c).strip().lower() for c in course.get("no_reminder_categories") or []}
+    return str(category).strip().lower() in off
+
+
 def should_apply_project_early(
     course_code: Optional[str],
     category_name_value: Optional[str],
