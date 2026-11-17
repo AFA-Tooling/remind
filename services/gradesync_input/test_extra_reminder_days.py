@@ -230,3 +230,15 @@ def test_main_reminder_off_malformed_is_ignored():
         student = make_student(main_reminder_off=bad)
         assert db_fetch.get_reminder_days(student, 3, "project") == {3}, bad
 
+
+# --- midterms never get reminders --------------------------------------------
+
+def test_midterm_never_fires_even_with_old_prefs_and_extras():
+    # Students saved before midterms were removed may still have midterm: True.
+    student = make_student(
+        category_prefs={"lab": True, "homework": True, "midterm": True, "project": True},
+        extra_reminder_days={"midterm": [0, 1, 2], "project": [0, 1, 2]},
+    )
+    for n in range(0, 6):
+        assert not fires(student, "Midterm 1", n), n
+        assert not fires(student, "Midterm 2 Retake", n), n

@@ -26,7 +26,6 @@ test('default category prefs match legacy keys', () => {
   assert.deepEqual(defaultCategoryPrefs('CS61A'), {
     lab: true,
     homework: true,
-    midterm: true,
     quiz: true,
     project: true,
   });
@@ -36,7 +35,7 @@ test('public course config exposes UI fields', () => {
   const cfg = publicCourseConfig('CS61A');
   assert.equal(cfg.course_code, 'CS61A');
   assert.equal(cfg.display_name, 'CS 61A');
-  assert.equal(cfg.categories.length, 5);
+  assert.equal(cfg.categories.length, 4);
   assert.equal(cfg.features.project_early_reminder.enabled, true);
   assert.equal(cfg.features.release_reminder.enabled, true);
 });
@@ -47,7 +46,6 @@ test('sanitize drops unknown category keys', () => {
     {
       lab: false,
       homework: true,
-      midterm: false,
       quiz: false,
       project: false,
     },
@@ -58,7 +56,6 @@ test('merge preserves known prefs and defaults new ones on', () => {
   assert.deepEqual(mergeCategoryPrefs('CS61A', { lab: false }), {
     lab: false,
     homework: true,
-    midterm: true,
     quiz: true,
     project: true,
   });
@@ -67,7 +64,7 @@ test('merge preserves known prefs and defaults new ones on', () => {
 // --- sanitizeExtraReminderDays ----------------------------------------------
 
 const EMPTY_CS61A_EXTRAS = {
-  other: [], lab: [], homework: [], midterm: [], quiz: [], project: [],
+  other: [], lab: [], homework: [], quiz: [], project: [],
 };
 
 test('extra reminder days: keeps valid days for course types and other', () => {

@@ -22,7 +22,7 @@ const CS61A = {
   display_name: 'CS 61A',
   categories: [
     { id: 'lab', label: 'Labs' }, { id: 'homework', label: 'Homework' },
-    { id: 'midterm', label: 'Midterms' }, { id: 'quiz', label: 'Quizzes' },
+    { id: 'quiz', label: 'Quizzes' },
     { id: 'project', label: 'Projects' },
   ],
   features: {},
@@ -40,8 +40,8 @@ function studentData(overrides = {}) {
     on_roster: true,
     course_code: 'CS61A',
     course: CS61A,
-    category_prefs: { lab: true, homework: false, midterm: true, quiz: true, project: true },
-    extra_reminder_days: { other: [], lab: [], homework: [], midterm: [], quiz: [], project: [1] },
+    category_prefs: { lab: true, homework: false, quiz: true, project: true },
+    extra_reminder_days: { other: [], lab: [], homework: [], quiz: [], project: [1] },
     canvas_connected: false,
     ...overrides,
   };
@@ -140,7 +140,7 @@ async function waitFor(cond, what, timeoutMs = 3000) {
 test('grid shows one row per course type plus Other / bCourses', async (t) => {
   const d = await loadDashboard();
   t.after(d.close);
-  assert.deepEqual(d.rowTypes(), ['lab', 'homework', 'midterm', 'quiz', 'project', 'other']);
+  assert.deepEqual(d.rowTypes(), ['lab', 'homework', 'quiz', 'project', 'other']);
   assert.equal(d.doc.querySelectorAll('#extra-grid thead th[data-day]').length, 6);
 });
 
@@ -285,14 +285,14 @@ test('unticking a saved extra sends it as cleared', async (t) => {
 test('in-grid Save sends exactly what Save Settings sends', async (t) => {
   const d = await loadDashboard();
   t.after(d.close);
-  d.cell('midterm', 2).click();
+  d.cell('lab', 2).click();
   d.$('#extra-save-btn').click();
   await waitFor(() => d.saves.length === 1, 'in-grid save');
   await d.flush();
   d.$('#main-cta-btn').click();
   await waitFor(() => d.saves.length === 2, 'main save');
   assert.deepEqual(d.saves[0], d.saves[1]);
-  assert.deepEqual(d.saves[0].extra_reminder_days.midterm, [2]);
+  assert.deepEqual(d.saves[0].extra_reminder_days.lab, [2]);
 });
 
 test('in-grid Save lives inside Advanced options, so it folds away with it', async (t) => {

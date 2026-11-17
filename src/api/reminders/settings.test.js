@@ -89,7 +89,7 @@ function body(extra = {}) {
     channels: { email: true },
     days_before: 3,
     preferred_first_name: 'Sam',
-    category_prefs: { lab: true, homework: true, midterm: true, quiz: true, project: true },
+    category_prefs: { lab: true, homework: true, quiz: true, project: true },
     ...extra,
   };
 }
@@ -111,7 +111,7 @@ test('saves extra reminder days, cleaned, with every course row present', async 
   }));
   assert.equal(res.statusCode, 200);
   assert.deepEqual(stored(db).extra_reminder_days, {
-    other: [0], lab: [], homework: [], midterm: [], quiz: [], project: [1],
+    other: [0], lab: [], homework: [], quiz: [], project: [1],
   });
 });
 
@@ -215,7 +215,7 @@ test('regular save without extras still stores slider, channels and type prefs',
   const db = makeDb({ students: { [CALLER]: { welcome_email_sent: true } } });
   const res = await save(db, body({
     days_before: 4,
-    category_prefs: { lab: true, homework: false, midterm: true, quiz: true, project: true },
+    category_prefs: { lab: true, homework: false, quiz: true, project: true },
   }));
   assert.equal(res.statusCode, 200);
   const s = stored(db);

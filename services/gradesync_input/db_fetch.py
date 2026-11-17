@@ -25,6 +25,7 @@ if str(SERVICES_DIR) not in sys.path:
 from shared import settings
 from shared.courses import (
     categorize_assignment,
+    reminders_off_for_category,
     should_apply_project_early,
 )
 
@@ -678,6 +679,13 @@ def build_assignment_payload(
     category = derive_assignment_category(
         entry.get("assignment_name"), code, course_code=course_code
     )
+    if reminders_off_for_category(course_code, category):
+        msg = f"Skipping {code}: no reminders are sent for category '{category}'"
+        if is_target_student or debug:
+            print(f"   ❌ {msg}")
+        debug_print(debug, msg)
+        return None
+
     category_prefs = student.get("category_prefs")
     if isinstance(category_prefs, dict):
         if not category_prefs.get(category.lower(), True):

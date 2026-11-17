@@ -8,7 +8,7 @@ import saveHandler from './settings.js';
 // save → load round trip through both real handlers.
 
 const CALLER = 'student@berkeley.edu';
-const EMPTY_CS61A = { other: [], lab: [], homework: [], midterm: [], quiz: [], project: [] };
+const EMPTY_CS61A = { other: [], lab: [], homework: [], quiz: [], project: [] };
 
 function isPlainObject(v) {
   return v !== null && typeof v === 'object' && !Array.isArray(v);
@@ -146,7 +146,7 @@ test('save then load returns exactly what the grid sent (after cleanup)', async 
   await saveHandler({ method: 'POST', body: {
     channels: { email: true },
     days_before: 3,
-    category_prefs: { lab: true, homework: false, midterm: true, quiz: true, project: true },
+    category_prefs: { lab: true, homework: false, quiz: true, project: true },
     extra_reminder_days: { project: [1, 0], quiz: [5], other: [2] },
   } }, saveRes, makeDeps(db));
   assert.equal(saveRes.statusCode, 200);
