@@ -18,10 +18,13 @@ dotenv.config({ path: envPath });
 import settingsHandler from './api/reminders/settings.js';
 import getHandler from './api/reminders/get.js';
 import registerHandler from './api/reminders/register.js';
+import accountRoleHandler from './api/account/role.js';
 import syncCourseHandler from './api/reminders/syncCourse.js';
 import deadlinesGetHandler from './api/deadlines/get.js';
 import resourcesGetHandler from './api/resources/get.js';
 import completedAssignmentsHandler from './api/assignments/completed.js';
+import instructorCoursesHandler from './api/instructor/courses.js';
+import instructorProfileHandler from './api/instructor/profile.js';
 
 // Canvas integration handlers
 import canvasAuthHandler from './api/canvas/auth.js';
@@ -186,6 +189,30 @@ const server = http.createServer(async (req, res) => {
       } catch (error) {
         res.writeHead(500, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ error: 'Internal server error', details: error.message }));
+      }
+    });
+    return;
+  }
+
+  if (urlPath === '/api/account/role' && ['GET', 'PUT'].includes(req.method)) {
+    let body = '';
+    req.on('data', chunk => { body += chunk.toString(); });
+    req.on('end', async () => {
+      try {
+        const mockReq = {
+          method: req.method,
+          body: body ? JSON.parse(body) : {},
+          headers: { authorization: req.headers.authorization },
+        };
+        const mockRes = {
+          status: (code) => { res.statusCode = code; return mockRes; },
+          json: (data) => { res.setHeader('Content-Type', 'application/json'); res.end(JSON.stringify(data)); },
+        };
+        await accountRoleHandler(mockReq, mockRes);
+      } catch (error) {
+        console.error('Error handling account role request:', error);
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Internal server error' }));
       }
     });
     return;
@@ -442,6 +469,93 @@ const server = http.createServer(async (req, res) => {
 
   // ---- Canvas Integration Routes ----
 
+  // GET/POST/PUT/DELETE /api/instructor/courses
+  if (urlPath === '/api/instructor/courses' && ['GET', 'POST', 'PUT', 'DELETE'].includes(req.method)) {
+    let body = '';
+    req.on('data', chunk => { body += chunk.toString(); });
+    req.on('end', async () => {
+      try {
+        const mockReq = {
+          method: req.method,
+          body: body ? JSON.parse(body) : {},
+          headers: { authorization: req.headers.authorization },
+        };
+        // With "X-Course-Progress: stream", the reply is newline-delimited JSON:
+        // { type: 'progress', ... } lines while sources sync, then one
+        // { type: 'result', status, body } line in place of the usual JSON reply.
+        const wantsProgress = req.headers['x-course-progress'] === 'stream';
+        let streaming = false;
+        let statusCode = 200;
+        const startStream = () => {
+          if (streaming) return;
+          streaming = true;
+          res.writeHead(200, {
+            'Content-Type': 'application/x-ndjson; charset=utf-8',
+            'Cache-Control': 'no-cache',
+            'X-Accel-Buffering': 'no',
+          });
+        };
+        const mockRes = {
+          status: (code) => { statusCode = code; if (!streaming) res.statusCode = code; return mockRes; },
+          json: (data) => {
+            if (streaming) {
+              res.end(`${JSON.stringify({ type: 'result', status: statusCode, body: data })}\n`);
+              return;
+            }
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify(data));
+          },
+          ...(wantsProgress ? {
+            progress: (event) => {
+              if (res.writableEnded) return;
+              startStream();
+              res.write(`${JSON.stringify({ type: 'progress', ...event })}\n`);
+            },
+          } : {}),
+        };
+        try {
+          await instructorCoursesHandler(mockReq, mockRes);
+        } catch (error) {
+          if (streaming) {
+            console.error('Instructor courses request failed:', error);
+            if (!res.writableEnded) res.end(`${JSON.stringify({ type: 'result', status: 500, body: { error: 'Internal server error' } })}\n`);
+            return;
+          }
+          throw error;
+        }
+      } catch (error) {
+        console.error('Instructor courses request failed:', error);
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Internal server error' }));
+      }
+    });
+    return;
+  }
+
+  if (urlPath === '/api/instructor/profile' && ['GET', 'PUT'].includes(req.method)) {
+    let body = '';
+    req.on('data', chunk => { body += chunk.toString(); });
+    req.on('end', async () => {
+      try {
+        const mockReq = {
+          method: req.method,
+          body: body ? JSON.parse(body) : {},
+          headers: { authorization: req.headers.authorization },
+        };
+        const mockRes = {
+          status: code => { res.statusCode = code; return mockRes; },
+          json: data => { res.setHeader('Content-Type', 'application/json'); res.end(JSON.stringify(data)); },
+        };
+        await instructorProfileHandler(mockReq, mockRes);
+      } catch (error) {
+        console.error('Instructor profile route failed:', error);
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Request body must be valid JSON' }));
+      }
+    });
+    return;
+  }
+
   // Helper to build mock req/res with redirect support
   const mockRes = {
     status: (code) => { res.statusCode = code; return mockRes; },
@@ -619,6 +733,10 @@ const server = http.createServer(async (req, res) => {
   // Serve static files - use urlPath (without query string) for file path
   // Since server.js is in src/, static files are in ../public/
   let filePath = path.join(__dirname, '../public', urlPath);
+
+  if (urlPath === '/my-courses') {
+    filePath = path.join(PUBLIC_DIR, 'my-courses.html');
+  }
 
   // Handle root - default to landing.html (marketing page).
   // index.html (the dashboard) is gated by client-side auth and redirects

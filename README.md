@@ -9,6 +9,7 @@ AutoRemind is a modular notification system that sends personalized assignment r
 - **Multi-channel reminders** — Email, SMS (Twilio), and Discord DMs
 - **bCourses integration** — Students connect their bCourses account via OAuth; upcoming assignments are synced automatically
 - **Google Calendar Tasks integration** — Students can connect Google Tasks to sync assignments and due dates into a dedicated task list visible in Google Calendar
+- **Instructor course imports** — Instructors sync assignments from Gradescope or have a language model read a course website; new assignments and resource links are staged for review before adding them to a course
 - **GradeSync integration** — Shared class deadlines ingested from Google Sheets
 - **Student dashboard** — Configure reminder channels, preferred name, and how many days before a deadline to be notified
 - **Admin dashboard** — View all students, deadlines, resources, and message delivery logs; manage assignment resources via a CRUD interface
@@ -61,6 +62,8 @@ Serves the student dashboard and REST API. All Firestore access goes through `sr
 | `GET /api/reminders/get` | GET | Fetch student settings |
 | `POST /api/reminders/register` | POST | Create student doc on first login |
 | `POST /api/reminders/settings` | POST | Save reminder preferences |
+| `/api/account/role` | GET/PUT | Read or save the signed-in user's student/instructor role |
+| `/api/instructor/courses` | GET/POST/PUT/DELETE | List, create, edit, review, finalize, and delete instructor courses |
 | `POST /api/reminders/unsubscribe` | POST | Disable notification channels |
 | `GET /api/deadlines` | GET | Student's GradeSync deadlines |
 | `GET /api/resources` | GET | Resources for an assignment |
@@ -93,6 +96,7 @@ Orchestrated by `services/gradesync_input/main.py`:
 | Collection | Key | Description |
 |---|---|---|
 | `students` | email | Student preferences and channel settings |
+| `user_profiles` | Firebase UID | Account role selected after Google sign-in |
 | `deadlines` | `{course}__{assignment}` | Shared GradeSync deadlines |
 | `assignment_resources` | auto-id | Study resources linked to assignments |
 | `assignment_submissions` | `{assignment}__{student}` | Submission status from GradeSync |
@@ -101,6 +105,9 @@ Orchestrated by `services/gradesync_input/main.py`:
 | `google_calendar_tokens` | email | Google OAuth tokens and task-list ID (server-side only) |
 | `google_calendar_oauth_states` | hash | Short-lived, one-time OAuth state tied to the initiating student |
 | `google_calendar_tasks` | hash | Maps a student's assignment to its Google Task |
+| `instructor_courses` | `{firebase_uid}__{course_id}` | Instructor course details and linked assignment sources |
+| `instructor_course_assignments` | `{uid}__{course_id}__{assignment_id}` | Assignments and available due dates for instructor courses |
+| `instructor_course_assignment_reviews` | `{uid}__{course_id}__{assignment_id}` | Imported assignments awaiting instructor approval |
 | `message_delivery_logs` | auto-id | Record of every sent/failed reminder |
 
 ---
@@ -122,6 +129,27 @@ Students can connect their bCourses account from the dashboard settings page.
 Students can opt in from the Assignments page by connecting Google Tasks. AutoRemind creates or updates tasks in a dedicated **AutoRemind Assignments** task list, including each assignment's due date; that list is visible from Google Calendar's Tasks view. Assignments without a due date are skipped. Sync runs when the assignments page loads and can also be started manually. Disconnecting revokes the app's Google authorization when possible and stops future syncing; tasks already created remain in the student's Google account.
 
 **Local setup:** Enable the Google Tasks API in the Google Cloud project and create an OAuth client ID. Add `http://localhost:3000/api/google-calendar/callback` as an authorized redirect URI in Google Cloud, then put the client ID and secret in `.env.local` and set `GOOGLE_CALENDAR_REDIRECT_URI=http://localhost:3000/api/google-calendar/callback`. Start the app with `npm run dev`. These credentials should stay in `.env.local`, not `.env.example`.
+
+## Instructor Dashboard
+
+After Google sign-in, users choose **Student** or **Instructor**. The choice is saved to their account and can be changed from the account menu. Instructors manage their courses at `/my-courses`.
+
+1. Instructor creates a course with a name and, optionally, a term, a numeric Gradescope course ID, and a course website URL. A course can also be created with no linked source.
+2. AutoRemind imports assignments from the linked sources. When both are linked, items that describe the same deadline are combined into one, and Gradescope's name and due time win.
+3. Imported assignments are staged for review. The instructor edits, removes, or adds assignments, attaches named resource links, and chooses **Publish Assignments**.
+4. **Sync** re-reads the sources later. Assignments still in review are replaced with the fresh import, unless the instructor edited them; published assignments are never changed by a sync.
+
+Each AutoRemind course has its own ID, separate from the Gradescope ID, so several terms can use the same Gradescope course. Courses can be edited, archived and restored, or deleted from the course actions menu. Assignments without a verified due date show "Due date not listed."
+
+**Course website imports** read only the course page (following same-site redirects). The HTML is trimmed to numbered lines with simple text substitutions, with no scraper or HTML parser, and a Groq model lists the deadlines. Code then checks the result against the page:
+
+- Due dates are kept only when the page states them for that item.
+- Dates the page gives in a fixed form override the model: an item's own row in a schedule table ("HW 4 Due"), or the day heading above a "Homework 1 due" entry.
+- Numbered work the model missed (from links, labels, and table cells) is added for review.
+- Names for one deadline ("Cats project", "Project 2") are merged using the page's own links, labels, and cell styling.
+- Incomplete imports are not saved.
+
+**Setup:** Add `autoremindberkeley@gmail.com` to each Gradescope course as a TA before importing. Set `GRADESCOPE_EMAIL`, `GRADESCOPE_PASSWORD`, and `GROQ_API_KEY` in `.env.local` (in production they come from Secret Manager). Instructors are never asked for these credentials.
 
 ---
 
@@ -160,6 +188,9 @@ See `.env.example` for a full template. Key variables:
 | `GOOGLE_CALENDAR_CLIENT_ID` | Node | Google OAuth client ID |
 | `GOOGLE_CALENDAR_CLIENT_SECRET` | Node | Google OAuth client secret |
 | `GOOGLE_CALENDAR_REDIRECT_URI` | Node | Google Tasks OAuth callback URL |
+| `GRADESCOPE_EMAIL` | Node/Python | Shared Gradescope account email; configure locally in `.env.local` or in production from Secret Manager |
+| `GRADESCOPE_PASSWORD` | Node/Python | Shared Gradescope account password; configure locally in `.env.local` or in production from Secret Manager |
+| `GROQ_API_KEY` | Python | Groq API key for course website assignment extraction; configure locally or as the `GROQ_API_KEY` Secret Manager secret in production |
 | `ADMIN_EMAILS` | Node | Comma-separated admin email allowlist |
 
 ---

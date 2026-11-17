@@ -46,12 +46,65 @@ class FirebaseAuth {
         return this.user.getIdToken();
     }
 
+    async getAccountRole() {
+        const token = await this.getToken();
+        if (!token) throw new Error('Not authenticated');
+        const response = await fetch('/api/account/role', {
+            headers: { 'Authorization': 'Bearer ' + token },
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Could not load account role');
+        return data.role;
+    }
+
+    async setAccountRole(role) {
+        const token = await this.getToken();
+        if (!token) throw new Error('Not authenticated');
+        const response = await fetch('/api/account/role', {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer ' + token,
+            },
+            body: JSON.stringify({ role }),
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Could not save account role');
+        if (role === 'student') {
+            try {
+                await this.registerStudent();
+            } catch (e) {
+                console.warn('Could not register student in Firestore:', e);
+            }
+        }
+        return data.role;
+    }
+
+    async registerStudent() {
+        const token = await this.getToken();
+        if (!token || !this.user) throw new Error('Not authenticated');
+        const response = await fetch('/api/reminders/register', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+            body: JSON.stringify({ display_name: this.user.displayName || '' }),
+        });
+        if (!response.ok) {
+            const data = await response.json();
+            throw new Error(data.error || 'Could not register student');
+        }
+    }
+
     init() {
         this._auth.onAuthStateChanged(async (user) => {
             this.user = user;
             this.session = user ? { user } : null;
             if (user) {
                 try {
+                    if (await this.getAccountRole() !== 'student') {
+                        this.loading = false;
+                        this.notifyListeners();
+                        return;
+                    }
                     const token = await user.getIdToken();
                     await fetch('/api/reminders/register', {
                         method: 'POST',

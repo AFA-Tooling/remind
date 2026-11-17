@@ -26,6 +26,10 @@ export default async function handler(req, res) {
     }
 
     const db = getDb();
+    const profileSnap = await db.collection('user_profiles').doc(authResult.uid).get();
+    if (!profileSnap.exists || profileSnap.data().role !== 'student') {
+      return res.status(403).json({ error: 'Student role required', code: 'STUDENT_ROLE_REQUIRED' });
+    }
 
     // Study-gating: don't create a student doc for non-consented users.
     const study = await getStudyStatus(db, loginEmail);

@@ -14,6 +14,9 @@ RUN pip3 install -r services/requirements.txt --break-system-packages
 
 COPY src/ ./src/
 COPY public/ ./public/
+COPY gradesync_input/simple_sync.py ./gradesync_input/simple_sync.py
+COPY gradesync_input/course_import.py ./gradesync_input/course_import.py
+COPY gradesync_input/website_import.py ./gradesync_input/website_import.py
 COPY services/email-service/ ./services/email-service/
 COPY services/shared/ ./services/shared/
 

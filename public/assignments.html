@@ -339,6 +339,11 @@
       color: #5c3d00;
     }
 
+    .source-badge.gradescope {
+      background: #e8f0fe;
+      color: #1a4d8f;
+    }
+
     /* Mobile */
     @media (max-width: 600px) {
       .assignments-hero {
@@ -461,6 +466,8 @@
     let currentUserEmail = null;
     let showingPastAssignments = false;
     let completedAssignments = new Set();
+    // Set when an instructor views this page; students keep the original wording.
+    let viewingAsInstructor = false;
 
     function getAssignmentKey(deadline) {
       return [
@@ -552,7 +559,9 @@
       const listEl = document.getElementById('assignments-list');
       listEl.innerHTML = deadlines.map(d => {
         const overdue = isOverdue(d.due);
-        const sourceBadge = d.source === 'canvas' ? '<span class="source-badge canvas">bCourses</span>' : '';
+        const sourceBadge = d.source === 'canvas'
+          ? '<span class="source-badge canvas">bCourses</span>'
+          : d.source === 'gradescope' ? '<span class="source-badge gradescope">Gradescope</span>' : '';
         const key = getAssignmentKey(d);
         const checked = isAssignmentCompleted(d);
         return `
@@ -574,8 +583,10 @@
               <div class="assignment-course">${escapeHtml(d.course_code || '')}</div>
             </div>
             <div class="assignment-due${overdue ? ' overdue' : ''}">
-              <span class="due-label">Due</span>
-              ${escapeHtml(formatDate(d.due))}
+              ${!d.due && viewingAsInstructor
+                ? 'No Due Date'
+                : `<span class="due-label">Due</span>
+              ${escapeHtml(formatDate(d.due))}`}
             </div>
             <svg class="assignment-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><polyline points="9 18 15 12 9 6"></polyline></svg>
           </div>`;
@@ -643,11 +654,43 @@
       try {
         const token = await window.auth?.getToken();
         const authHeader = token ? { 'Authorization': `Bearer ${token}` } : {};
-        const [gradesyncRes, canvasRes, completedRes] = await Promise.all([
-          fetch(`/api/deadlines?user_email=${encodeURIComponent(email)}`, { headers: authHeader }).catch(() => null),
-          fetch(`/api/canvas/deadlines?user_email=${encodeURIComponent(email)}`, { headers: authHeader }).catch(() => null),
-          fetch('/api/assignments/completed', { headers: authHeader }).catch(() => null)
-        ]);
+        let gradesyncDeadlines = [];
+        let gradescopeDeadlines = [];
+        let canvasDeadlines = [];
+        let enrolled = false;
+        let completedRes = null;
+        const accountRole = await window.auth?.getAccountRole();
+        viewingAsInstructor = accountRole === 'instructor';
+        if (accountRole === 'instructor') {
+          const response = await fetch('/api/instructor/courses', { headers: authHeader });
+          const json = await response.json();
+          if (!response.ok) throw new Error(json.error || 'Could not load instructor courses');
+          const courses = json.courses || [];
+          enrolled = courses.length > 0;
+          gradescopeDeadlines = courses.flatMap(course => (course.assignments || []).map(assignment => ({
+            ...assignment,
+            course_code: course.course_name,
+            source: 'gradescope',
+          })));
+        } else {
+          let gradesyncRes, canvasRes;
+          [gradesyncRes, canvasRes, completedRes] = await Promise.all([
+            fetch(`/api/deadlines?user_email=${encodeURIComponent(email)}`, { headers: authHeader }).catch(() => null),
+            fetch(`/api/canvas/deadlines?user_email=${encodeURIComponent(email)}`, { headers: authHeader }).catch(() => null),
+            fetch('/api/assignments/completed', { headers: authHeader }).catch(() => null)
+          ]);
+
+          if (gradesyncRes && gradesyncRes.ok) {
+            const json = await gradesyncRes.json();
+            enrolled = !!json.enrolled;
+            gradesyncDeadlines = (json.data || []).map(d => ({ ...d, source: 'gradesync' }));
+          }
+
+          if (canvasRes && canvasRes.ok) {
+            const canvasJson = await canvasRes.json();
+            canvasDeadlines = (canvasJson.data || []).map(d => ({ ...d, source: 'canvas' }));
+          }
+        }
 
         if (completedRes && completedRes.ok) {
           const completedJson = await completedRes.json();
@@ -656,27 +699,16 @@
 
         loadingEl.style.display = 'none';
 
-        let gradesyncDeadlines = [];
-        let enrolled = false;
-        if (gradesyncRes && gradesyncRes.ok) {
-          const json = await gradesyncRes.json();
-          enrolled = !!json.enrolled;
-          gradesyncDeadlines = (json.data || []).map(d => ({ ...d, source: 'gradesync' }));
-        }
-
-        let canvasDeadlines = [];
-        if (canvasRes && canvasRes.ok) {
-          const canvasJson = await canvasRes.json();
-          canvasDeadlines = (canvasJson.data || []).map(d => ({ ...d, source: 'canvas' }));
-        }
-
-        const allDeadlines = [...gradesyncDeadlines, ...canvasDeadlines];
+        const allDeadlines = [...gradescopeDeadlines, ...gradesyncDeadlines, ...canvasDeadlines];
         allDeadlines.sort((a, b) => {
           if (!a.due) return 1;
           if (!b.due) return -1;
           return new Date(a.due) - new Date(b.due);
         });
         if (allDeadlines.length === 0 && !enrolled && canvasDeadlines.length === 0) {
+          if (accountRole === 'instructor') {
+            notEnrolledEl.textContent = 'No Gradescope courses imported yet. Return to the dashboard to import a course.';
+          }
           notEnrolledEl.style.display = 'block';
           return;
         }
@@ -745,12 +777,30 @@
 
       waitForAuth((auth) => {
         auth.onAuthStateChange(async (user, session, loading) => {
-          if (!loading) {
-            const loader = document.getElementById('auth-loading');
-            const guard = document.getElementById('auth-guard');
-            if (loader) loader.style.display = 'none';
-            if (guard) guard.remove();
+          if (loading) return;
+
+          if (user) {
+            try {
+              const accountRole = await auth.getAccountRole();
+              if (accountRole === 'instructor') {
+                window.location.replace('/my-courses');
+                return;
+              }
+            } catch (error) {
+              console.error('Could not load account role:', error);
+              document.getElementById('auth-loading').style.display = 'none';
+              document.getElementById('auth-guard').remove();
+              const empty = document.getElementById('assignments-empty');
+              empty.textContent = 'Could not load your account role. Refresh to try again.';
+              empty.style.display = 'block';
+              return;
+            }
           }
+
+          const loader = document.getElementById('auth-loading');
+          const guard = document.getElementById('auth-guard');
+          if (loader) loader.style.display = 'none';
+          if (guard) guard.remove();
 
           if (user) {
             document.getElementById('user-email').textContent = user.email;

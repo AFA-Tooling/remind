@@ -160,7 +160,7 @@
         const featuresLink = document.getElementById('nav-features-link');
         const howItWorksLink = document.getElementById('nav-howitworks-link');
         const aboutLink = document.getElementById('nav-about-link');
-        auth.onAuthStateChange((user, session, loading) => {
+        auth.onAuthStateChange(async (user, session, loading) => {
           if (!loading) {
             const loader = document.getElementById('auth-loading');
             const guard = document.getElementById('auth-guard');
@@ -171,7 +171,18 @@
             userEmail.textContent = user.email;
             userEmail.style.display = 'inline-block';
             logoutBtn.style.display = 'inline-block';
-            document.getElementById('nav-assignments-link').style.display = 'inline-block';
+            const assignmentsLink = document.getElementById('nav-assignments-link');
+            try {
+              const role = await auth.getAccountRole();
+              assignmentsLink.textContent = role === 'instructor' ? 'My Courses' : 'Assignments';
+              assignmentsLink.href = role === 'instructor' ? '/my-courses' : './assignments.html';
+              assignmentsLink.dataset.nav = role === 'instructor' ? 'my-courses' : 'assignments';
+              assignmentsLink.classList.toggle('nav__link--active', role === 'student' && location.pathname === '/assignments.html');
+              assignmentsLink.style.display = 'inline-block';
+            } catch (error) {
+              console.error('Could not load account role for navigation:', error);
+              assignmentsLink.style.display = 'none';
+            }
             if (loginLink) loginLink.style.display = 'none';
             if (featuresLink) featuresLink.style.display = 'none';
             if (howItWorksLink) howItWorksLink.style.display = 'none';

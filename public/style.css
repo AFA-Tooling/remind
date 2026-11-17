@@ -786,3 +786,63 @@ a {
     color: var(--olive);
     font-weight: 600;
 }
+
+/* Live course sync steps (course-progress.js) */
+.course-progress {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin: 18px 0 0;
+    padding: 12px 14px;
+    border: 1px solid #f0c36d;
+    border-radius: 10px;
+    background: #fff8e6;
+    font-size: 13px;
+    line-height: 1.45;
+    text-align: left;
+}
+
+.course-progress[hidden] {
+    display: none;
+}
+
+.course-progress-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    color: var(--text);
+}
+
+.course-progress-row.is-done {
+    color: var(--muted);
+}
+
+.course-progress-icon {
+    flex-shrink: 0;
+    width: 14px;
+    height: 14px;
+    margin-top: 2px;
+    border: 2px solid #d5dbe8;
+    border-top-color: var(--olive);
+    border-radius: 50%;
+    box-sizing: border-box;
+    animation: course-progress-spin .8s linear infinite;
+}
+
+.course-progress-row.is-done .course-progress-icon {
+    border: 0;
+    animation: none;
+    background: no-repeat center / 14px 14px url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%231a7f37' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12.5l4.5 4.5L19 7.5'/%3E%3C/svg%3E");
+}
+
+@keyframes course-progress-spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .course-progress-icon {
+        animation-duration: 2.4s;
+    }
+}

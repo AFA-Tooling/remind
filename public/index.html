@@ -47,6 +47,7 @@
 
   <!-- Styles are now external -->
   <link rel="stylesheet" href="style.css">
+  <script src="course-progress.js"></script>
 
   <style id="auth-guard">
     body>*:not(#auth-loading) {
@@ -63,9 +64,112 @@
       }
     }
   </style>
+  <style>
+    .instructor-courses-empty { color: var(--muted); margin: 8px 0 16px; font-size: 15px; }
+    .instructor-current-courses h3, .instructor-archived-courses h3 { margin: 0 0 4px; padding: 0; font-size: 15px; font-weight: 600; }
+    .instructor-archived-courses { margin-top: 20px; }
+    /* Match the .label beside it (16px, 10px above, 12px below) so the heading and
+       the first course card line up with "What should we call you?" and its input. */
+    .instructor-current-courses h3 { margin: 10px 0 12px; font-size: 16px; }
+    .instructor-course-links { display: flex; flex-direction: column; gap: 10px; margin: 10px 0 16px; padding: 0; list-style: none; }
+    .instructor-course-links a {
+      display: flex; align-items: center; gap: 8px; padding: 10px 13px;
+      border: 1px solid var(--line); border-radius: 10px; background: #fff;
+      color: var(--olive); font-size: 15px; font-weight: 500; text-decoration: none;
+      transition: border-color .15s, background-color .15s, box-shadow .15s;
+    }
+    /* "›" sits a little below the middle of its line, so it is nudged up to center it. */
+    .instructor-course-links a::after {
+      content: '\203A'; margin-left: auto; color: var(--muted); font-size: 20px; line-height: 1;
+      transform: translateY(-2px);
+    }
+    .instructor-course-links a:hover { border-color: var(--olive); background: #f5f7fc; box-shadow: 0 1px 4px rgba(0, 38, 118, .12); }
+    .instructor-course-links a:hover::after { color: var(--olive); }
+    .instructor-course-links a:focus-visible { outline: 2px solid var(--olive); outline-offset: 2px; }
+    .instructor-course-tab-status { margin-left: 8px; color: var(--muted); font-size: 12px; font-weight: 600; }
+    /* Create Course modal (same markup and styles as my-courses.html) */
+    #course-import-modal.active { display: flex; }
+    #course-import-modal .modal-content {
+      width: min(720px, calc(100vw - 32px));
+      max-width: 720px;
+      max-height: 88vh;
+      overflow-y: auto;
+      padding: 32px;
+      text-align: left;
+    }
+    #course-import-modal .course-import-intro { margin: 0 0 22px; line-height: 1.5; }
+    .course-import-field { margin-top: 18px; }
+    .course-import-field:first-child { margin-top: 0; }
+    .course-import-field .label {
+      margin: 0 0 7px;
+      font-size: 14px;
+      line-height: 1.4;
+    }
+    .course-import-field .channel-field {
+      display: block;
+      width: 100%;
+      box-sizing: border-box;
+      min-height: 44px;
+      margin: 0;
+      background: #fff;
+      font: inherit;
+      font-size: 14px;
+      line-height: 1.45;
+    }
+    .course-import-field textarea.channel-field { min-height: 96px; resize: vertical; }
+    .course-import-field .channel-field::placeholder { color: #a4acb8; opacity: 1; }
+    #course-name-input.course-name-missing { border-color: #c0392b; }
+    .course-import-help { margin: 5px 0 0; color: var(--muted); font-size: 12px; line-height: 1.45; }
+    .course-import-confirm {
+      display: flex; align-items: flex-start; gap: 10px; margin-top: 10px; padding: 10px 12px;
+      border: 1px solid var(--line); border-radius: 8px; background: #f7f8fb;
+      font-size: 13px; line-height: 1.45; cursor: pointer;
+    }
+    .course-import-confirm[hidden] { display: none; }
+    .course-import-confirm input { margin: 2px 0 0; flex-shrink: 0; width: 16px; height: 16px; cursor: pointer; }
+    .course-import-confirm.course-import-confirm-missing { border-color: #c0392b; background: #fdecea; }
+    .course-import-section-title { margin: 26px 0 0; font-size: 17px; line-height: 1.4; font-weight: 600; }
+    #course-import-modal .course-import-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 22px; }
+    #course-import-modal .course-import-status { min-height: 20px; margin: 12px 0 0; font-size: 13px; }
+    @media (max-width: 560px) {
+      #course-import-modal .modal-content { padding: 24px 20px; }
+    }
+    .instructor-create-course-actions { display: flex; justify-content: flex-start; margin: 18px 0 0; }
+    body.instructor-view .grid > div:first-child { display: contents; }
+    body.instructor-view .grid > div:nth-child(2) { display: contents; }
+    body.instructor-view .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    body.instructor-view #preferred-name-section { grid-column: 1; }
+    body.instructor-view #instructor-courses-panel { grid-column: 2; }
+    body.instructor-view .instructor-settings-actions { grid-column: 1; }
+    body.instructor-view #student-preference-options,
+    body.instructor-view #student-course-options,
+    body.instructor-view .cta-wrap,
+    body.instructor-view #assignments-section,
+    body.instructor-view #unsubscribe-link { display: none !important; }
+    .instructor-settings-actions { display: none; justify-content: flex-start; margin: 18px 0 0; }
+    body.instructor-view .instructor-settings-actions { display: flex; }
+    #instructor-profile-load-status { margin: 6px 0 0; color: #c0392b; font-size: 13px; }
+    @media (max-width: 820px) {
+      body.instructor-view .grid { grid-template-columns: 1fr; }
+      body.instructor-view #instructor-courses-panel { grid-column: 1; }
+    }
+    @media (max-width: 600px) {
+      body.instructor-view #instructor-courses-panel { grid-column: 1; }
+    }
+  </style>
 </head>
 
 <body data-page="index">
+  <script>
+    // My Courses has its own page; old links to the dashboard's course view go there.
+    (function () {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('view') !== 'instructor-assignments') return;
+      const destination = new URL('/my-courses', window.location.href);
+      if (params.get('course_id')) destination.searchParams.set('course_id', params.get('course_id'));
+      window.location.replace(destination.href);
+    })();
+  </script>
   <div id="auth-loading"
     style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center; background: white; z-index: 9999;">
     <div
@@ -82,7 +186,7 @@
   <!-- Hero -->
   <section class="hero">
     <div style="max-width: 800px; margin: 0 auto;">
-      <h1>Never miss an assignment.</h1>
+      <h1 id="hero-headline">Never miss an assignment.</h1>
 
       <div class="hero-features">
         <span class="hero-feature">
@@ -118,13 +222,38 @@
       <div class="grid">
         <!-- Left column -->
         <div>
-          <div class="divider"><span class="pill">Preferred Name</span></div>
-          <div style="margin-bottom: 24px;">
-            <label for="preferred-name" class="label">What should we call you?</label>
-            <input id="preferred-name" type="text" name="preferred_first_name" placeholder="E.g. Alex"
-              class="channel-field" style="display: block; margin-top: 0;" maxlength="50" />
+          <div id="preferred-name-section">
+            <div class="divider"><span class="pill">Preferred Name</span></div>
+            <div class="instructor-preferred-name-row">
+              <div>
+                <label for="preferred-name" class="label">What should we call you?</label>
+                <input id="preferred-name" type="text" name="preferred_first_name" placeholder="E.g. Alex"
+                  class="channel-field" style="display: block; margin-top: 0;" maxlength="50" />
+                <p id="instructor-profile-load-status" role="status" hidden></p>
+                <div class="instructor-settings-actions">
+                  <button id="instructor-save-settings-btn" class="btn btn--cta" type="button">Save Settings</button>
+                </div>
+              </div>
+            </div>
           </div>
 
+          <section id="instructor-courses-panel" style="display:none;" aria-labelledby="instructor-courses-title">
+            <div class="divider"><span class="pill" id="instructor-courses-title">My Courses</span></div>
+            <section class="instructor-current-courses" aria-labelledby="instructor-current-title">
+              <h3 id="instructor-current-title">Current Courses</h3>
+              <p id="instructor-courses-empty" class="instructor-courses-empty">Loading courses...</p>
+              <ul id="instructor-course-links" class="instructor-course-links"></ul>
+            </section>
+            <section id="instructor-archived-courses" class="instructor-archived-courses" style="display:none;" aria-labelledby="instructor-archived-title">
+              <h3 id="instructor-archived-title">Archived Courses</h3>
+              <ul id="instructor-archived-course-links" class="instructor-course-links"></ul>
+            </section>
+            <div class="instructor-create-course-actions">
+              <button id="dashboard-create-course-btn" class="btn btn--cta" type="button">Create Course</button>
+            </div>
+          </section>
+
+          <div id="student-preference-options">
           <div class="divider"><span class="pill">Reminder Channels</span></div>
           <p class="label">Turn reminders on via:</p>
 
@@ -186,11 +315,13 @@
             </div>
             <div id="google-tasks-status" role="status" aria-live="polite" style="font-size:12px; margin-top:8px; color:var(--muted);"></div>
             <p style="font-size:11px; color:var(--muted); margin:8px 0 0;">Disconnecting stops future syncing. Tasks already created in Google will remain there.</p>
+            </div>
           </div>
         </div>
 
         <!-- Right column -->
         <div>
+          <div id="student-course-options">
           <div class="divider"><span class="pill">Frequency &amp; Timing</span></div>
 
           <div class="days-input-row">
@@ -258,6 +389,8 @@
             </div>
             <div id="canvas-sync-status" style="font-size: 12px; margin-top: 6px; display: none;"></div>
           </div>
+          </div>
+
         </div>
       </div>
 
@@ -351,6 +484,44 @@
   </div>
 
   <!-- Generic Message/Error Modal -->
+  <div id="course-import-modal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="course-import-title">
+    <div class="modal-content">
+      <h2 id="course-import-title">Create New Course</h2>
+      <p class="course-import-intro" style="font-size:14px; color:var(--muted);">
+        Add the details for your course and connect its assignment platforms.
+      </p>
+      <div class="course-import-field">
+        <label for="course-name-input" class="label">Course Name</label>
+        <input id="course-name-input" type="text" class="channel-field" placeholder="e.g. CS 61A" maxlength="120" required>
+      </div>
+      <div class="course-import-field">
+        <label for="course-term-input" class="label">Term <span style="font-weight:400;color:var(--muted);">(Optional)</span></label>
+        <input id="course-term-input" type="text" class="channel-field" placeholder="e.g. Fall 2026" maxlength="80" autocomplete="off">
+      </div>
+      <h3 class="course-import-section-title">Import Assignments</h3>
+      <div class="course-import-field">
+        <label for="course-website-url" class="label">Course Website URL <span style="font-weight:400;color:var(--muted);">(Optional)</span></label>
+        <input id="course-website-url" type="url" class="channel-field" placeholder="https://example.edu/course" autocomplete="url">
+        <p class="course-import-help">Add a link to your course website.</p>
+      </div>
+      <div class="course-import-field">
+        <label for="gradescope-course-id" class="label">Gradescope Course ID <span style="font-weight:400;color:var(--muted);">(Optional)</span></label>
+        <input id="gradescope-course-id" type="text" class="channel-field" inputmode="numeric" placeholder="e.g. 1234567" autocomplete="off">
+        <p class="course-import-help">Enter the numeric Course ID.</p>
+        <label id="gradescope-ta-confirm-field" class="course-import-confirm" for="gradescope-ta-confirm" hidden>
+          <input id="gradescope-ta-confirm" type="checkbox">
+          <span><strong>Required for Gradescope:</strong> I've added <strong>autoremindberkeley@gmail.com</strong> as a TA in this Gradescope course.</span>
+        </label>
+      </div>
+      <div id="course-import-progress" class="course-progress" aria-live="polite" hidden></div>
+      <p id="course-import-status" class="course-import-status" role="status" aria-live="polite"></p>
+      <div class="course-import-actions">
+        <button id="course-import-cancel-btn" class="btn btn--outline" type="button">Cancel</button>
+        <button id="submit-course-import-btn" class="btn btn--primary" type="button">Create New Course</button>
+      </div>
+    </div>
+  </div>
+
   <div id="message-modal" class="modal-overlay">
     <div class="modal-content">
       <h2 id="msg-title" style="margin-top:0;">Notice</h2>
@@ -896,7 +1067,170 @@
         }
       }
 
+      async function readApiResponse(response) {
+        const text = await response.text();
+        let data;
+        try {
+          data = JSON.parse(text);
+        } catch {
+          throw new Error('AutoRemind could not read the server response. Refresh the page and try again.');
+        }
+        if (!response.ok) {
+          throw new Error(data.error || `Request failed (${response.status})`);
+        }
+        return data;
+      }
+
+      function escHtml(str) {
+        return String(str)
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;');
+      }
+
+      // Create Course runs here on the dashboard: the request creates the course and
+      // syncs its sources before responding, then we open it on My Courses.
+      function setupDashboardCreateCourse(auth) {
+        const modal = document.getElementById('course-import-modal');
+        const openButton = document.getElementById('dashboard-create-course-btn');
+        const nameInput = document.getElementById('course-name-input');
+        const termInput = document.getElementById('course-term-input');
+        const gradescopeInput = document.getElementById('gradescope-course-id');
+        const websiteInput = document.getElementById('course-website-url');
+        const taConfirm = document.getElementById('gradescope-ta-confirm');
+        const taConfirmField = document.getElementById('gradescope-ta-confirm-field');
+        const status = document.getElementById('course-import-status');
+        const syncProgress = CourseProgress.panel(document.getElementById('course-import-progress'));
+        const submitButton = document.getElementById('submit-course-import-btn');
+        const cancelButton = document.getElementById('course-import-cancel-btn');
+        let submitting = false;
+
+        const setStatus = (text, isError = false) => {
+          status.textContent = text;
+          status.style.color = isError ? '#c0392b' : 'var(--muted)';
+        };
+        const open = () => {
+          [nameInput, termInput, gradescopeInput, websiteInput].forEach(input => { input.value = ''; });
+          taConfirm.checked = false;
+          taConfirmField.hidden = true;
+          taConfirmField.classList.remove('course-import-confirm-missing');
+          nameInput.classList.remove('course-name-missing');
+          nameInput.removeAttribute('aria-invalid');
+          setStatus('');
+          syncProgress.stop();
+          modal.classList.add('active');
+          nameInput.focus();
+        };
+        const close = () => {
+          if (submitting) return;
+          modal.classList.remove('active');
+          openButton.focus();
+        };
+
+        openButton.addEventListener('click', open);
+        cancelButton.addEventListener('click', close);
+        modal.addEventListener('click', event => { if (event.target === modal) close(); });
+        document.addEventListener('keydown', event => {
+          if (event.key === 'Escape' && modal.classList.contains('active')) close();
+        });
+        [nameInput, termInput, gradescopeInput, websiteInput].forEach(input => {
+          input.addEventListener('keydown', event => {
+            if (event.key === 'Enter') {
+              event.preventDefault();
+              submitButton.click();
+            }
+          });
+        });
+        nameInput.addEventListener('input', () => {
+          nameInput.classList.remove('course-name-missing');
+          nameInput.removeAttribute('aria-invalid');
+        });
+        taConfirm.addEventListener('change', () => taConfirmField.classList.remove('course-import-confirm-missing'));
+        // The TA step only applies once a Gradescope Course ID is entered.
+        gradescopeInput.addEventListener('input', () => {
+          taConfirmField.hidden = !gradescopeInput.value.trim();
+        });
+
+        submitButton.addEventListener('click', async () => {
+          if (submitting) return;
+          const courseName = nameInput.value.trim();
+          const gradescopeCourseId = gradescopeInput.value.trim();
+          const courseWebsiteUrl = websiteInput.value.trim();
+          if (!courseName) {
+            nameInput.setAttribute('aria-invalid', 'true');
+            nameInput.classList.add('course-name-missing');
+            setStatus('Enter a course name.', true);
+            nameInput.focus();
+            return;
+          }
+          if (gradescopeCourseId && !taConfirm.checked) {
+            taConfirmField.classList.add('course-import-confirm-missing');
+            setStatus('Add autoremindberkeley@gmail.com as a TA in Gradescope, then check the box to confirm.', true);
+            taConfirm.focus();
+            return;
+          }
+          submitting = true;
+          submitButton.disabled = true;
+          cancelButton.disabled = true;
+          submitButton.textContent = 'Creating...';
+          const sources = [gradescopeCourseId && 'gradescope', courseWebsiteUrl && 'website'].filter(Boolean);
+          setStatus(courseWebsiteUrl
+            ? 'Creating the course. Reading the course website can take a few minutes.'
+            : 'Creating the course...');
+          syncProgress.start(sources);
+          try {
+            const token = await auth.getToken();
+            const data = await CourseProgress.request('/api/instructor/courses', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+              body: JSON.stringify({
+                course_name: courseName,
+                term: termInput.value.trim(),
+                gradescope_url: gradescopeCourseId,
+                course_website_url: courseWebsiteUrl,
+              }),
+            }, syncProgress.handle);
+            const destination = new URL('/my-courses', window.location.href);
+            destination.searchParams.set('course_id', data.course.course_id);
+            window.location.assign(destination.href);
+          } catch (error) {
+            syncProgress.stop();
+            setStatus(error.message || 'Course creation failed. Please try again.', true);
+            submitting = false;
+            submitButton.disabled = false;
+            cancelButton.disabled = false;
+            submitButton.textContent = 'Create New Course';
+          }
+        });
+      }
+
+      // The instructor dashboard lists courses; each opens on the My Courses page.
+      async function loadDashboardCourses(auth) {
+        const token = await auth.getToken();
+        const response = await fetch('/api/instructor/courses', {
+          headers: { 'Authorization': `Bearer ${token}` },
+        });
+        const data = await readApiResponse(response);
+        const courses = data.courses || [];
+        const link = course => {
+          const href = `/my-courses?course_id=${encodeURIComponent(course.course_id)}`;
+          const name = course.term ? `${course.course_name} (${course.term})` : course.course_name;
+          const needsReview = course.status === 'pending_review' || course.new_assignments?.length;
+          return `<li><a href="${escHtml(href)}">${escHtml(name)}${needsReview ? '<span class="instructor-course-tab-status">Review</span>' : ''}</a></li>`;
+        };
+        const current = courses.filter(course => !course.archived);
+        const archived = courses.filter(course => course.archived);
+        const empty = document.getElementById('instructor-courses-empty');
+        empty.textContent = 'No current courses found. Create a course to get started.';
+        empty.style.display = current.length ? 'none' : 'block';
+        document.getElementById('instructor-course-links').innerHTML = current.map(link).join('');
+        document.getElementById('instructor-archived-course-links').innerHTML = archived.map(link).join('');
+        document.getElementById('instructor-archived-courses').style.display = archived.length ? 'block' : 'none';
+      }
+
       waitForAuth((auth) => {
+        setupDashboardCreateCourse(auth);
         const userEmail = document.getElementById('user-email');
         const logoutBtn = document.getElementById('logout-btn');
         const unsubLink = document.getElementById('unsubscribe-link');
@@ -906,10 +1240,83 @@
           if (loading) return;
 
           if (user) {
+            let accountRole;
+            try {
+              accountRole = await auth.getAccountRole();
+              if (accountRole !== 'student' && accountRole !== 'instructor') {
+                window.location.replace('./role.html');
+                return;
+              }
+              const coursesNavLink = document.getElementById('nav-assignments-link');
+              if (coursesNavLink) {
+                coursesNavLink.textContent = accountRole === 'instructor' ? 'My Courses' : 'Assignments';
+                coursesNavLink.href = accountRole === 'instructor'
+                  ? '/my-courses'
+                  : './assignments.html';
+                coursesNavLink.dataset.nav = accountRole === 'instructor' ? 'my-courses' : 'assignments';
+                coursesNavLink.classList.remove('nav__link--active');
+              }
+            } catch (e) {
+              console.error('Could not load account role:', e);
+              const loader = document.getElementById('auth-loading');
+              if (loader) loader.innerHTML = '<div style="font-family:system-ui;color:#b42318;font-weight:600;">Could not load your account role. Refresh to try again.</div>';
+              return;
+            }
+
             // Logged In
             userEmail.textContent = user.email;
             userEmail.style.display = 'inline-block';
             logoutBtn.style.display = 'inline-block';
+            if (accountRole === 'instructor') {
+              document.body.classList.add('instructor-view');
+              document.getElementById('hero-headline').textContent = 'Instructor Dashboard';
+              document.getElementById('instructor-courses-panel').style.display = 'block';
+              try {
+                const profileToken = await auth.getToken();
+                const profileResponse = await fetch('/api/instructor/profile', {
+                  headers: { 'Authorization': `Bearer ${profileToken}` },
+                });
+                const profileData = await readApiResponse(profileResponse);
+                document.getElementById('preferred-name').value = profileData.preferred_first_name || '';
+              } catch (error) {
+                console.error('Could not load instructor profile:', error);
+                const status = document.getElementById('instructor-profile-load-status');
+                status.textContent = error.message || 'Could not load your saved name.';
+                status.hidden = false;
+              }
+              loadDashboardCourses(auth).catch(error => {
+                const empty = document.getElementById('instructor-courses-empty');
+                empty.textContent = error.message || 'Could not load courses. Refresh the page to try again.';
+                empty.style.color = '#c0392b';
+              });
+              const instructorSaveButton = document.getElementById('instructor-save-settings-btn');
+              instructorSaveButton.onclick = async () => {
+                instructorSaveButton.disabled = true;
+                instructorSaveButton.textContent = 'Saving...';
+                try {
+                  const token = await auth.getToken();
+                  const response = await fetch('/api/instructor/profile', {
+                    method: 'PUT',
+                    headers: {
+                      'Content-Type': 'application/json',
+                      'Authorization': `Bearer ${token}`,
+                    },
+                    body: JSON.stringify({
+                      preferred_first_name: document.getElementById('preferred-name').value,
+                    }),
+                  });
+                  const profileData = await readApiResponse(response);
+                  const savedName = profileData.preferred_first_name || '';
+                  document.getElementById('preferred-name').value = savedName;
+                  showMessage('Settings were updated.', 'Settings Updated');
+                } catch (error) {
+                  showMessage(error.message || 'Could not save your settings.', 'Settings save failed');
+                } finally {
+                  instructorSaveButton.disabled = false;
+                  instructorSaveButton.textContent = 'Save Settings';
+                }
+              };
+            }
             unsubLink.style.display = 'block';
             document.querySelector('.cta-wrap').style.display = 'flex';
             document.getElementById('nav-assignments-link').style.display = 'inline-block';
@@ -918,18 +1325,20 @@
             appContainer.classList.remove('is-locked');
 
             // Research-study gate — lock out non-consented students entirely.
-            enforceStudyGate(user.email);
+            if (accountRole === 'student') enforceStudyGate(user.email);
 
             // Wait for settings to populate before revealing the form so the
             // user never sees the default template values flash on screen.
-            await fetchSettings(user.email);
+            if (accountRole === 'student') await fetchSettings(user.email);
             const loader = document.getElementById('auth-loading');
             const guard = document.getElementById('auth-guard');
             if (loader) loader.style.display = 'none';
             if (guard) guard.remove();
 
-            loadAssignmentsPreview(user.email);
-            checkGoogleTasksConnection();
+            if (accountRole === 'student') {
+              loadAssignmentsPreview(user.email);
+              checkGoogleTasksConnection();
+            }
           } else {
             // Auth resolved with no user — bounce to landing
             window.location.replace('/');
@@ -1013,10 +1422,6 @@
             document.getElementById('assignments-section').style.display = 'block';
             document.getElementById('scroll-arrow').style.display = 'flex';
           } catch (e) { /* silently skip preview on error */ }
-        }
-
-        function escHtml(str) {
-          return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
         }
 
         // Make available globally for unsubscribe to call

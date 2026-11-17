@@ -131,8 +131,18 @@
 
     waitForAuth((auth) => {
       // Redirect if already logged in
-      auth.onAuthStateChange((user, session, loading) => {
-        if (!loading && user) window.location.href = './index.html';
+      auth.onAuthStateChange(async (user, session, loading) => {
+        if (!loading && user) {
+          try {
+            const role = await auth.getAccountRole();
+            window.location.replace(role === 'student' || role === 'instructor' ? './index.html' : './role.html');
+          } catch (e) {
+            console.error('Could not load account role:', e);
+            const err = document.getElementById('error-message');
+            err.textContent = 'Could not load your account. Please refresh and try again.';
+            err.style.display = 'block';
+          }
+        }
       });
 
       const btn = document.getElementById('google-signin-btn');

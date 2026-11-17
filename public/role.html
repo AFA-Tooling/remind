@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="icon" href="/favicon.ico" sizes="any" /><link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
+  <title>AutoRemind – Choose Your Role</title>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+  <script>
+    (async function () {
+      if (!window.FIREBASE_API_KEY || !window.FIREBASE_AUTH_DOMAIN) {
+        const response = await fetch('/api/config');
+        if (!response.ok) throw new Error('Could not load sign-in configuration');
+        const config = await response.json();
+        window.FIREBASE_API_KEY = config.FIREBASE_API_KEY;
+        window.FIREBASE_AUTH_DOMAIN = config.FIREBASE_AUTH_DOMAIN;
+        window.FIREBASE_PROJECT_ID = config.FIREBASE_PROJECT_ID;
+      }
+      const script = document.createElement('script');
+      script.src = './auth.js';
+      script.defer = true;
+      document.head.appendChild(script);
+    })().catch(error => {
+      console.error('Could not initialize sign-in:', error);
+      document.getElementById('role-error').textContent = 'Could not initialize sign-in. Refresh the page to try again.';
+    });
+  </script>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    body { display: flex; flex-direction: column; min-height: 100vh; }
+    .hero { flex: 1; display: flex; flex-direction: column; justify-content: center; margin-top: -10vh; }
+    .role-buttons { display: flex; justify-content: center; gap: 12px; flex-wrap: wrap; }
+    /* Same look as the sign-in button on login.html. */
+    .role-buttons .btn--login {
+      display: inline-flex; align-items: center; justify-content: center; gap: 10px;
+      min-width: 200px; padding: 14px 32px; border: none; border-radius: 999px;
+      background: var(--olive); color: #fff; font: inherit; font-size: 18px; font-weight: 600;
+      cursor: pointer; transition: background 0.15s, transform 0.15s, box-shadow 0.15s;
+    }
+    .role-buttons .btn--login svg { width: 22px; height: 22px; flex-shrink: 0; }
+    .role-buttons .btn--login:hover:not(:disabled) {
+      background: #1d4bb0; transform: translateY(-2px); box-shadow: 0 6px 16px rgba(0, 38, 118, 0.28);
+    }
+    .role-buttons .btn--login:active:not(:disabled) { transform: translateY(0); box-shadow: none; }
+    @media (prefers-reduced-motion: reduce) {
+      .role-buttons .btn--login:hover:not(:disabled) { transform: none; }
+    }
+    .role-buttons .btn--login:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
+    .role-buttons .btn--login:disabled { opacity: 0.6; cursor: default; }
+    .error-message { color: #d32f2f; background: #fef2f2; padding: 10px; border-radius: 8px; margin-top: 16px; display: none; }
+    #sign-out-btn { margin-top: 28px; }
+  </style>
+</head>
+<body data-page="login">
+  <!-- HEADER -->
+
+  <section class="hero">
+    <h1>Welcome!</h1>
+    <p style="margin-bottom: 32px; color: var(--muted);">Choose your role.</p>
+    <div class="role-buttons">
+      <button class="btn--login" type="button" data-role="student">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 10 12 5 2 10l10 5 10-5Z"/><path d="M6 12v5c3 2 9 2 12 0v-5"/></svg>
+        Student
+      </button>
+      <button class="btn--login" type="button" data-role="instructor">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="12" rx="1"/><path d="M7 20h10M12 16v4M7 9h6M7 12h4"/></svg>
+        Instructor
+      </button>
+    </div>
+    <div id="role-error" class="error-message" role="alert"></div>
+    <button id="sign-out-btn" class="btn btn--outline" type="button">Sign Out</button>
+  </section>
+
+  <!-- FOOTER -->
+
+  <script>
+    function waitForAuth(callback) {
+      let attempts = 0;
+      const check = () => {
+        if (window.auth && window.auth._auth) callback(window.auth);
+        else if (attempts++ < 50) setTimeout(check, 100);
+        else showRoleError('Sign-in is unavailable. Refresh the page to try again.');
+      };
+      check();
+    }
+
+    function showRoleError(message) {
+      const error = document.getElementById('role-error');
+      error.textContent = message;
+      error.style.display = 'block';
+    }
+
+    waitForAuth(auth => {
+      const buttons = document.querySelectorAll('[data-role]');
+
+      auth.onAuthStateChange(async (user, session, loading) => {
+        if (loading) return;
+        if (!user) {
+          window.location.replace('./login.html');
+          return;
+        }
+        try {
+          await auth.getAccountRole();
+        } catch (e) {
+          console.error('Could not load account role:', e);
+          showRoleError('Could not load your account role. Please refresh the page to try again.');
+        }
+      });
+
+      buttons.forEach(button => {
+        button.addEventListener('click', async () => {
+          const role = button.dataset.role;
+          buttons.forEach(option => { option.disabled = true; });
+          document.getElementById('role-error').style.display = 'none';
+          try {
+            await auth.setAccountRole(role);
+            window.location.replace('./index.html');
+          } catch (e) {
+            console.error('Could not save account role:', e);
+            showRoleError('Could not save your role. Please try again.');
+            buttons.forEach(option => { option.disabled = false; });
+          }
+        });
+      });
+      document.getElementById('sign-out-btn').addEventListener('click', async () => {
+        await auth.signOut();
+        window.location.replace('./');
+      });
+    });
+  </script>
+</body>
+</html>

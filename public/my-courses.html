@@ -1,0 +1,2115 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="icon" href="/favicon.ico" sizes="any" /><link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
+  <title>My Courses - AutoRemind</title>
+
+  <!-- Firebase JS SDK (compat v9) -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+  <!-- Load credentials -->
+  <script>
+    (async function () {
+      await new Promise(resolve => setTimeout(resolve, 50));
+      if (window.FIREBASE_API_KEY && window.FIREBASE_AUTH_DOMAIN) {
+        console.log('✅ Using server-injected credentials');
+        const script = document.createElement('script');
+        script.src = './auth.js';
+        script.defer = true;
+        document.head.appendChild(script);
+        return;
+      }
+      try {
+        const response = await fetch('/api/config');
+        if (!response.ok) throw new Error('Failed to fetch config');
+        const config = await response.json();
+        window.FIREBASE_API_KEY = config.FIREBASE_API_KEY;
+        window.FIREBASE_AUTH_DOMAIN = config.FIREBASE_AUTH_DOMAIN;
+        window.FIREBASE_PROJECT_ID = config.FIREBASE_PROJECT_ID;
+        console.log('✅ Using API-fetched credentials');
+        const script = document.createElement('script');
+        script.src = './auth.js';
+        script.defer = true;
+        document.head.appendChild(script);
+      } catch (error) {
+        console.error('❌ Error loading credentials:', error);
+        // Still try to load auth.js
+        const script = document.createElement('script');
+        script.src = './auth.js';
+        script.defer = true;
+        document.head.appendChild(script);
+      }
+    })();
+  </script>
+
+  <!-- Styles are now external -->
+  <link rel="stylesheet" href="style.css">
+  <script src="course-progress.js"></script>
+
+  <style id="auth-guard">
+    body>*:not(#auth-loading) {
+      display: none !important;
+    }
+
+    @keyframes spin {
+      0% {
+        transform: rotate(0deg);
+      }
+
+      100% {
+        transform: rotate(360deg);
+      }
+    }
+  </style>
+  <style>
+    .instructor-courses-empty { color: var(--muted); margin: 8px 0 16px; font-size: 15px; }
+    .instructor-course-tabs { display: flex; flex-direction: column; gap: 0; margin: 0 0 16px; }
+    .instructor-course-row { display: flex; align-items: center; }
+    .instructor-course-tab { flex: 1; min-width: 0; border: 0; border-radius: 0; padding: 14px 0; background: transparent; color: var(--text); text-align: left; font: inherit; font-size: 16px; cursor: pointer; }
+    .instructor-course-tab[aria-selected="true"] { color: var(--olive-dark); font-weight: 700; }
+    .instructor-course-tab-status { margin-left: 8px; color: var(--muted); font-size: 12px; font-weight: 600; }
+    .instructor-course-menu { position: relative; }
+    .instructor-course-menu-toggle { display: flex; align-items: center; justify-content: center; width: 34px; height: 34px; border: 0; border-radius: 6px; background: transparent; color: var(--muted); cursor: pointer; font-size: 23px; line-height: 1; }
+    .instructor-course-menu-toggle:hover,
+    .instructor-course-menu.context-menu-open .instructor-course-menu-toggle { background: var(--pale); color: var(--text); }
+    .instructor-course-menu-items { display: none; position: absolute; z-index: 20; top: 38px; right: 0; min-width: 140px; padding: 4px; border: 1px solid var(--line); border-radius: 8px; background: #fff; box-shadow: 0 5px 18px rgba(0,0,0,.12); }
+    .instructor-course-menu.context-menu-open .instructor-course-menu-items { display: block; position: fixed; top: var(--menu-top); left: var(--menu-left); right: auto; }
+    .instructor-course-menu-items button { display: block; width: 100%; padding: 8px 10px; border: 0; border-radius: 5px; background: transparent; color: var(--text); text-align: left; font: inherit; font-size: 14px; cursor: pointer; }
+    .instructor-course-menu-items button:hover { background: var(--pale); }
+    .instructor-course-menu-items [data-delete-course]:hover { color: #c0392b; }
+    .instructor-course-detail { margin: 0 0 16px; }
+    .instructor-course-detail .divider { margin: 14px 0 18px; }
+    .instructor-course-detail > .divider { margin: 2px 0 2px; }
+    .instructor-course-toolbar { display: flex; justify-content: flex-end; gap: 6px; min-height: 36px; margin: 8px 0 4px; }
+    .instructor-course-toolbar-button { display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; border: 0; border-radius: 6px; background: transparent; color: var(--muted); cursor: pointer; }
+    .instructor-course-toolbar-button:hover,
+    .instructor-course-toolbar-button:focus-visible { background: var(--pale); color: var(--olive-dark); }
+    .instructor-course-toolbar-button { position: relative; }
+    .instructor-course-toolbar-button::after { position: absolute; z-index: 25; right: 50%; bottom: calc(100% + 6px); width: max-content; max-width: 180px; padding: 7px 10px; border-radius: 6px; background: #222; color: #fff; content: attr(data-tooltip); font-size: 12px; font-weight: 500; line-height: 1.3; opacity: 0; pointer-events: none; transform: translate(50%, 2px); transition: opacity 120ms ease, transform 120ms ease; }
+    .instructor-course-toolbar-button:hover::after,
+    .instructor-course-toolbar-button:focus-visible::after { opacity: 1; transform: translate(50%, 0); }
+    .instructor-course-toolbar-button:last-child::after { right: 0; transform: translate(0, 2px); }
+    .instructor-course-toolbar-button:last-child:hover::after,
+    .instructor-course-toolbar-button:last-child:focus-visible::after { transform: translate(0, 0); }
+    .instructor-course-toolbar-button[data-delete-course]:hover { color: #c0392b; }
+    .instructor-course-toolbar-button svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+    #instructor-course-sync-modal.active { display: flex; }
+    #instructor-course-sync-modal .modal-content { width: min(460px, calc(100vw - 32px)); max-width: 460px; padding: 26px; text-align: left; }
+    #instructor-course-sync-modal h2 { margin: 0 0 6px; font-size: 19px; }
+    #instructor-course-sync-course { margin: 0 0 20px; color: var(--muted); font-size: 14px; }
+    .instructor-course-sync-options { display: grid; gap: 10px; }
+    .instructor-course-sync-option { display: flex; align-items: flex-start; gap: 10px; padding: 12px; border: 1px solid var(--line); border-radius: 8px; cursor: pointer; }
+    .instructor-course-sync-option:has(input:checked) { border-color: var(--olive); background: var(--pale); }
+    .instructor-course-sync-option:has(input:disabled) { color: var(--muted); cursor: not-allowed; opacity: .7; }
+    .instructor-course-sync-option input { margin-top: 3px; accent-color: var(--olive-dark); }
+    .instructor-course-sync-option strong,
+    .instructor-course-sync-option span { display: block; }
+    .instructor-course-sync-option span { margin-top: 2px; color: var(--muted); font-size: 12px; }
+    #instructor-course-sync-status { min-height: 20px; margin: 12px 0 0; color: #a93226; font-size: 13px; }
+    .instructor-course-sync-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 16px; }
+    #instructor-course-confirm-modal.active { display: flex; }
+    #instructor-course-confirm-modal .modal-content { width: min(420px, calc(100vw - 32px)); max-width: 420px; padding: 26px; text-align: left; }
+    #instructor-course-confirm-modal h2 { margin: 0 0 10px; font-size: 19px; }
+    #instructor-course-confirm-message { margin: 0; color: var(--muted); line-height: 1.5; }
+    .instructor-course-confirm-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 24px; }
+    #instructor-course-confirm-submit.is-danger { border-color: #c0392b; background: #c0392b; color: #fff; }
+    #instructor-course-confirm-submit.is-danger:hover { border-color: #962d22; background: #962d22; }
+    .instructor-course-meta { color: var(--muted); font-size: 13px; }
+    .instructor-assignment-list { margin-top: 8px; }
+    .instructor-assignment-row { display: grid; grid-template-columns: minmax(0, 1fr) auto 34px; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--line); }
+    .instructor-assignment-row-review { grid-template-columns: minmax(0, 1fr) 34px; }
+    .instructor-assignment-review-content { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 12px; min-width: 0; }
+    .instructor-assignment-review-name { display: flex; align-items: center; gap: 9px; min-width: 0; }
+    .instructor-assignment-review-name input { flex: 0 0 auto; }
+    .instructor-assignment-name { min-width: 0; }
+    .instructor-term-mismatch { margin: 4px 0 0; color: #b4570b; font-size: 13px; font-weight: 500; }
+    .instructor-review-section-title { margin: 22px 0 4px; font-size: 15px; font-weight: 600; }
+    .instructor-review-section-title:first-of-type { margin-top: 20px; }
+    .instructor-review-section-note { margin: 0 0 8px; color: var(--muted); font-size: 13px; }
+    .instructor-merged-versions { margin-top: 3px; font-size: 12px; }
+    .instructor-merged-versions > summary { color: var(--muted); cursor: pointer; width: fit-content; }
+    .instructor-merged-versions > summary:hover { color: var(--olive-dark); }
+    .instructor-merged-versions ul { margin: 6px 0 2px; padding: 0 0 0 14px; border-left: 2px solid var(--line); list-style: none; }
+    .instructor-merged-versions li { display: flex; justify-content: space-between; gap: 12px; padding: 2px 0; color: var(--muted); }
+    .instructor-merged-versions li span:first-child { color: var(--ink, inherit); }
+    .instructor-merged-toggle { display: block; margin-top: 5px; padding: 0; border: 0; background: none; color: var(--muted); font: inherit; font-size: 12px; font-weight: 500; text-align: left; cursor: pointer; }
+    .instructor-merged-toggle::before { content: '▶'; display: inline-block; margin-right: 4.5px; font-size: 10px; line-height: 1; transition: transform .15s; }
+    .instructor-merged-toggle[aria-expanded="true"]::before { transform: rotate(90deg); }
+    .instructor-merged-toggle:hover { color: var(--olive-dark); }
+    .instructor-merged-version-rows { padding-left: 26px; border-bottom: 1px solid var(--line); }
+    .instructor-merged-version-rows .instructor-assignment-row:last-child { border-bottom: 0; }
+    .instructor-review-empty { margin: 4px 0 8px; color: var(--muted); font-size: 13px; }
+    .instructor-assignment-review-reason { display: block; margin-top: 5px; color: #b4570b; font-size: 12px; font-weight: 500; }
+    .instructor-assignment-source { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; }
+    .instructor-assignment-source span { padding: 1px 7px; border-radius: 999px; background: var(--pale); color: var(--olive-dark); font-size: 11px; font-weight: 600; white-space: nowrap; }
+    .instructor-assignment-combined { display: block; margin-top: 2px; color: var(--muted); font-size: 12px; font-weight: 400; }
+    .instructor-assignment-name .instructor-assignment-resource-trigger { overflow-wrap: anywhere; text-align: left; }
+    .instructor-assignment-name .instructor-course-meta { display: block; margin-top: 2px; }
+    .instructor-assignment-due { color: var(--olive-dark); font-size: 13px; font-weight: 600; text-align: right; white-space: nowrap; }
+    .instructor-assignment-menu { justify-self: end; }
+    .instructor-assignment-menu .instructor-course-menu-items { top: 34px; right: 0; }
+    .instructor-course-menu.instructor-assignment-menu.context-menu-open .instructor-course-menu-items { display: block; position: absolute; top: 34px; right: 0; left: auto; }
+    .instructor-course-sync-status { border-top: 1px solid var(--line); margin-top: 22px; padding-top: 10px; color: var(--muted); font-size: 12px; }
+    .instructor-course-select-prompt { color: var(--muted); margin: 0; }
+    .instructor-course-tabs-header { display: flex; align-items: flex-end; gap: 8px; }
+    .instructor-course-tabs-header .instructor-course-tabs { flex: 1; min-width: 0; }
+    .instructor-archive-toggle, .instructor-create-course-icon { display: none; flex: 0 0 auto; align-items: center; justify-content: center; width: 36px; height: 36px; margin: 0 0 4px; padding: 0; border: 0; border-radius: 6px; background: transparent; color: var(--olive-dark); cursor: pointer; }
+    .instructor-archive-toggle:hover,
+    .instructor-archive-toggle:focus-visible,
+    .instructor-create-course-icon:hover,
+    .instructor-create-course-icon:focus-visible { background: var(--pale); }
+    .instructor-archive-toggle svg, .instructor-create-course-icon svg { width: 19px; height: 19px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+    .instructor-archive-toggle, .instructor-create-course-icon { position: relative; }
+    .instructor-archive-toggle::after, .instructor-create-course-icon::after { position: absolute; z-index: 25; top: calc(100% + 6px); right: 0; width: max-content; max-width: 220px; padding: 7px 10px; border-radius: 6px; background: #222; color: #fff; content: attr(data-tooltip); font-size: 12px; font-weight: 500; line-height: 1.3; opacity: 0; pointer-events: none; transform: translateY(-2px); transition: opacity 120ms ease, transform 120ms ease; }
+    .instructor-archive-toggle:hover::after,
+    .instructor-archive-toggle:focus-visible::after,
+    .instructor-create-course-icon:hover::after,
+    .instructor-create-course-icon:focus-visible::after { opacity: 1; transform: translateY(0); }
+    .instructor-review-intro { color: var(--muted); margin: 14px 0 8px; font-size: 14px; }
+    .instructor-review-item { display: flex; gap: 10px; align-items: flex-start; padding: 10px 0; border-top: 1px solid var(--line); }
+    .instructor-review-item input { margin-top: 4px; }
+    .instructor-review-item-main { flex: 1; }
+    .instructor-review-actions { display: flex; justify-content: flex-end; margin-top: 16px; }
+    .instructor-new-assignment-review-actions { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 16px; }
+    .instructor-discard-synced-button { border: 0; padding: 8px 0; background: transparent; color: #c0392b; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; }
+    .instructor-discard-synced-button:hover { color: #962d22; text-decoration: underline; }
+    .instructor-assignment-actions { display: flex; justify-content: flex-start; margin-top: 16px; }
+    .instructor-review-footer { display: flex; flex-direction: column; gap: 12px; margin-top: 16px; }
+    .instructor-review-footer .instructor-review-actions,
+    .instructor-review-footer .instructor-assignment-actions { margin-top: 0; }
+    .instructor-new-assignment-review { margin: 0 0 20px; padding: 14px; border: 1px solid var(--line); border-radius: 8px; }
+    .instructor-new-assignment-review h3 { margin: 0; font-size: 15px; }
+    .instructor-course-sync-status p { margin: 4px 0; overflow-wrap: anywhere; }
+    .instructor-assignment-resource-trigger { border: 0; padding: 0; background: none; color: var(--olive-dark); font: inherit; font-size: 15px; font-weight: 600; text-align: left; cursor: pointer; }
+    .instructor-assignment-review-name > .instructor-assignment-name { font-size: 15px; }
+    .instructor-assignment-resource-trigger:hover { text-decoration: underline; }
+    #instructor-resource-modal.active { display: flex; }
+    #instructor-resource-modal .modal-content { width: min(520px, calc(100vw - 32px)); max-width: 520px; max-height: 80vh; overflow-y: auto; padding: 24px; text-align: left; }
+    #instructor-resource-modal h2 { margin: 0 0 6px; font-size: 18px; }
+    .instructor-resource-due { margin-bottom: 14px; color: var(--muted); font-size: 13px; }
+    .instructor-resource-heading { margin: 0 0 8px; font-size: 14px; font-weight: 600; }
+    .instructor-resource-empty { padding: 20px 0; color: var(--muted); font-size: 14px; text-align: center; }
+    #instructor-resource-modal-close { display: block; width: 100%; margin-top: 16px; }
+    #instructor-assignment-modal.active { display: flex; }
+    #instructor-assignment-modal .modal-content { width: min(520px, calc(100vw - 32px)); max-width: 520px; max-height: 88vh; overflow-y: auto; padding: 28px; text-align: left; }
+    #instructor-assignment-modal h2 { margin: 0 0 18px; }
+    .instructor-assignment-modal-field { display: block; margin-top: 16px; font-size: 13px; font-weight: 600; }
+    .instructor-assignment-modal-field input { display: block; box-sizing: border-box; width: 100%; min-height: 42px; margin-top: 6px; font-family: inherit; font-size: 15px; font-weight: 400; }
+    #instructor-assignment-modal-name.assignment-name-missing { border-color: #c0392b; }
+    .instructor-assignment-modal-resources { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--line); color: var(--text); font-size: 13px; }
+    .instructor-assignment-resource-fields { display: grid; grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.2fr) minmax(0, 1.4fr) 34px; gap: 8px; margin-top: 10px; }
+    .instructor-assignment-resource-fields input.channel-field { display: block; box-sizing: border-box; width: 100%; min-width: 0; min-height: 38px; font-family: inherit; font-size: 15px; font-weight: 400; }
+    .instructor-resource-tag-field { position: relative; min-width: 0; }
+    .instructor-resource-tag-options { display: none; position: absolute; z-index: 30; top: calc(100% + 2px); right: 0; left: 0; max-height: 180px; overflow-y: auto; padding: 4px; border: 1px solid var(--line); border-radius: 6px; background: #fff; box-shadow: 0 4px 12px rgba(0,0,0,.12); }
+    .instructor-resource-tag-options.is-open { display: block; }
+    .instructor-assignment-resource-fields .instructor-resource-tag-options button { display: block; width: 100%; height: auto; padding: 7px 9px; border: 0; border-radius: 4px; background: transparent; color: var(--text); text-align: left; font: inherit; font-size: 14px; cursor: pointer; }
+    .instructor-assignment-resource-fields .instructor-resource-tag-options button:hover,
+    .instructor-assignment-resource-fields .instructor-resource-tag-options button:focus-visible { background: var(--pale); color: var(--text); }
+    .instructor-assignment-resource-fields button { align-self: center; display: flex; align-items: center; justify-content: center; width: 34px; height: 38px; padding: 0; border: 0; background: transparent; color: #c0392b; cursor: pointer; font-family: Arial, sans-serif; font-size: 22px; line-height: 1; }
+    .instructor-assignment-resource-fields button span { transform: translateY(3px); }
+    .instructor-assignment-resource-fields button:hover { color: #922b21; }
+    .instructor-resource-item { display: flex; align-items: flex-start; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+    .instructor-resource-item:last-child { border-bottom: none; }
+    .instructor-resource-type-tag { font-size: 11px; font-weight: 600; color: var(--olive-dark); background: var(--pale); padding: 2px 8px; border-radius: 999px; white-space: nowrap; flex-shrink: 0; margin-top: 2px; }
+    .instructor-resource-link { font-size: 14px; color: var(--olive); text-decoration: none; line-height: 1.4; word-break: break-word; overflow-wrap: anywhere; }
+    .instructor-resource-link:hover { text-decoration: underline; }
+    .instructor-assignment-modal-status { min-height: 20px; margin: 12px 0 0; color: #c0392b; font-size: 13px; }
+    .instructor-assignment-modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 18px; }
+    @media (max-width: 600px) {
+      .instructor-assignment-row { grid-template-columns: minmax(0, 1fr) auto 34px; gap: 8px; }
+      .instructor-assignment-review-content { grid-template-columns: minmax(0, 1fr); gap: 2px; }
+      .instructor-assignment-due { grid-column: 1; text-align: left; margin-left: 27px; }
+      .instructor-assignment-due { font-size: 13px; }
+      #instructor-assignment-modal .modal-content { padding: 24px 20px; }
+      .instructor-assignment-resource-fields { grid-template-columns: minmax(0, 1fr) 34px; }
+      .instructor-assignment-resource-fields input:first-of-type { grid-column: 1 / -1; }
+      .instructor-assignment-resource-fields input:last-of-type { grid-column: 1; }
+    }
+    #course-import-modal.active { display: flex; }
+    #course-import-modal .modal-content {
+      width: min(720px, calc(100vw - 32px));
+      max-width: 720px;
+      max-height: 88vh;
+      overflow-y: auto;
+      padding: 32px;
+      text-align: left;
+    }
+    #course-import-modal .course-import-intro { margin: 0 0 22px; line-height: 1.5; }
+    .course-import-field { margin-top: 18px; }
+    .course-import-field:first-child { margin-top: 0; }
+    .course-import-field .label {
+      margin: 0 0 7px;
+      font-size: 14px;
+      line-height: 1.4;
+    }
+    .course-import-field .channel-field {
+      display: block;
+      width: 100%;
+      box-sizing: border-box;
+      min-height: 44px;
+      margin: 0;
+      background: #fff;
+      font: inherit;
+      font-size: 14px;
+      line-height: 1.45;
+    }
+    .course-import-field textarea.channel-field { min-height: 96px; resize: vertical; }
+    .course-import-field .channel-field::placeholder { color: #a4acb8; opacity: 1; }
+    #course-name-input.course-name-missing { border-color: #c0392b; }
+    .course-import-help { margin: 5px 0 0; color: var(--muted); font-size: 12px; line-height: 1.45; }
+    .course-import-confirm {
+      display: flex; align-items: flex-start; gap: 10px; margin-top: 10px; padding: 10px 12px;
+      border: 1px solid var(--line); border-radius: 8px; background: #f7f8fb;
+      font-size: 13px; line-height: 1.45; cursor: pointer;
+    }
+    .course-import-confirm[hidden] { display: none; }
+    .course-import-confirm input { margin: 2px 0 0; flex-shrink: 0; width: 16px; height: 16px; cursor: pointer; }
+    .course-import-confirm.course-import-confirm-missing { border-color: #c0392b; background: #fdecea; }
+    .course-import-section-title { margin: 26px 0 0; font-size: 17px; line-height: 1.4; font-weight: 600; }
+    #course-import-modal .course-import-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 22px; }
+    #course-import-modal .course-import-status { min-height: 20px; margin: 12px 0 0; font-size: 13px; }
+    @media (max-width: 560px) {
+      #course-import-modal .modal-content { padding: 24px 20px; }
+    }
+
+    /* Page layout */
+    #app-container { padding-top: 40px; padding-bottom: 16px; }
+    #instructor-course-workspace { background: #fff; }
+    body.instructor-no-current-courses #instructor-course-detail-column { display: none; }
+    .instructor-course-tabs {
+      align-items: flex-end; flex-direction: row; flex-wrap: nowrap; gap: 4px; margin: 0; padding: 0;
+      overflow-x: auto; overflow-y: hidden; border-bottom: 0;
+    }
+    .instructor-course-row { flex: 0 0 auto; max-width: 240px; }
+    .instructor-course-tab {
+      display: block; flex: 0 1 auto; width: auto; max-width: 240px;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      border: 0; border-radius: 8px 8px 0 0;
+      padding: 10px 18px; background: transparent; color: var(--muted);
+      text-align: center; font-size: 14px; font-weight: 500;
+    }
+    .instructor-course-tab[aria-selected="true"],
+    .instructor-course-tab[aria-selected="true"]:hover {
+      position: relative; z-index: 1; margin-bottom: 0;
+      background: var(--gold); color: #1a1a1a; font-weight: 600;
+    }
+    .instructor-course-tab:hover:not([aria-selected="true"]),
+    .instructor-course-tab:focus-visible:not([aria-selected="true"]) { background: #f5f5f5; }
+    #instructor-course-detail {
+      margin: 0; padding: 0 20px 20px; border: 1px solid var(--line); border-radius: 0 0 8px 8px; background: #fff;
+      animation: instructor-course-panel-in 180ms ease-out;
+    }
+    .instructor-assignment-list { margin-top: 0; }
+    .instructor-review-intro { margin: 8px 0 8px; }
+    .instructor-new-assignment-review { margin-top: 8px; }
+    .instructor-assignment-list > .instructor-assignment-row:first-child { padding-top: 6px; }
+    #instructor-course-detail .divider:first-child { margin-top: 0; }
+    @keyframes instructor-course-panel-in {
+      from { opacity: 0; transform: translateY(5px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .instructor-archive-toggle, .instructor-create-course-icon { display: flex; }
+    #instructor-settings-link { display: inline-block; margin-top: 16px; }
+  </style>
+</head>
+
+<body data-page="my-courses">
+  <div id="auth-loading"
+    style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center; background: white; z-index: 9999;">
+    <div
+      style="width: 40px; height: 40px; margin-bottom: 16px; border: 4px solid #f3f3f3; border-top: 4px solid #002676; border-radius: 50%; animation: spin 1s linear infinite;">
+    </div>
+    <div style="font-family: system-ui; color: #002676; font-weight: 600;">Loading AutoRemind...</div>
+  </div>
+
+  <!-- HEADER -->
+
+  <div class="first-screen">
+    <section class="container" id="app-container">
+          <section id="instructor-courses-panel" aria-label="My Courses">
+            <section class="instructor-current-courses" aria-label="Current courses">
+              <p id="instructor-courses-empty" class="instructor-courses-empty">No current courses found. Create a course to get started.</p>
+              <div id="instructor-course-workspace">
+                <div class="instructor-course-tabs-header">
+                  <div id="instructor-course-tabs" class="instructor-course-tabs" role="tablist" aria-label="Courses"></div>
+                  <button id="instructor-archive-toggle" class="instructor-archive-toggle" type="button" aria-label="Show Archived Courses" title="Show Archived Courses" aria-controls="instructor-course-tabs" aria-pressed="false">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>
+                  </button>
+                  <button id="create-course-icon-btn" class="instructor-create-course-icon" type="button" aria-label="Create Course" data-tooltip="Create Course">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+                  </button>
+                </div>
+                <section id="instructor-course-detail-column" aria-label="Selected course">
+                  <section id="instructor-course-detail" class="instructor-course-detail" style="display:none;" role="tabpanel" aria-label="Selected course details" tabindex="0" aria-live="polite"></section>
+                </section>
+              </div>
+            </section>
+            <a id="instructor-settings-link" class="btn btn--outline" href="./index.html">Back to Settings</a>
+          </section>
+    </section>
+  </div>
+
+  <div id="course-import-modal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="course-import-title">
+    <div class="modal-content">
+      <h2 id="course-import-title">Create New Course</h2>
+      <div id="course-create-fields">
+        <p class="course-import-intro" style="font-size:14px; color:var(--muted);">
+          Add the details for your course and connect its assignment platforms.
+        </p>
+        <div class="course-import-field">
+          <label for="course-name-input" class="label">Course Name</label>
+          <input id="course-name-input" type="text" class="channel-field" placeholder="e.g. CS 61A" maxlength="120" required>
+        </div>
+        <div class="course-import-field">
+          <label for="course-term-input" class="label">Term <span style="font-weight:400;color:var(--muted);">(Optional)</span></label>
+          <input id="course-term-input" type="text" class="channel-field" placeholder="e.g. Fall 2026" maxlength="80" autocomplete="off">
+        </div>
+        <h3 id="course-import-section-title" class="course-import-section-title">Import Assignments</h3>
+        <div id="course-website-field" class="course-import-field">
+          <label for="course-website-url" class="label">Course Website URL <span style="font-weight:400;color:var(--muted);">(Optional)</span></label>
+          <input id="course-website-url" type="url" class="channel-field" placeholder="https://example.edu/course" autocomplete="url">
+          <p class="course-import-help">Add a link to your course website.</p>
+        </div>
+        <div id="gradescope-course-field" class="course-import-field">
+          <label for="gradescope-course-id" class="label">Gradescope Course ID <span style="font-weight:400;color:var(--muted);">(Optional)</span></label>
+          <input id="gradescope-course-id" type="text" class="channel-field" inputmode="numeric" placeholder="e.g. 1234567" autocomplete="off">
+          <p class="course-import-help">Enter the numeric Course ID.</p>
+          <label id="gradescope-ta-confirm-field" class="course-import-confirm" for="gradescope-ta-confirm" hidden>
+            <input id="gradescope-ta-confirm" type="checkbox">
+            <span><strong>Required for Gradescope:</strong> I've added <strong>autoremindberkeley@gmail.com</strong> as a TA in this Gradescope course.</span>
+          </label>
+        </div>
+        <div id="course-import-progress" class="course-progress" aria-live="polite" hidden></div>
+        <p id="gradescope-import-status" class="course-import-status" role="status" aria-live="polite"></p>
+        <div class="course-import-actions">
+          <button id="course-import-cancel-btn" class="btn btn--outline" type="button">Cancel</button>
+          <button id="submit-course-import-btn" class="btn btn--primary" type="button">Create New Course</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="instructor-resource-modal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="instructor-resource-title">
+    <div class="modal-content">
+      <h2 id="instructor-resource-title"></h2>
+      <div id="instructor-resource-due" class="instructor-resource-due"></div>
+      <div id="instructor-resource-content" aria-live="polite"></div>
+      <button id="instructor-resource-modal-close" class="btn btn--outline" type="button">Close</button>
+    </div>
+  </div>
+
+  <div id="instructor-assignment-modal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="instructor-assignment-modal-title">
+    <div class="modal-content">
+      <h2 id="instructor-assignment-modal-title">Edit Assignment</h2>
+      <label class="instructor-assignment-modal-field" for="instructor-assignment-modal-name">
+        Assignment Name
+        <input id="instructor-assignment-modal-name" class="channel-field" type="text" maxlength="200" placeholder="E.g. Homework 1" required>
+      </label>
+      <label class="instructor-assignment-modal-field" for="instructor-assignment-modal-due">
+        Due Date
+        <input id="instructor-assignment-modal-due" class="channel-field" type="date" required>
+      </label>
+      <div class="instructor-assignment-modal-resources">
+        <strong>Resources</strong>
+        <div id="instructor-assignment-modal-resource-fields"></div>
+        <button id="instructor-assignment-add-resource" class="btn btn--outline" type="button" style="margin-top:18px;">Add Resource</button>
+      </div>
+      <p id="instructor-assignment-modal-status" class="instructor-assignment-modal-status" role="status" aria-live="polite"></p>
+      <div class="instructor-assignment-modal-actions">
+        <button id="instructor-assignment-modal-cancel" class="btn btn--outline" type="button">Cancel</button>
+        <button id="instructor-assignment-modal-save" class="btn btn--primary" type="button">Save Assignment</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="instructor-course-confirm-modal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="instructor-course-confirm-title" aria-describedby="instructor-course-confirm-message">
+    <div class="modal-content">
+      <h2 id="instructor-course-confirm-title"></h2>
+      <p id="instructor-course-confirm-message"></p>
+      <div class="instructor-course-confirm-actions">
+        <button id="instructor-course-confirm-cancel" class="btn btn--outline" type="button">Cancel</button>
+        <button id="instructor-course-confirm-submit" class="btn btn--primary" type="button"></button>
+      </div>
+    </div>
+  </div>
+
+  <div id="instructor-course-sync-modal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="instructor-course-sync-title" aria-describedby="instructor-course-sync-course">
+    <div class="modal-content">
+      <h2 id="instructor-course-sync-title">Sync Course</h2>
+      <p id="instructor-course-sync-course"></p>
+      <fieldset class="instructor-course-sync-options" style="border:0; margin:0; padding:0;">
+        <legend class="label" style="margin-bottom:8px;">Sync From</legend>
+        <label class="instructor-course-sync-option">
+        <input type="checkbox" name="instructor-course-sync-source" value="gradescope">
+          <div><strong>Gradescope</strong><span id="instructor-course-sync-gradescope-detail"></span></div>
+        </label>
+        <label class="instructor-course-sync-option">
+          <input type="checkbox" name="instructor-course-sync-source" value="website">
+          <div><strong>Course Website</strong><span id="instructor-course-sync-website-detail"></span></div>
+        </label>
+      </fieldset>
+      <div id="instructor-course-sync-progress" class="course-progress" aria-live="polite" hidden></div>
+      <p id="instructor-course-sync-status" role="status" aria-live="polite"></p>
+      <div class="instructor-course-sync-actions">
+        <button id="instructor-course-sync-cancel" class="btn btn--outline" type="button">Cancel</button>
+        <button id="instructor-course-sync-submit" class="btn btn--primary" type="button">Sync</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Generic Message/Error Modal -->
+  <div id="message-modal" class="modal-overlay">
+    <div class="modal-content">
+      <h2 id="msg-title" style="margin-top:0;">Notice</h2>
+      <p id="msg-body" style="font-size:16px; color:#555; margin-bottom:24px; word-break: break-word;"></p>
+      <button id="msg-ok-btn" class="btn btn--primary">OK</button>
+    </div>
+  </div>
+
+  <!-- FOOTER -->
+
+  <script>
+    // Generic message popup
+    const msgModal = document.getElementById('message-modal');
+    function showMessage(msg, title = 'Notice') {
+      document.getElementById('msg-title').textContent = title;
+      document.getElementById('msg-body').textContent = msg;
+      msgModal.style.display = 'flex';
+    }
+    document.getElementById('msg-ok-btn').addEventListener('click', () => {
+      msgModal.style.display = 'none';
+    });
+
+    (function () {
+      function waitForAuth(callback) {
+        let attempts = 0;
+        const check = () => {
+          if (window.auth && window.auth._auth) callback(window.auth);
+          else if (attempts++ < 20) setTimeout(check, 100);
+          else {
+            document.getElementById('auth-loading').style.display = 'none';
+          }
+        };
+        check();
+      }
+
+      async function readApiResponse(response) {
+        const text = await response.text();
+        let data;
+        try {
+          data = JSON.parse(text);
+        } catch {
+          throw new Error('AutoRemind could not read the server response. Refresh the page and try again.');
+        }
+        if (!response.ok) {
+          throw new Error(data.error || `Request failed (${response.status})`);
+        }
+        return data;
+      }
+
+      function escHtml(str) {
+        return String(str)
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;');
+      }
+
+      // The website states its own term ("Fall 2026"); flag a different typed term.
+      function termsDisagree(websiteTerm, courseTerm) {
+        const parse = value => {
+          const match = /\b(fall|autumn|spring|summer|winter)\s+(20\d{2})\b/i.exec(String(value || ''));
+          return match ? `${match[1].toLowerCase().replace('autumn', 'fall')} ${match[2]}` : null;
+        };
+        const website = parse(websiteTerm);
+        if (!website || !courseTerm) return false;
+        const typed = parse(courseTerm);
+        const typedYear = /\b(19|20)\d{2}\b/.exec(String(courseTerm))?.[0];
+        return typed ? typed !== website : Boolean(typedYear && !website.endsWith(typedYear));
+      }
+
+      // Review sections: an item is "Ready for Review" when it has a due date and nothing flagged it.
+      function reviewReasons(assignment) {
+        const reasons = Array.isArray(assignment.review_reasons) ? [...assignment.review_reasons] : [];
+        // A merged item whose versions disagree already says why it has no date.
+        const explained = reasons.some(reason => reason.startsWith('Versions are due on different days'));
+        if (!assignment.due && !explained) reasons.unshift('No due date found. Use Edit to add one before including it.');
+        return reasons;
+      }
+
+      function isPendingReview(assignment) {
+        return reviewReasons(assignment).length > 0;
+      }
+
+      function reviewReasonNote(assignment) {
+        return reviewReasons(assignment)
+          .map(reason => `<span class="instructor-assignment-review-reason">${escHtml(reason)}</span>`)
+          .join('');
+      }
+
+      function reviewSections(assignments, renderRow, emptyMessage) {
+        if (!assignments.length) return `<p class="instructor-course-meta">${emptyMessage}</p>`;
+        const confident = assignments.filter(assignment => !isPendingReview(assignment));
+        const pending = assignments.filter(isPendingReview);
+        return `<h4 class="instructor-review-section-title">Ready for Review (${confident.length})</h4>
+          <p class="instructor-review-section-note">Found with a due date and selected by default. Please review names and dates before publishing.</p>
+          ${confident.map(renderRow).join('') || '<p class="instructor-review-empty">None.</p>'}
+          <h4 class="instructor-review-section-title">Missing Details (${pending.length})</h4>
+          <p class="instructor-review-section-note">Missing a due date or needs a second look. These aren’t included unless you check them, and a deadline needs a due date before it can be added.</p>
+          ${pending.map(renderRow).join('') || '<p class="instructor-review-empty">None.</p>'}`;
+      }
+
+      // Merged items expand to list their versions; open state survives re-renders.
+      const openMergedItems = new Set();
+
+      // One version of a merged item, as an assignment row (ID "<merged id>#v<n>").
+      function mergedVersionItem(parent, index) {
+        const version = parent.merged_versions[index];
+        return {
+          ...version,
+          assignment_id: `${parent.assignment_id}#v${index}`,
+          course_id: parent.course_id,
+          resources: Array.isArray(version.resources) ? version.resources : [],
+          review_reasons: [],
+          is_version: true,
+        };
+      }
+
+      /** An assignment in a list by ID, including versions of merged items. */
+      function findCourseItem(list, id) {
+        const direct = (list || []).find(item => String(item.assignment_id) === String(id));
+        if (direct) return direct;
+        const match = /^(.+)#v(\d+)$/.exec(String(id));
+        const parent = match && (list || []).find(item => String(item.assignment_id) === match[1]);
+        return parent?.merged_versions?.[Number(match[2])] ? mergedVersionItem(parent, Number(match[2])) : null;
+      }
+
+      // During review, a merged item's note toggles its version rows.
+      function mergedVersionToggle(assignment) {
+        const versions = Array.isArray(assignment.merged_versions) ? assignment.merged_versions : [];
+        if (!versions.length) return '';
+        const id = String(assignment.assignment_id);
+        const open = openMergedItems.has(id);
+        return `<button type="button" class="instructor-merged-toggle" data-toggle-merged="${escHtml(id)}" aria-expanded="${open}">Assignment created by merging ${versions.length} version${versions.length === 1 ? '' : 's'}. Select individual versions to also add them as separate assignments.</button>`;
+      }
+
+      function mergedVersionRows(assignment, renderRow) {
+        const versions = Array.isArray(assignment.merged_versions) ? assignment.merged_versions : [];
+        if (!versions.length) return '';
+        const id = String(assignment.assignment_id);
+        return `<div class="instructor-merged-version-rows" data-merged-rows="${escHtml(id)}" ${openMergedItems.has(id) ? '' : 'hidden'}>${versions.map((_, index) => renderRow(mergedVersionItem(assignment, index))).join('')}</div>`;
+      }
+
+      document.addEventListener('click', event => {
+        const toggle = event.target.closest?.('[data-toggle-merged]');
+        if (!toggle) return;
+        const id = toggle.dataset.toggleMerged;
+        const open = !openMergedItems.has(id);
+        if (open) openMergedItems.add(id);
+        else openMergedItems.delete(id);
+        toggle.setAttribute('aria-expanded', String(open));
+        const rows = [...document.querySelectorAll('[data-merged-rows]')].find(element => element.dataset.mergedRows === id);
+        if (rows) rows.hidden = !open;
+      });
+
+      const SOURCE_LABELS = { gradescope: 'Gradescope', website: 'Course Website', instructor: 'Manual Addition' };
+      const sourceLabel = source => SOURCE_LABELS[source || 'gradescope'] || String(source);
+
+      // Source label; merged items list every source among their versions.
+      function assignmentSourceNote(assignment) {
+        const versions = Array.isArray(assignment.merged_versions) && assignment.merged_versions.length
+          ? assignment.merged_versions
+          : [assignment];
+        const sources = [...new Set(versions.map(version => version.source || 'gradescope'))]
+          .sort((a, b) => Object.keys(SOURCE_LABELS).indexOf(a) - Object.keys(SOURCE_LABELS).indexOf(b));
+        return `<span class="instructor-assignment-source">${sources.map(source => `<span>${escHtml(sourceLabel(source))}</span>`).join('')}</span>`;
+      }
+
+      // Elsewhere (published assignments), the versions are listed for reference.
+      function mergedVersionsNote(assignment) {
+        const versions = Array.isArray(assignment.merged_versions) ? assignment.merged_versions : [];
+        if (!versions.length) return '';
+        const id = String(assignment.assignment_id);
+        const rows = versions.map(version => {
+          const due = version.due ? formatInstructorDueDate(version.due) : 'No Due Date';
+          const source = escHtml(sourceLabel(version.source));
+          return `<li><span>${escHtml(version.assignment_name)}</span><span>${escHtml(due)} · ${source}</span></li>`;
+        }).join('');
+        return `<details class="instructor-merged-versions" data-merged-item="${escHtml(id)}" ${openMergedItems.has(id) ? 'open' : ''}>
+            <summary>Assignment created by merging ${versions.length} version${versions.length === 1 ? '' : 's'}</summary>
+            <ul>${rows}</ul>
+          </details>`;
+      }
+
+      document.addEventListener('toggle', event => {
+        const details = event.target.closest?.('[data-merged-item]');
+        if (!details) return;
+        if (details.open) openMergedItems.add(details.dataset.mergedItem);
+        else openMergedItems.delete(details.dataset.mergedItem);
+      }, true);
+
+      // One item may stand for several Gradescope assignments (for example two language versions).
+      function combinedAssignmentNote(assignment, { listVersions = true } = {}) {
+        if (Array.isArray(assignment.merged_versions) && assignment.merged_versions.length) {
+          return listVersions ? mergedVersionsNote(assignment) : mergedVersionToggle(assignment);
+        }
+        // Legacy items: list the names it was combined from.
+        const titles = Array.isArray(assignment.combined_titles) ? assignment.combined_titles : [];
+        if (titles.length < 2) return '';
+        return mergedVersionsNote({
+          ...assignment,
+          merged_versions: titles.map(title => ({ assignment_name: title, due: assignment.due, source: 'gradescope' })),
+        });
+      }
+
+      function formatInstructorDueDate(value) {
+        const dateOnly = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value));
+        const due = dateOnly
+          ? new Date(Number(dateOnly[1]), Number(dateOnly[2]) - 1, Number(dateOnly[3]))
+          : new Date(value);
+        return due.toLocaleDateString('en-US', { dateStyle: 'medium' });
+      }
+
+      function sortInstructorAssignments(assignments) {
+        return [...assignments].sort((a, b) => {
+          const dueOrder = !a.due
+            ? (b.due ? 1 : 0)
+            : !b.due
+              ? -1
+              : new Date(a.due) - new Date(b.due);
+          return dueOrder || String(a.assignment_name || '').localeCompare(
+            String(b.assignment_name || ''),
+            undefined,
+            { numeric: true, sensitivity: 'base' },
+          );
+        });
+      }
+
+      const courseImportModal = document.getElementById('course-import-modal');
+      const courseNameInput = document.getElementById('course-name-input');
+      const courseTermInput = document.getElementById('course-term-input');
+      const gradescopeCourseInput = document.getElementById('gradescope-course-id');
+      const courseWebsiteInput = document.getElementById('course-website-url');
+      const courseImportStatus = document.getElementById('gradescope-import-status');
+      const courseImportProgress = CourseProgress.panel(document.getElementById('course-import-progress'));
+      const gradescopeTaConfirm = document.getElementById('gradescope-ta-confirm');
+      const gradescopeTaConfirmField = document.getElementById('gradescope-ta-confirm-field');
+      const createCourseIconButton = document.getElementById('create-course-icon-btn');
+      let courseModalOpener = null;
+      const submitCourseImportButton = document.getElementById('submit-course-import-btn');
+      const instructorResourceModal = document.getElementById('instructor-resource-modal');
+      const instructorAssignmentModal = document.getElementById('instructor-assignment-modal');
+      const instructorCourseSyncModal = document.getElementById('instructor-course-sync-modal');
+      const instructorCourseSyncStatus = document.getElementById('instructor-course-sync-status');
+      const instructorCourseSyncProgress = CourseProgress.panel(document.getElementById('instructor-course-sync-progress'));
+      const instructorCourseSyncSubmit = document.getElementById('instructor-course-sync-submit');
+      let syncingInstructorCourseId = null;
+      let editingAssignment = null;
+      let editingSyncedAssignment = false;
+      let editingCourseId = null;
+      let editingCourseSources = { gradescope: '', website: '' };
+
+      function normalizedWebsiteUrl(value) {
+        try {
+          return value ? new URL(value).toString() : '';
+        } catch {
+          return value;
+        }
+      }
+
+      // Mirrors the server: a source syncs only when it is set and differs from the saved one.
+      function changedCourseSources(gradescopeInput, websiteInput) {
+        const gradescopeId = (gradescopeInput.match(/\d{1,20}/) || [''])[0];
+        return {
+          gradescope: Boolean(gradescopeId) && gradescopeId !== editingCourseSources.gradescope,
+          website: Boolean(websiteInput) &&
+            normalizedWebsiteUrl(websiteInput) !== normalizedWebsiteUrl(editingCourseSources.website),
+        };
+      }
+      let instructorCourses = [];
+      const instructorAssignmentsUrl = new URLSearchParams(window.location.search);
+      let selectedInstructorCourseId = instructorAssignmentsUrl.get('course_id');
+      const SHOW_ARCHIVED_COURSES_KEY = 'instructor-show-archived-courses';
+      let showArchivedCourses = localStorage.getItem(SHOW_ARCHIVED_COURSES_KEY) !== 'false';
+      let initialCourseSelectionHandled = false;
+      let resolveCourseConfirmation = null;
+      const reviewAssignmentSelections = new Map();
+
+      function closeInstructorCourseMenus() {
+        document.querySelectorAll('.instructor-course-menu').forEach(menu => {
+          if (menu instanceof HTMLDetailsElement) menu.open = false;
+          menu.classList.remove('context-menu-open');
+          menu.querySelector('.instructor-course-menu-toggle')?.setAttribute('aria-expanded', 'false');
+        });
+      }
+
+      function openInstructorResourceModal(assignment) {
+        const title = document.getElementById('instructor-resource-title');
+        const due = document.getElementById('instructor-resource-due');
+        const content = document.getElementById('instructor-resource-content');
+        title.textContent = assignment.assignment_name || 'Assignment';
+        due.textContent = assignment.due
+          ? `Due ${formatInstructorDueDate(assignment.due)}`
+          : '';
+        const resources = Array.isArray(assignment.resources) ? assignment.resources : [];
+        content.innerHTML = resources.length
+          ? `<h3 class="instructor-resource-heading">Resources</h3><div class="instructor-resource-list">${resources.map(resource => `
+              <div class="instructor-resource-item">
+                <span class="instructor-resource-type-tag">${escHtml(resource.resource_type || 'Link')}</span>
+                <a class="instructor-resource-link" href="${escHtml(resource.link)}" target="_blank" rel="noopener noreferrer">${escHtml(resource.resource_name || resource.link)}</a>
+              </div>`).join('')}</div>`
+          : '<h3 class="instructor-resource-heading">Resources</h3><div class="instructor-resource-empty">No curated resources are available for this assignment yet.</div>';
+        instructorResourceModal.classList.add('active');
+      }
+
+      function closeInstructorResourceModal() {
+        instructorResourceModal.classList.remove('active');
+      }
+
+      function openInstructorAssignmentModal(assignment = null, isSyncedReview = false) {
+        editingAssignment = assignment;
+        editingSyncedAssignment = isSyncedReview;
+        document.getElementById('instructor-assignment-modal-title').textContent = assignment ? 'Edit Assignment' : 'Create New Assignment';
+        const nameInput = document.getElementById('instructor-assignment-modal-name');
+        nameInput.value = assignment?.assignment_name || '';
+        nameInput.classList.remove('assignment-name-missing');
+        nameInput.removeAttribute('aria-invalid');
+        document.getElementById('instructor-assignment-modal-due').value = assignment?.due
+          ? String(assignment.due).slice(0, 10)
+          : '';
+        document.getElementById('instructor-assignment-modal-status').textContent = '';
+        document.getElementById('instructor-assignment-modal-save').textContent = assignment ? 'Save Changes' : 'Create New Assignment';
+        const resourceFields = document.getElementById('instructor-assignment-modal-resource-fields');
+        resourceFields.innerHTML = '';
+        (assignment?.resources?.length ? assignment.resources : [{}]).forEach(resource => {
+          appendInstructorAssignmentResource(resource);
+        });
+        instructorAssignmentModal.classList.add('active');
+        document.getElementById('instructor-assignment-modal-name').focus();
+      }
+
+      function appendInstructorAssignmentResource(resource = {}) {
+        const row = document.createElement('div');
+        row.className = 'instructor-assignment-resource-fields';
+        row.innerHTML = `<div class="instructor-resource-tag-field">
+          <input class="channel-field" type="text" maxlength="40" placeholder="Tag (e.g. Spec, Link)" aria-label="Resource Tag" autocomplete="off" value="${escHtml(resource.resource_type || '')}">
+          <div class="instructor-resource-tag-options" role="listbox" aria-label="Resource categories"></div>
+        </div>
+          <input class="channel-field" type="text" maxlength="120" placeholder="Resource Name" aria-label="Resource Name" value="${escHtml(resource.resource_name || '')}">
+          <input class="channel-field" type="url" maxlength="2048" placeholder="https://..." aria-label="Resource URL" value="${escHtml(resource.link || '')}">
+          <button type="button" data-remove-resource aria-label="Remove resource"><span aria-hidden="true">×</span></button>`;
+        document.getElementById('instructor-assignment-modal-resource-fields').append(row);
+      }
+
+      function closeInstructorAssignmentModal() {
+        instructorAssignmentModal.classList.remove('active');
+        editingAssignment = null;
+        editingSyncedAssignment = false;
+      }
+
+      function setCourseModalMode(course = null) {
+        editingCourseId = course?.course_id || null;
+        // Remember the saved sources so the form can say which ones will re-sync.
+        editingCourseSources = {
+          gradescope: String(course?.gradescope_course_id || ''),
+          website: course?.course_website_url || '',
+        };
+        document.getElementById('course-import-title').textContent = course ? 'Edit Course' : 'Create New Course';
+        document.getElementById('course-import-section-title').style.display = '';
+        document.getElementById('course-import-section-title').textContent = course ? 'Course Sources' : 'Import Assignments';
+        courseNameInput.value = course?.course_name || '';
+        courseNameInput.classList.remove('course-name-missing');
+        courseNameInput.removeAttribute('aria-invalid');
+        courseTermInput.value = course?.term || '';
+        gradescopeCourseInput.value = course?.gradescope_course_id || '';
+        // A course that already syncs from Gradescope has had the TA added.
+        gradescopeTaConfirm.checked = Boolean(course?.gradescope_course_id);
+        gradescopeTaConfirmField.hidden = !course?.gradescope_course_id;
+        gradescopeTaConfirmField.classList.remove('course-import-confirm-missing');
+        courseWebsiteInput.value = course?.course_website_url || '';
+        document.getElementById('gradescope-course-field').style.display = '';
+        document.getElementById('course-website-field').style.display = '';
+        submitCourseImportButton.textContent = course ? 'Save Changes' : 'Create New Course';
+        courseImportStatus.textContent = '';
+        courseImportStatus.style.color = 'var(--muted)';
+        courseImportProgress.stop();
+      }
+
+      function openCourseImportModal(event) {
+        courseModalOpener = event?.currentTarget || null;
+        setCourseModalMode();
+        courseImportModal.classList.add('active');
+        courseNameInput.focus();
+      }
+
+      function closeCourseImportModal() {
+        courseImportModal.classList.remove('active');
+        setCourseModalMode();
+        submitCourseImportButton.disabled = false;
+        const cancelBtn = document.getElementById('course-import-cancel-btn');
+        if (cancelBtn) cancelBtn.disabled = false;
+        (courseModalOpener || createCourseIconButton)?.focus();
+        courseModalOpener = null;
+      }
+
+      function renderInstructorCourseDetail(course) {
+        const detail = document.getElementById('instructor-course-detail');
+        if (!course) {
+          if (!instructorCourses.some(item => !item.archived)) {
+            detail.innerHTML = '';
+            detail.style.display = 'none';
+            return;
+          }
+          detail.innerHTML = '<p class="instructor-course-select-prompt">Select a course to view its dashboard.</p>';
+          detail.style.display = 'block';
+          return;
+        }
+
+        const archiveAction = course.archived ? 'unarchive' : 'archive';
+        const archiveLabel = course.archived ? 'Restore' : 'Archive';
+        const courseToolbar = `<div class="instructor-course-toolbar" role="toolbar" aria-label="Course actions">
+          <button type="button" class="instructor-course-toolbar-button" data-open-assignment-editor data-tooltip="Create Assignment" title="Create Assignment" aria-label="Create Assignment">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+          </button>
+          <button type="button" class="instructor-course-toolbar-button" data-open-course-sync="${escHtml(course.course_id)}" data-tooltip="Sync Course" title="Sync Course" aria-label="Sync Course">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8.1 8.1 0 0 0-15.5-2"/><path d="M4 4v5h5"/><path d="M4 13a8.1 8.1 0 0 0 15.5 2"/><path d="M20 20v-5h-5"/></svg>
+          </button>
+          <button type="button" class="instructor-course-toolbar-button" data-edit-course="${escHtml(course.course_id)}" data-tooltip="Edit Course" title="Edit Course" aria-label="Edit Course">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4Z"/></svg>
+          </button>
+          <button type="button" class="instructor-course-toolbar-button" data-course-archive-action="${archiveAction}" data-course-id="${escHtml(course.course_id)}" data-tooltip="${archiveLabel} Course" title="${archiveLabel} Course" aria-label="${archiveLabel} Course">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h18v4H3z"/><path d="M5 8v12h14V8M10 12h4"/></svg>
+          </button>
+          <button type="button" class="instructor-course-toolbar-button" data-delete-course="${escHtml(course.course_id)}" data-course-name="${escHtml(course.course_name)}" data-tooltip="Delete Course" title="Delete Course" aria-label="Delete Course">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 11v5M14 11v5"/></svg>
+          </button>
+        </div>`;
+
+        let content;
+        if (course.status === 'pending_review') {
+          const pendingAssignments = sortInstructorAssignments(course.pending_assignments || []);
+          const renderReviewRow = assignment => {
+            const due = assignment.due ? formatInstructorDueDate(assignment.due) : 'No Due Date';
+            const pending = isPendingReview(assignment);
+            // Undated items can't be included; flagged items and versions start unchecked.
+            const isSelected = Boolean(assignment.due) &&
+              (reviewAssignmentSelections.get(`${course.course_id}:${assignment.assignment_id}`) ??
+                (!pending && !assignment.is_version));
+            return `<div class="instructor-assignment-row instructor-assignment-row-review">
+              <div class="instructor-assignment-review-content">
+                <div class="instructor-assignment-review-name">
+                  <input type="checkbox" aria-label="Include ${escHtml(assignment.assignment_name)}" data-review-assignment="${escHtml(assignment.assignment_id)}" ${isSelected ? 'checked' : ''} ${assignment.due ? '' : 'disabled'}>
+                  <span class="instructor-assignment-name">
+                    <button type="button" class="instructor-assignment-resource-trigger" data-assignment-resource="${escHtml(assignment.assignment_id)}">${escHtml(assignment.assignment_name)}</button>
+                    ${assignmentSourceNote(assignment)}
+                    ${reviewReasonNote(assignment)}
+                    ${combinedAssignmentNote(assignment, { listVersions: false })}
+                  </span>
+                </div>
+                <span class="instructor-assignment-due">${escHtml(due)}</span>
+              </div>
+              <div class="instructor-course-menu instructor-assignment-menu">
+                <button type="button" class="instructor-course-menu-toggle" aria-label="Actions for ${escHtml(assignment.assignment_name)}" aria-haspopup="menu" aria-expanded="false">⋮</button>
+                <div class="instructor-course-menu-items" role="menu">
+                  <button type="button" data-edit-assignment="${escHtml(assignment.assignment_id)}">Edit</button>
+                  <button type="button" data-delete-assignment="${escHtml(assignment.assignment_id)}">Delete</button>
+                </div>
+              </div>
+            </div>${mergedVersionRows(assignment, renderReviewRow)}`;
+          };
+          const assignments = pendingAssignments.length;
+          // Boxed like the "New Assignments Found" review shown after later syncs.
+          content = `<section class="instructor-new-assignment-review" aria-label="Assignments to review">
+              <h3>Assignments Found</h3>
+              <p class="instructor-course-meta">Review the assignments and choose which ones to add to your course.</p>
+              ${reviewSections(pendingAssignments, renderReviewRow, 'No assignments were found to review.')}
+              <div class="instructor-review-footer">
+                <div class="instructor-new-assignment-review-actions">
+                  ${assignments
+                    ? `<button class="instructor-discard-synced-button" type="button" data-discard-review="${escHtml(course.course_id)}">Discard All</button>`
+                    : '<span></span>'}
+                  <button class="btn btn--primary" type="button" data-finalize-course="${escHtml(course.course_id)}">Publish Assignments</button>
+                </div>
+              </div>
+            </section>`;
+        } else {
+          const assignments = sortInstructorAssignments(course.assignments || []).map(assignment => {
+            const due = assignment.due ? formatInstructorDueDate(assignment.due) : 'No Due Date';
+            return `<div class="instructor-assignment-row">
+              <span class="instructor-assignment-name">
+                <button type="button" class="instructor-assignment-resource-trigger" data-assignment-resource="${escHtml(assignment.assignment_id)}">${escHtml(assignment.assignment_name)}</button>
+                ${combinedAssignmentNote(assignment)}
+              </span>
+              <span class="instructor-assignment-due">${escHtml(due)}</span>
+              <div class="instructor-course-menu instructor-assignment-menu">
+                <button type="button" class="instructor-course-menu-toggle" aria-label="Actions for ${escHtml(assignment.assignment_name)}" aria-haspopup="menu" aria-expanded="false">⋮</button>
+                <div class="instructor-course-menu-items" role="menu">
+                  <button type="button" data-edit-assignment="${escHtml(assignment.assignment_id)}">Edit</button>
+                  <button type="button" data-delete-assignment="${escHtml(assignment.assignment_id)}">Delete</button>
+                </div>
+              </div>
+            </div>`;
+          }).join('');
+          const newAssignmentsToReview = sortInstructorAssignments(course.new_assignments || []);
+          const renderSyncedRow = assignment => {
+            const due = assignment.due ? formatInstructorDueDate(assignment.due) : 'No Due Date';
+            const checked = Boolean(assignment.due) && !isPendingReview(assignment) && !assignment.is_version;
+            return `<div class="instructor-assignment-row instructor-assignment-row-review">
+              <div class="instructor-assignment-review-content">
+                <div class="instructor-assignment-review-name">
+                  <input type="checkbox" aria-label="Add ${escHtml(assignment.assignment_name)}" data-synced-assignment="${escHtml(assignment.assignment_id)}" ${checked ? 'checked' : ''} ${assignment.due ? '' : 'disabled'}>
+                  <span class="instructor-assignment-name"><button type="button" class="instructor-assignment-resource-trigger" data-assignment-resource="${escHtml(assignment.assignment_id)}" data-assignment-resource-list="new">${escHtml(assignment.assignment_name)}</button>${assignmentSourceNote(assignment)}${reviewReasonNote(assignment)}${combinedAssignmentNote(assignment, { listVersions: false })}</span>
+                </div>
+                <span class="instructor-assignment-due">${escHtml(due)}</span>
+              </div>
+              <div class="instructor-course-menu instructor-assignment-menu">
+                <button type="button" class="instructor-course-menu-toggle" aria-label="Actions for ${escHtml(assignment.assignment_name)}" aria-haspopup="menu" aria-expanded="false">⋮</button>
+                <div class="instructor-course-menu-items" role="menu">
+                  <button type="button" role="menuitem" data-edit-synced-assignment="${escHtml(assignment.assignment_id)}">Edit</button>
+                </div>
+              </div>
+            </div>${mergedVersionRows(assignment, renderSyncedRow)}`;
+          };
+          const newlyFound = newAssignmentsToReview.length
+            ? reviewSections(newAssignmentsToReview, renderSyncedRow, '')
+            : '';
+          const reviewSection = newlyFound
+            ? `<section class="instructor-new-assignment-review" aria-label="New assignments to review">
+                <h3>New Assignments Found</h3>
+                <p class="instructor-course-meta">Choose which newly synced assignments to add. Unchecked assignments will be discarded.</p>
+                ${newlyFound}
+                <div class="instructor-new-assignment-review-actions">
+                  <button class="instructor-discard-synced-button" type="button" data-discard-synced="${escHtml(course.course_id)}">Discard All</button>
+                  <button class="btn btn--primary" type="button" data-review-synced="${escHtml(course.course_id)}">Add Selected Assignments</button>
+                </div>
+              </section>`
+            : '';
+          content = `${reviewSection}${assignments
+              ? `<div class="instructor-course-assignments instructor-assignment-list">${assignments}</div>`
+              : '<p class="instructor-course-meta">No assignments found for this course.</p>'}`;
+        }
+
+        const syncStatus = [];
+        if (course.gradescope_course_id) {
+          const lastSynced = course.synced_at
+            ? `Last Synced ${escHtml(new Date(course.synced_at).toLocaleString())}`
+            : 'Not Synced Yet';
+          syncStatus.push(`<p>Gradescope Course (${escHtml(course.gradescope_course_id)}) · ${lastSynced}${course.status === 'pending_review' ? ' · Awaiting Assignment Review' : ''}</p>`);
+        }
+        if (course.course_website_url) {
+          const lastSynced = course.course_website_synced_at
+            ? `Last Synced ${escHtml(new Date(course.course_website_synced_at).toLocaleString())}`
+            : 'Not Synced Yet';
+          syncStatus.push(`<p>Course Website (<a href="${escHtml(course.course_website_url)}" target="_blank" rel="noopener noreferrer">${escHtml(course.course_website_url)}</a>) · ${lastSynced}</p>`);
+          if (termsDisagree(course.course_website_term, course.term)) {
+            syncStatus.push(`<p class="instructor-term-mismatch">This website is for ${escHtml(course.course_website_term)}, but the course term is “${escHtml(course.term)}”. Dates were read as ${escHtml(course.course_website_term)}. Edit the course if its term is wrong.</p>`);
+          }
+        }
+        if (!syncStatus.length) syncStatus.push('<p>No external course sources linked.</p>');
+        detail.innerHTML = `${courseToolbar}
+          <div class="divider"><span class="pill">Assignments</span></div>
+          ${content}
+          <div class="instructor-course-sync-status"><strong>Sync Status</strong>${syncStatus.join('')}</div>`;
+        detail.style.display = 'block';
+      }
+
+      function openInstructorCourseSyncModal(course) {
+        syncingInstructorCourseId = course.course_id;
+        const hasGradescope = Boolean(course.gradescope_course_id);
+        const hasWebsite = Boolean(course.course_website_url);
+        document.getElementById('instructor-course-sync-course').textContent = course.term
+          ? `${course.course_name} (${course.term})`
+          : course.course_name;
+        document.getElementById('instructor-course-sync-gradescope-detail').textContent = hasGradescope
+          ? `Course ID: ${course.gradescope_course_id}`
+          : 'Add a Gradescope Course ID to enable syncing.';
+        document.getElementById('instructor-course-sync-website-detail').textContent = hasWebsite
+          ? course.course_website_url
+          : 'Add a course website URL to enable syncing.';
+        const gradescopeOption = instructorCourseSyncModal.querySelector('[value="gradescope"]');
+        const websiteOption = instructorCourseSyncModal.querySelector('[value="website"]');
+        gradescopeOption.disabled = !hasGradescope;
+        websiteOption.disabled = !hasWebsite;
+        gradescopeOption.checked = hasGradescope;
+        websiteOption.checked = hasWebsite;
+        instructorCourseSyncStatus.textContent = '';
+        instructorCourseSyncSubmit.disabled = !hasGradescope && !hasWebsite;
+        instructorCourseSyncModal.classList.add('active');
+        (hasGradescope ? gradescopeOption : hasWebsite ? websiteOption : document.getElementById('instructor-course-sync-cancel')).focus();
+      }
+
+      function closeInstructorCourseSyncModal() {
+        if (document.getElementById('instructor-course-sync-cancel').disabled) return;
+        instructorCourseSyncModal.classList.remove('active');
+        instructorCourseSyncStatus.textContent = '';
+        syncingInstructorCourseId = null;
+      }
+
+      async function syncInstructorCourseFromSelectedSource() {
+        if (!syncingInstructorCourseId) return;
+        const courseId = syncingInstructorCourseId;
+        const selectedSources = [...instructorCourseSyncModal.querySelectorAll('[name="instructor-course-sync-source"]:checked')]
+          .map(option => option.value);
+        if (!selectedSources.length || selectedSources.some(source => !['gradescope', 'website'].includes(source))) {
+          instructorCourseSyncStatus.textContent = 'Select at least one available sync source.';
+          return;
+        }
+
+        const syncsGradescope = selectedSources.includes('gradescope');
+        const syncsWebsite = selectedSources.includes('website');
+        const action = syncsGradescope && syncsWebsite
+          ? 'sync_all_sources'
+          : syncsWebsite ? 'sync_course_website' : 'sync_gradescope';
+        instructorCourseSyncSubmit.disabled = true;
+        document.getElementById('instructor-course-sync-cancel').disabled = true;
+        instructorCourseSyncStatus.style.color = 'var(--muted)';
+        instructorCourseSyncStatus.textContent = syncsGradescope && syncsWebsite
+          ? 'Syncing Gradescope and reading the course homepage...'
+          : syncsWebsite
+            ? 'Reading the course homepage and finding assignments...'
+            : 'Syncing Gradescope...';
+        instructorCourseSyncProgress.start(selectedSources);
+        try {
+          const token = await auth.getToken();
+          let data;
+          try {
+            data = await CourseProgress.request('/api/instructor/courses', {
+              method: 'PUT',
+              headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${token}`,
+              },
+              body: JSON.stringify({ action, course_id: courseId }),
+            }, instructorCourseSyncProgress.handle);
+          } catch (error) {
+            const unrecognizedActionError =
+              'Enter a course name (up to 120 characters); term must be within 80 characters.';
+            if (action !== 'sync_all_sources' || error.message !== unrecognizedActionError) throw error;
+
+            const syncLegacySource = async syncAction => {
+              const legacyResponse = await fetch('/api/instructor/courses', {
+                method: 'PUT',
+                headers: {
+                  'Content-Type': 'application/json',
+                  Authorization: 'Bearer ' + token,
+                },
+                body: JSON.stringify({ action: syncAction, course_id: courseId }),
+              });
+              return readApiResponse(legacyResponse);
+            };
+            const gradescopeData = await syncLegacySource('sync_gradescope');
+            let websiteData;
+            try {
+              websiteData = await syncLegacySource('sync_course_website');
+            } catch (websiteError) {
+              throw new Error(`Gradescope synced successfully, but the course website sync failed: ${websiteError.message}`);
+            }
+            data = {
+              ...websiteData,
+              course: {
+                ...websiteData.course,
+                new_assignment_count:
+                  gradescopeData.course.new_assignment_count + websiteData.course.new_assignment_count,
+              },
+            };
+          }
+          await loadInstructorCourses(auth, courseId);
+          const foundNewAssignments = data.course.new_assignment_count > 0;
+          const sourceTitle = syncsGradescope && syncsWebsite
+            ? 'Gradescope and Course Website Synced'
+            : syncsWebsite ? 'Course Website Synced' : 'Gradescope Synced';
+          const summary = syncsGradescope && syncsWebsite
+            ? 'Synced Gradescope and scanned the course homepage. '
+            : syncsWebsite
+              ? 'Scanned the course homepage. '
+              : '';
+          document.getElementById('instructor-course-sync-cancel').disabled = false;
+          closeInstructorCourseSyncModal();
+          showMessage(
+            foundNewAssignments
+              ? `${summary}Found ${data.course.new_assignment_count} new assignment${data.course.new_assignment_count === 1 ? '' : 's'}. Review them below.`
+              : `${summary}No new assignments were found.`,
+            sourceTitle,
+          );
+        } catch (error) {
+          instructorCourseSyncProgress.stop();
+          instructorCourseSyncStatus.style.color = '#a93226';
+          const outdatedWebsiteSyncMessage =
+            'Enter a course name (up to 120 characters); term must be within 80 characters.';
+          instructorCourseSyncStatus.textContent =
+            syncsWebsite && error.message === outdatedWebsiteSyncMessage
+              ? 'The server handling this request does not yet support course website sync. Restart the local server or deploy the latest API, then refresh and try again.'
+              : error.message || 'Could not sync this course.';
+          instructorCourseSyncSubmit.disabled = false;
+        } finally {
+          document.getElementById('instructor-course-sync-cancel').disabled = false;
+        }
+      }
+
+      function confirmInstructorCourseAction(title, message, confirmLabel, isDanger = false) {
+        const modal = document.getElementById('instructor-course-confirm-modal');
+        const submit = document.getElementById('instructor-course-confirm-submit');
+        document.getElementById('instructor-course-confirm-title').textContent = title;
+        document.getElementById('instructor-course-confirm-message').textContent = message;
+        submit.textContent = confirmLabel;
+        submit.classList.toggle('is-danger', isDanger);
+        modal.classList.add('active');
+        submit.focus();
+        return new Promise(resolve => {
+          resolveCourseConfirmation = resolve;
+        });
+      }
+
+      function finishInstructorCourseConfirmation(confirmed) {
+        const modal = document.getElementById('instructor-course-confirm-modal');
+        modal.classList.remove('active');
+        if (resolveCourseConfirmation) {
+          resolveCourseConfirmation(confirmed);
+          resolveCourseConfirmation = null;
+        }
+      }
+
+      function confirmCourseArchiveAction(button) {
+        const course = instructorCourses.find(item => item.course_id === button.dataset.courseId);
+        if (!course) return Promise.resolve(false);
+        const restoring = button.dataset.courseArchiveAction === 'unarchive';
+        const action = restoring ? 'Restore' : 'Archive';
+        const confirmation = restoring
+          ? `${action} "${course.course_name}" and move it to Current Courses?`
+          : `${action} "${course.course_name}"? You can restore it later from Archived Courses.`;
+        return confirmInstructorCourseAction(`${action} Course?`, confirmation, action);
+      }
+
+      function renderInstructorCourses() {
+        const tabs = document.getElementById('instructor-course-tabs');
+        const archiveToggle = document.getElementById('instructor-archive-toggle');
+        const empty = document.getElementById('instructor-courses-empty');
+        const activeCourses = instructorCourses.filter(course => !course.archived);
+        const archivedCourses = instructorCourses.filter(course => course.archived);
+        const selectedCourse = instructorCourses.find(course => course.course_id === selectedInstructorCourseId);
+        document.body.classList.toggle(
+          'instructor-no-current-courses',
+          activeCourses.length === 0 &&
+            !selectedCourse
+        );
+        empty.style.display = activeCourses.length ? 'none' : 'block';
+        empty.textContent = 'No current courses found. Create a course to get started.';
+        empty.style.color = 'var(--muted)';
+        const renderCourseRows = courses => courses.map(course => {
+          const displayName = course.term ? `${course.course_name} (${course.term})` : course.course_name;
+          const archiveAction = course.archived ? 'unarchive' : 'archive';
+          const archiveLabel = course.archived ? 'Restore' : 'Archive';
+          const statusLabels = [
+            course.status === 'pending_review' || course.new_assignments?.length ? 'Review' : '',
+          ].filter(Boolean);
+          return `<div class="instructor-course-row">
+            <button class="instructor-course-tab" type="button" role="tab" aria-controls="instructor-course-detail" aria-selected="${course.course_id === selectedInstructorCourseId}" data-select-course="${escHtml(course.course_id)}" aria-label="${escHtml(displayName)}${statusLabels.length ? `, ${statusLabels.join(', ')}` : ''}.">${escHtml(displayName)}${statusLabels.map(label => `<span class="instructor-course-tab-status">${label}</span>`).join('')}</button>
+          </div>`;
+        }).join('');
+        const visibleCourses = showArchivedCourses
+          ? [...activeCourses, ...archivedCourses]
+          : [...activeCourses, ...(selectedCourse?.archived ? [selectedCourse] : [])];
+        tabs.innerHTML = renderCourseRows(visibleCourses);
+        archiveToggle.style.display = archivedCourses.length ? 'flex' : 'none';
+        const archiveToggleLabel = showArchivedCourses ? 'Hide Archived Courses' : 'Show Archived Courses';
+        archiveToggle.setAttribute('aria-label', archiveToggleLabel);
+        archiveToggle.title = archiveToggleLabel;
+        archiveToggle.dataset.tooltip = archiveToggleLabel;
+        archiveToggle.querySelector('svg').innerHTML = showArchivedCourses
+          ? '<path d="m3 3 18 18"/><path d="M10.6 10.6a2 2 0 0 0 2.8 2.8"/><path d="M9.9 5.2A10.7 10.7 0 0 1 12 5c6.4 0 10 7 10 7a15.7 15.7 0 0 1-4 4.8"/><path d="M6.2 6.2C3.5 8 2 12 2 12s3.6 7 10 7c1 0 2-.2 2.9-.5"/>'
+          : '<path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/>';
+        archiveToggle.setAttribute('aria-pressed', String(showArchivedCourses));
+        renderInstructorCourseDetail(instructorCourses.find(course => course.course_id === selectedInstructorCourseId));
+      }
+
+      async function loadInstructorCourses(auth, preferredCourseId = selectedInstructorCourseId) {
+        const token = await auth.getToken();
+        const response = await fetch('/api/instructor/courses', {
+          headers: { 'Authorization': `Bearer ${token}` },
+        });
+        const data = await readApiResponse(response);
+
+        instructorCourses = data.courses || [];
+        const preferredCourse = instructorCourses.find(course => course.course_id === preferredCourseId);
+        selectedInstructorCourseId = preferredCourse && (
+          !preferredCourse.archived ||
+          showArchivedCourses ||
+          preferredCourseId === instructorAssignmentsUrl.get('course_id')
+        )
+          ? preferredCourseId
+          : instructorCourses.find(course => !course.archived)?.course_id || null;
+        if (!initialCourseSelectionHandled) {
+          const initiallySelectedCourse = instructorCourses.find(course => course.course_id === selectedInstructorCourseId);
+          if (initiallySelectedCourse?.archived) {
+            showArchivedCourses = true;
+          }
+          initialCourseSelectionHandled = true;
+        }
+        renderInstructorCourses();
+      }
+
+      waitForAuth((auth) => {
+        auth.onAuthStateChange(async (user, session, loading) => {
+          if (loading) return;
+          if (!user) {
+            window.location.replace('/');
+            return;
+          }
+          try {
+            const accountRole = await auth.getAccountRole();
+            if (accountRole !== 'student' && accountRole !== 'instructor') {
+              window.location.replace('./role.html');
+              return;
+            }
+            if (accountRole !== 'instructor') {
+              window.location.replace('./index.html');
+              return;
+            }
+          } catch (e) {
+            console.error('Could not load account role:', e);
+            const loader = document.getElementById('auth-loading');
+            if (loader) loader.innerHTML = '<div style="font-family:system-ui;color:#b42318;font-weight:600;">Could not load your account role. Refresh to try again.</div>';
+            return;
+          }
+
+          document.getElementById('user-email').textContent = user.email;
+          document.getElementById('user-email').style.display = 'inline-block';
+          document.getElementById('logout-btn').style.display = 'inline-block';
+          const coursesNavLink = document.getElementById('nav-assignments-link');
+          coursesNavLink.style.display = 'inline-block';
+          coursesNavLink.classList.add('nav__link--active');
+
+          try {
+            await loadInstructorCourses(auth);
+          } catch (error) {
+            const empty = document.getElementById('instructor-courses-empty');
+            empty.style.display = 'block';
+            empty.textContent = error.message || 'Could not load courses. Refresh the page to try again.';
+            empty.style.color = '#c0392b';
+          }
+          const loader = document.getElementById('auth-loading');
+          const guard = document.getElementById('auth-guard');
+          if (loader) loader.style.display = 'none';
+          if (guard) guard.remove();
+
+          // The dashboard's "Create Course" button links here with ?create=1.
+          if (instructorAssignmentsUrl.get('create') === '1') {
+            const destination = new URL(window.location.href);
+            destination.searchParams.delete('create');
+            window.history.replaceState(null, '', destination);
+            openCourseImportModal();
+          }
+        });
+
+        createCourseIconButton.addEventListener('click', openCourseImportModal);
+        document.getElementById('instructor-course-confirm-cancel').addEventListener('click', () => {
+          finishInstructorCourseConfirmation(false);
+        });
+        document.getElementById('instructor-course-confirm-submit').addEventListener('click', () => {
+          finishInstructorCourseConfirmation(true);
+        });
+        document.getElementById('instructor-course-confirm-modal').addEventListener('click', event => {
+          if (event.target === event.currentTarget) finishInstructorCourseConfirmation(false);
+        });
+        document.getElementById('instructor-course-sync-cancel').addEventListener('click', closeInstructorCourseSyncModal);
+        instructorCourseSyncSubmit.addEventListener('click', syncInstructorCourseFromSelectedSource);
+        instructorCourseSyncModal.addEventListener('click', event => {
+          if (event.target === event.currentTarget &&
+              !document.getElementById('instructor-course-sync-cancel').disabled) {
+            closeInstructorCourseSyncModal();
+          }
+        });
+        document.getElementById('instructor-archive-toggle').addEventListener('click', () => {
+          showArchivedCourses = !showArchivedCourses;
+          localStorage.setItem(SHOW_ARCHIVED_COURSES_KEY, String(showArchivedCourses));
+          const selectedCourse = instructorCourses.find(course => course.course_id === selectedInstructorCourseId);
+          if (!showArchivedCourses && selectedCourse?.archived) {
+            selectedInstructorCourseId = instructorCourses.find(course => !course.archived)?.course_id || null;
+            const destination = new URL(window.location.href);
+            if (selectedInstructorCourseId) destination.searchParams.set('course_id', selectedInstructorCourseId);
+            else destination.searchParams.delete('course_id');
+            window.history.replaceState(null, '', destination);
+          }
+          renderInstructorCourses();
+        });
+        const courseTabs = document.getElementById('instructor-course-tabs');
+        courseTabs.addEventListener('click', event => {
+          const tab = event.target.closest('[data-select-course]');
+          if (!tab) return;
+          selectedInstructorCourseId = tab.dataset.selectCourse;
+          const destination = new URL(window.location.href);
+          destination.searchParams.set('course_id', selectedInstructorCourseId);
+          window.history.replaceState(null, '', destination);
+          renderInstructorCourses();
+        });
+        courseTabs.addEventListener('keydown', event => {
+          const tabs = [...courseTabs.querySelectorAll('[role="tab"]')];
+          const currentIndex = tabs.indexOf(document.activeElement);
+          if (currentIndex < 0 || !['ArrowRight', 'ArrowLeft', 'Home', 'End'].includes(event.key)) return;
+          event.preventDefault();
+          const nextIndex = event.key === 'Home'
+            ? 0
+            : event.key === 'End'
+              ? tabs.length - 1
+              : (currentIndex + (event.key === 'ArrowRight' ? 1 : tabs.length - 1)) % tabs.length;
+          tabs[nextIndex].focus();
+          tabs[nextIndex].click();
+        });
+        document.addEventListener('click', event => {
+          if (!event.target.closest('.instructor-course-menu')) closeInstructorCourseMenus();
+        });
+        document.addEventListener('keydown', event => {
+          if (event.key === 'Escape') {
+            closeInstructorCourseMenus();
+            if (document.getElementById('instructor-course-confirm-modal').classList.contains('active')) {
+              finishInstructorCourseConfirmation(false);
+            }
+            if (instructorCourseSyncModal.classList.contains('active') &&
+                !document.getElementById('instructor-course-sync-cancel').disabled) {
+              closeInstructorCourseSyncModal();
+            }
+          }
+        });
+        document.getElementById('instructor-course-detail').addEventListener('click', async event => {
+          const syncCourseButton = event.target.closest('[data-open-course-sync]');
+          if (syncCourseButton) {
+            const course = instructorCourses.find(item => item.course_id === syncCourseButton.dataset.openCourseSync);
+            if (course) openInstructorCourseSyncModal(course);
+            return;
+          }
+
+          const editCourseButton = event.target.closest('[data-edit-course]');
+          if (editCourseButton) {
+            const course = instructorCourses.find(item => item.course_id === editCourseButton.dataset.editCourse);
+            if (!course) return;
+            setCourseModalMode(course);
+            courseImportModal.classList.add('active');
+            courseNameInput.focus();
+            return;
+          }
+
+          const archiveCourseButton = event.target.closest('[data-course-archive-action]');
+          if (archiveCourseButton) {
+            if (!await confirmCourseArchiveAction(archiveCourseButton)) return;
+            archiveCourseButton.disabled = true;
+            try {
+              const token = await auth.getToken();
+              const response = await fetch('/api/instructor/courses', {
+                method: 'PUT',
+                headers: {
+                  'Content-Type': 'application/json',
+                  Authorization: `Bearer ${token}`,
+                },
+                body: JSON.stringify({
+                  action: archiveCourseButton.dataset.courseArchiveAction,
+                  course_id: archiveCourseButton.dataset.courseId,
+                }),
+              });
+              const data = await readApiResponse(response);
+              await loadInstructorCourses(auth, data.course.course_id);
+            } catch (error) {
+              showMessage(error.message || 'Could not update the course archive status.', 'Course update failed');
+              archiveCourseButton.disabled = false;
+            }
+            return;
+          }
+
+          const deleteCourseButton = event.target.closest('[data-delete-course]');
+          if (deleteCourseButton) {
+            const courseName = deleteCourseButton.dataset.courseName;
+            if (!await confirmInstructorCourseAction(
+              'Delete Course?',
+              `Delete "${courseName}" and all of its imported assignments? This cannot be undone.`,
+              'Delete Course',
+              true,
+            )) return;
+            const courseId = deleteCourseButton.dataset.deleteCourse;
+            const previousCourses = instructorCourses;
+            const previousSelectedCourseId = selectedInstructorCourseId;
+            instructorCourses = instructorCourses.filter(course => course.course_id !== courseId);
+            if (selectedInstructorCourseId === courseId) {
+              selectedInstructorCourseId = instructorCourses.find(course => !course.archived)?.course_id || null;
+            }
+            renderInstructorCourses();
+            try {
+              const token = await auth.getToken();
+              const response = await fetch('/api/instructor/courses', {
+                method: 'DELETE',
+                headers: {
+                  'Content-Type': 'application/json',
+                  Authorization: `Bearer ${token}`,
+                },
+                body: JSON.stringify({ course_id: courseId }),
+              });
+              const data = await readApiResponse(response);
+              showMessage(`Deleted ${data.course.course_name}.`, 'Course Deleted');
+            } catch (error) {
+              instructorCourses = previousCourses;
+              selectedInstructorCourseId = previousSelectedCourseId;
+              renderInstructorCourses();
+              showMessage(error.message || 'Could not delete the course.', 'Course deletion failed');
+            }
+            return;
+          }
+
+          const resourceTrigger = event.target.closest('[data-assignment-resource]');
+          if (resourceTrigger) {
+            const course = instructorCourses.find(item => item.course_id === selectedInstructorCourseId);
+            // Newly synced items (found by a later sync) are listed separately.
+            const assignments = course?.status === 'pending_review'
+              ? course.pending_assignments || []
+              : resourceTrigger.dataset.assignmentResourceList === 'new'
+                ? course?.new_assignments || []
+                : course?.assignments || [];
+            const assignment = findCourseItem(assignments, resourceTrigger.dataset.assignmentResource);
+            if (assignment) openInstructorResourceModal(assignment);
+            return;
+          }
+
+          const assignmentMenuToggle = event.target.closest('.instructor-assignment-menu .instructor-course-menu-toggle');
+          if (assignmentMenuToggle) {
+            const menu = assignmentMenuToggle.closest('.instructor-course-menu');
+            const isOpen = menu.classList.contains('context-menu-open');
+            closeInstructorCourseMenus();
+            if (!isOpen) {
+              menu.classList.add('context-menu-open');
+              assignmentMenuToggle.setAttribute('aria-expanded', 'true');
+            }
+            return;
+          }
+
+          if (event.target.closest('[data-open-assignment-editor]')) {
+            openInstructorAssignmentModal();
+            return;
+          }
+
+          const editAssignmentButton = event.target.closest('[data-edit-assignment]');
+          if (editAssignmentButton) {
+            const course = instructorCourses.find(item => item.course_id === selectedInstructorCourseId);
+            const assignments = course?.status === 'pending_review'
+              ? course.pending_assignments || []
+              : course?.assignments || [];
+            const assignment = findCourseItem(assignments, editAssignmentButton.dataset.editAssignment);
+            if (assignment) openInstructorAssignmentModal(assignment);
+            closeInstructorCourseMenus();
+            return;
+          }
+
+          const editSyncedAssignmentButton = event.target.closest('[data-edit-synced-assignment]');
+          if (editSyncedAssignmentButton) {
+            const course = instructorCourses.find(item => item.course_id === selectedInstructorCourseId);
+            const assignment = findCourseItem(course?.new_assignments, editSyncedAssignmentButton.dataset.editSyncedAssignment);
+            closeInstructorCourseMenus();
+            if (assignment) openInstructorAssignmentModal(assignment, true);
+            return;
+          }
+
+          const reviewSyncedButton = event.target.closest('[data-review-synced]');
+          if (reviewSyncedButton) {
+            const courseId = reviewSyncedButton.dataset.reviewSynced;
+            const course = instructorCourses.find(item => item.course_id === courseId);
+            if (!course) return;
+            const approvedAssignmentIds = [...document.getElementById('instructor-course-detail').querySelectorAll('[data-synced-assignment]:checked')]
+              .map(checkbox => checkbox.dataset.syncedAssignment);
+            const previousNewAssignments = course.new_assignments || [];
+            const previousAssignments = course.assignments || [];
+            const previousAssignmentCount = course.assignment_count;
+            const approvedAssignments = previousNewAssignments.filter(assignment =>
+              approvedAssignmentIds.includes(String(assignment.assignment_id))
+            );
+            // Versions of a merged item checked to be added on their own ("<id>#v<n>").
+            for (const value of approvedAssignmentIds) {
+              const match = /^(.+)#v(\d+)$/.exec(value);
+              const parent = match && previousNewAssignments.find(item => String(item.assignment_id) === match[1]);
+              const version = parent?.merged_versions?.[Number(match[2])];
+              if (version) {
+                approvedAssignments.push({
+                  ...version,
+                  assignment_id: `${match[1]}-v${match[2]}`,
+                  course_id: parent.course_id,
+                  resources: [],
+                });
+              }
+            }
+            course.assignments = sortInstructorAssignments([...previousAssignments, ...approvedAssignments]);
+            course.assignment_count = (Number(previousAssignmentCount) || previousAssignments.length) + approvedAssignments.length;
+            course.new_assignments = [];
+            renderInstructorCourseDetail(course);
+            try {
+              const token = await auth.getToken();
+              const response = await fetch('/api/instructor/courses', {
+                method: 'PUT',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${token}`,
+                },
+                body: JSON.stringify({
+                  action: 'review_synced_assignments',
+                  course_id: courseId,
+                  approved_assignment_ids: approvedAssignmentIds,
+                }),
+              });
+              await readApiResponse(response);
+            } catch (error) {
+              course.assignments = previousAssignments;
+              course.assignment_count = previousAssignmentCount;
+              course.new_assignments = previousNewAssignments;
+              renderInstructorCourseDetail(course);
+              showMessage(error.message || 'Could not save the assignment review.', 'Assignment review failed');
+            }
+            return;
+          }
+
+          const discardSyncedButton = event.target.closest('[data-discard-synced]');
+          if (discardSyncedButton) {
+            const courseId = discardSyncedButton.dataset.discardSynced;
+            const course = instructorCourses.find(item => item.course_id === courseId);
+            if (!course) return;
+            const previousNewAssignments = course.new_assignments || [];
+            course.new_assignments = [];
+            renderInstructorCourseDetail(course);
+            try {
+              const token = await auth.getToken();
+              const response = await fetch('/api/instructor/courses', {
+                method: 'PUT',
+                headers: {
+                  'Content-Type': 'application/json',
+                  Authorization: 'Bearer ' + token,
+                },
+                body: JSON.stringify({
+                  action: 'review_synced_assignments',
+                  course_id: courseId,
+                  approved_assignment_ids: [],
+                }),
+              });
+              await readApiResponse(response);
+            } catch (error) {
+              course.new_assignments = previousNewAssignments;
+              renderInstructorCourseDetail(course);
+              showMessage(error.message || 'Could not discard the newly synced assignments.', 'Discard failed');
+            }
+            return;
+          }
+
+          const deleteAssignmentButton = event.target.closest('[data-delete-assignment]');
+          if (deleteAssignmentButton) {
+            closeInstructorCourseMenus();
+            const targetAssignmentId = deleteAssignmentButton.dataset.deleteAssignment;
+            const course = instructorCourses.find(item => item.course_id === selectedInstructorCourseId);
+            const assignments = course?.status === 'pending_review'
+              ? course.pending_assignments || []
+              : course?.assignments || [];
+            const assignment = findCourseItem(assignments, targetAssignmentId);
+            if (!await confirmInstructorCourseAction(
+              'Delete Assignment?',
+              `Delete "${assignment?.assignment_name || 'this assignment'}"${course ? ` from "${course.course_name}"` : ''}? This cannot be undone.`,
+              'Delete',
+              true,
+            )) return;
+
+            const previousAssignments = assignments;
+            const remainingAssignments = assignments.filter(
+              item => String(item.assignment_id) !== targetAssignmentId
+            );
+            if (course) {
+              if (course.status === 'pending_review') {
+                course.pending_assignments = remainingAssignments;
+                course.pending_assignment_count = remainingAssignments.length;
+              } else {
+                course.assignments = remainingAssignments;
+                course.assignment_count = remainingAssignments.length;
+              }
+              renderInstructorCourseDetail(course);
+            }
+
+            try {
+              const token = await auth.getToken();
+              const response = await fetch('/api/instructor/courses', {
+                method: 'PUT',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${token}`,
+                },
+                body: JSON.stringify({
+                  action: 'remove_assignment',
+                  course_id: selectedInstructorCourseId,
+                  assignment_id: targetAssignmentId,
+                }),
+              });
+              await readApiResponse(response);
+              const deletedVersion = /^(.+)#v\d+$/.exec(targetAssignmentId);
+              if (deletedVersion) {
+                // Later versions move up one place, so their checkmarks are reset.
+                for (const key of [...reviewAssignmentSelections.keys()]) {
+                  if (key.startsWith(`${selectedInstructorCourseId}:${deletedVersion[1]}#v`)) reviewAssignmentSelections.delete(key);
+                }
+                await loadInstructorCourses(auth, selectedInstructorCourseId);
+              } else if (course?.status === 'pending_review') {
+                reviewAssignmentSelections.delete(`${selectedInstructorCourseId}:${targetAssignmentId}`);
+              } else if (!course) {
+                await loadInstructorCourses(auth, selectedInstructorCourseId);
+              }
+            } catch (error) {
+              if (course) {
+                if (course.status === 'pending_review') {
+                  course.pending_assignments = previousAssignments;
+                  course.pending_assignment_count = previousAssignments.length;
+                } else {
+                  course.assignments = previousAssignments;
+                  course.assignment_count = previousAssignments.length;
+                }
+                renderInstructorCourseDetail(course);
+                showMessage(error.message || 'Could not delete the assignment.', 'Assignment deletion failed');
+              } else {
+                showMessage(error.message || 'Could not delete the assignment.', 'Assignment deletion failed');
+              }
+            }
+            return;
+          }
+
+          const addAssignmentButton = event.target.closest('[data-add-assignment]');
+          if (addAssignmentButton) {
+            const detail = document.getElementById('instructor-course-detail');
+            const assignmentNameInput = detail.querySelector('#instructor-assignment-name');
+            const assignmentDueInput = detail.querySelector('#instructor-assignment-due');
+            const assignmentName = assignmentNameInput.value.trim();
+            if (!assignmentName) {
+              assignmentNameInput.setAttribute('aria-invalid', 'true');
+              assignmentNameInput.focus();
+              return;
+            }
+            addAssignmentButton.disabled = true;
+            try {
+              const token = await auth.getToken();
+              const response = await fetch('/api/instructor/courses', {
+                method: 'PUT',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${token}`,
+                },
+                body: JSON.stringify({
+                  action: 'add_assignment',
+                  course_id: addAssignmentButton.dataset.addAssignment,
+                  assignment_name: assignmentName,
+                  due: assignmentDueInput.value,
+                }),
+              });
+              await readApiResponse(response);
+              await loadInstructorCourses(auth, addAssignmentButton.dataset.addAssignment);
+            } catch (error) {
+              showMessage(error.message || 'Could not add the assignment.', 'Assignment creation failed');
+              addAssignmentButton.disabled = false;
+            }
+            return;
+          }
+
+          const removeAssignmentButton = event.target.closest('[data-remove-assignment]');
+          if (removeAssignmentButton) {
+            const targetAssignmentId = removeAssignmentButton.dataset.removeAssignment;
+            const course = instructorCourses.find(item => item.course_id === selectedInstructorCourseId);
+            removeAssignmentButton.disabled = true;
+            const assignmentRow = removeAssignmentButton.closest('.instructor-assignment-row');
+            if (assignmentRow) {
+              assignmentRow.style.opacity = '0.4';
+              assignmentRow.style.pointerEvents = 'none';
+            }
+            try {
+              const token = await auth.getToken();
+              const response = await fetch('/api/instructor/courses', {
+                method: 'PUT',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${token}`,
+                },
+                body: JSON.stringify({
+                  action: 'remove_assignment',
+                  course_id: selectedInstructorCourseId,
+                  assignment_id: targetAssignmentId,
+                }),
+              });
+              await readApiResponse(response);
+
+              if (course) {
+                if (course.status === 'pending_review') {
+                  course.pending_assignments = (course.pending_assignments || []).filter(
+                    item => String(item.assignment_id) !== targetAssignmentId
+                  );
+                  course.pending_assignment_count = course.pending_assignments.length;
+                  reviewAssignmentSelections.delete(`${selectedInstructorCourseId}:${targetAssignmentId}`);
+                } else {
+                  course.assignments = (course.assignments || []).filter(
+                    item => String(item.assignment_id) !== targetAssignmentId
+                  );
+                  course.assignment_count = course.assignments.length;
+                }
+                renderInstructorCourseDetail(course);
+              } else {
+                await loadInstructorCourses(auth, selectedInstructorCourseId);
+              }
+            } catch (error) {
+              if (assignmentRow) {
+                assignmentRow.style.opacity = '';
+                assignmentRow.style.pointerEvents = '';
+              }
+              showMessage(error.message || 'Could not remove the assignment.', 'Assignment removal failed');
+              removeAssignmentButton.disabled = false;
+            }
+            return;
+          }
+
+          const discardReviewButton = event.target.closest('[data-discard-review]');
+          if (discardReviewButton) {
+            const courseId = discardReviewButton.dataset.discardReview;
+            const course = instructorCourses.find(item => item.course_id === courseId);
+            const count = course?.pending_assignments?.length || 0;
+            const confirmed = await confirmInstructorCourseAction(
+              'Discard All Assignments?',
+              `This discards all ${count} imported assignment${count === 1 ? '' : 's'} and publishes ${course?.course_name || 'the course'} without them. You can still add assignments yourself or sync again later.`,
+              'Discard All',
+              true,
+            );
+            if (!confirmed) return;
+            discardReviewButton.disabled = true;
+            try {
+              const token = await auth.getToken();
+              const response = await fetch('/api/instructor/courses', {
+                method: 'PUT',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${token}`,
+                },
+                body: JSON.stringify({ action: 'finalize', course_id: courseId, approved_assignment_ids: [] }),
+              });
+              const data = await readApiResponse(response);
+              await loadInstructorCourses(auth, data.course.course_id);
+              showMessage(`Discarded the imported assignments for ${data.course.course_name}.`, 'Assignments discarded');
+            } catch (error) {
+              discardReviewButton.disabled = false;
+              showMessage(error.message || 'Could not discard the imported assignments.', 'Discard failed');
+            }
+            return;
+          }
+
+          const finalizeButton = event.target.closest('[data-finalize-course]');
+          if (!finalizeButton) return;
+          finalizeButton.disabled = true;
+          finalizeButton.textContent = 'Adding...';
+          try {
+            const token = await auth.getToken();
+            const approvedAssignmentIds = [...document.getElementById('instructor-course-detail').querySelectorAll('[data-review-assignment]:checked')]
+              .map(checkbox => checkbox.dataset.reviewAssignment);
+            const response = await fetch('/api/instructor/courses', {
+              method: 'PUT',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`,
+              },
+              body: JSON.stringify({
+                action: 'finalize',
+                course_id: finalizeButton.dataset.finalizeCourse,
+                approved_assignment_ids: approvedAssignmentIds,
+              }),
+            });
+            const data = await readApiResponse(response);
+            await loadInstructorCourses(auth, data.course.course_id);
+            showMessage(`Added assignments to ${data.course.course_name}.`, 'Assignments added');
+          } catch (error) {
+            showMessage(error.message || 'Could not add assignments.', 'Adding assignments failed');
+            finalizeButton.disabled = false;
+            finalizeButton.textContent = 'Publish Assignments';
+          }
+        });
+        document.getElementById('instructor-course-detail').addEventListener('change', event => {
+          const checkbox = event.target.closest('[data-review-assignment]');
+          if (!checkbox) return;
+          reviewAssignmentSelections.set(
+            `${selectedInstructorCourseId}:${checkbox.dataset.reviewAssignment}`,
+            checkbox.checked,
+          );
+        });
+        courseImportModal.addEventListener('click', event => {
+          if (event.target === courseImportModal) closeCourseImportModal();
+        });
+        document.getElementById('course-import-cancel-btn').addEventListener('click', closeCourseImportModal);
+        document.getElementById('instructor-resource-modal-close').addEventListener('click', closeInstructorResourceModal);
+        instructorResourceModal.addEventListener('click', event => {
+          if (event.target === instructorResourceModal) closeInstructorResourceModal();
+        });
+        document.getElementById('instructor-assignment-modal-cancel').addEventListener('click', closeInstructorAssignmentModal);
+        document.getElementById('instructor-assignment-modal-save').addEventListener('click', async event => {
+          const saveButton = event.currentTarget;
+          const nameInput = document.getElementById('instructor-assignment-modal-name');
+          const dueInput = document.getElementById('instructor-assignment-modal-due');
+          const status = document.getElementById('instructor-assignment-modal-status');
+          const assignmentName = nameInput.value.trim();
+          const resources = [...document.querySelectorAll('#instructor-assignment-modal-resource-fields .instructor-assignment-resource-fields')]
+            .map(row => {
+              const [resourceType, resourceName, link] = row.querySelectorAll('input');
+              return {
+                resource_name: resourceName.value.trim(),
+                resource_type: resourceType.value.trim(),
+                link: link.value.trim(),
+              };
+            })
+            .filter(resource => resource.resource_name || resource.resource_type || resource.link);
+          if (!assignmentName) {
+            status.textContent = 'Enter an assignment name.';
+            nameInput.classList.add('assignment-name-missing');
+            nameInput.setAttribute('aria-invalid', 'true');
+            nameInput.focus();
+            return;
+          }
+          nameInput.classList.remove('assignment-name-missing');
+          if (!dueInput.value) {
+            status.textContent = 'Enter a due date.';
+            dueInput.setAttribute('aria-invalid', 'true');
+            dueInput.focus();
+            return;
+          }
+          dueInput.removeAttribute('aria-invalid');
+          nameInput.removeAttribute('aria-invalid');
+          if (resources.some(resource => !resource.resource_name || !resource.resource_type || !/^https?:\/\//i.test(resource.link))) {
+            status.textContent = 'Each resource needs a name, tag, and a valid HTTP or HTTPS URL.';
+            return;
+          }
+          saveButton.disabled = true;
+          status.textContent = '';
+          try {
+            const token = await auth.getToken();
+            const response = await fetch('/api/instructor/courses', {
+              method: 'PUT',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`,
+              },
+              body: JSON.stringify(editingAssignment
+                ? {
+                  action: editingSyncedAssignment ? 'update_synced_assignment' : 'update_assignment',
+                  course_id: selectedInstructorCourseId,
+                  assignment_id: editingAssignment.assignment_id,
+                  assignment_name: assignmentName,
+                  due: dueInput.value,
+                  resources,
+                }
+                : {
+                  action: 'add_assignment',
+                  course_id: selectedInstructorCourseId,
+                  assignment_name: assignmentName,
+                  due: dueInput.value,
+                  resources,
+                }),
+            });
+            await readApiResponse(response);
+            closeInstructorAssignmentModal();
+            await loadInstructorCourses(auth, selectedInstructorCourseId);
+          } catch (error) {
+            status.textContent = error.message || 'Could not save the assignment.';
+          } finally {
+            saveButton.disabled = false;
+          }
+        });
+        document.getElementById('instructor-assignment-add-resource').addEventListener('click', () => {
+          appendInstructorAssignmentResource();
+        });
+        document.getElementById('instructor-assignment-modal-name').addEventListener('input', event => {
+          if (event.currentTarget.value.trim()) {
+            event.currentTarget.classList.remove('assignment-name-missing');
+            event.currentTarget.removeAttribute('aria-invalid');
+          }
+        });
+        const assignmentResourceFields = document.getElementById('instructor-assignment-modal-resource-fields');
+        const resourceTagCategories = ['Link', 'Reading', 'Slides', 'Video', 'Spec', 'Starter Code', 'Notes', 'Rubric'];
+        const renderResourceTagOptions = (field, filter = '') => {
+          const options = field.querySelector('.instructor-resource-tag-options');
+          const normalizedFilter = filter.trim().toLowerCase();
+          const matchingCategories = resourceTagCategories.filter(category =>
+            category.toLowerCase().includes(normalizedFilter)
+          );
+          options.innerHTML = matchingCategories
+            .map(category => `<button type="button" role="option" data-resource-tag="${category}">${category}</button>`)
+            .join('');
+          options.classList.toggle('is-open', matchingCategories.length > 0);
+        };
+        assignmentResourceFields.addEventListener('focusin', event => {
+          const input = event.target.closest('.instructor-resource-tag-field input');
+          if (input) renderResourceTagOptions(input.parentElement);
+        });
+        assignmentResourceFields.addEventListener('input', event => {
+          const input = event.target.closest('.instructor-resource-tag-field input');
+          if (input) renderResourceTagOptions(input.parentElement, input.value);
+        });
+        assignmentResourceFields.addEventListener('click', event => {
+          const tagInput = event.target.closest('.instructor-resource-tag-field input');
+          if (tagInput) {
+            renderResourceTagOptions(tagInput.parentElement);
+            return;
+          }
+          const tagOption = event.target.closest('[data-resource-tag]');
+          if (tagOption) {
+            const field = tagOption.closest('.instructor-resource-tag-field');
+            const input = field.querySelector('input');
+            input.value = tagOption.dataset.resourceTag;
+            field.querySelector('.instructor-resource-tag-options').classList.remove('is-open');
+            input.focus();
+            return;
+          }
+          const removeResource = event.target.closest('[data-remove-resource]');
+          if (!removeResource) return;
+          const rows = document.querySelectorAll('#instructor-assignment-modal-resource-fields .instructor-assignment-resource-fields');
+          if (rows.length === 1) {
+            const inputs = removeResource.closest('.instructor-assignment-resource-fields').querySelectorAll('input');
+            inputs.forEach(input => { input.value = ''; });
+          } else {
+            removeResource.closest('.instructor-assignment-resource-fields').remove();
+          }
+        });
+        document.addEventListener('click', event => {
+          if (event.target.closest('.instructor-resource-tag-field')) return;
+          assignmentResourceFields.querySelectorAll('.instructor-resource-tag-options.is-open').forEach(options => {
+            options.classList.remove('is-open');
+          });
+        });
+        instructorAssignmentModal.addEventListener('click', event => {
+          if (event.target === instructorAssignmentModal) closeInstructorAssignmentModal();
+        });
+        document.addEventListener('keydown', event => {
+          if (event.key === 'Escape' && courseImportModal.classList.contains('active')) {
+            closeCourseImportModal();
+          }
+          if (event.key === 'Escape' && instructorResourceModal.classList.contains('active')) {
+            closeInstructorResourceModal();
+          }
+          if (event.key === 'Escape' && instructorAssignmentModal.classList.contains('active')) {
+            closeInstructorAssignmentModal();
+          }
+        });
+        [courseNameInput, courseTermInput, gradescopeCourseInput, courseWebsiteInput].forEach(input => {
+          input.addEventListener('keydown', event => {
+            if (event.key === 'Enter') {
+              event.preventDefault();
+              submitCourseImportButton.click();
+            }
+          });
+        });
+        courseNameInput.addEventListener('input', () => {
+          courseNameInput.classList.remove('course-name-missing');
+          courseNameInput.removeAttribute('aria-invalid');
+        });
+        gradescopeTaConfirm.addEventListener('change', () => {
+          gradescopeTaConfirmField.classList.remove('course-import-confirm-missing');
+        });
+        // The TA step only applies once a Gradescope Course ID is entered.
+        gradescopeCourseInput.addEventListener('input', () => {
+          gradescopeTaConfirmField.hidden = !gradescopeCourseInput.value.trim();
+        });
+
+        submitCourseImportButton.addEventListener('click', async () => {
+          const courseName = courseNameInput.value.trim();
+          const courseTerm = courseTermInput.value.trim();
+          const gradescopeCourseId = gradescopeCourseInput.value.trim();
+          const courseWebsiteUrl = courseWebsiteInput.value.trim();
+          const isEditingCourse = Boolean(editingCourseId);
+          if (!courseName) {
+            courseNameInput.setAttribute('aria-invalid', 'true');
+            courseNameInput.classList.add('course-name-missing');
+            courseImportStatus.textContent = 'Enter a course name.';
+            courseImportStatus.style.color = '#c0392b';
+            courseNameInput.focus();
+            return;
+          }
+          if (gradescopeCourseId && !gradescopeTaConfirm.checked) {
+            gradescopeTaConfirmField.classList.add('course-import-confirm-missing');
+            courseImportStatus.textContent = 'Add autoremindberkeley@gmail.com as a TA in Gradescope, then check the box to confirm.';
+            courseImportStatus.style.color = '#c0392b';
+            gradescopeTaConfirm.focus();
+            return;
+          }
+          submitCourseImportButton.disabled = true;
+          const courseImportCancelButton = document.getElementById('course-import-cancel-btn');
+          if (courseImportCancelButton) courseImportCancelButton.disabled = true;
+          submitCourseImportButton.textContent = isEditingCourse ? 'Saving...' : 'Creating...';
+          const changed = isEditingCourse
+            ? changedCourseSources(gradescopeCourseId, courseWebsiteUrl)
+            : { gradescope: false, website: false };
+          courseImportStatus.textContent = !isEditingCourse
+            ? (courseWebsiteUrl
+              ? 'Creating course and syncing the course website. This can take a few minutes...'
+              : 'Creating course and syncing any assignments found...')
+            : changed.gradescope && changed.website
+              ? 'Saving changes and syncing Gradescope and the new course website. This can take a few minutes...'
+              : changed.website
+                ? 'Saving changes and syncing the new course website. This can take a few minutes...'
+                : changed.gradescope
+                  ? 'Saving changes and syncing the new Gradescope course...'
+                  : 'Saving course changes...';
+          courseImportStatus.style.color = 'var(--muted)';
+          courseImportProgress.start(isEditingCourse
+            ? [changed.gradescope && 'gradescope', changed.website && 'website'].filter(Boolean)
+            : [gradescopeCourseId && 'gradescope', courseWebsiteUrl && 'website'].filter(Boolean));
+          try {
+            const token = await auth.getToken();
+            const data = await CourseProgress.request('/api/instructor/courses', {
+              method: isEditingCourse ? 'PUT' : 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`,
+              },
+              body: JSON.stringify({
+                ...(isEditingCourse ? { course_id: editingCourseId } : {}),
+                course_name: courseName,
+                term: courseTerm,
+                gradescope_url: gradescopeCourseId,
+                course_website_url: courseWebsiteUrl,
+              }),
+            }, courseImportProgress.handle);
+            if (!isEditingCourse) {
+              const destination = new URL('/my-courses', window.location.href);
+              destination.searchParams.set('course_id', data.course.course_id);
+              window.location.assign(destination.href);
+              return;
+            }
+            courseNameInput.value = '';
+            gradescopeCourseInput.value = '';
+            courseWebsiteInput.value = '';
+            await loadInstructorCourses(auth, data.course.course_id);
+            closeCourseImportModal();
+            // Report the automatic sync explicitly, even when it found nothing new.
+            const synced = data.sync_summary || {};
+            const syncedNames = [
+              synced.gradescope ? `Gradescope (${synced.gradescope.found} found)` : '',
+              synced.website ? `the course website (${synced.website.found} found)` : '',
+            ].filter(Boolean);
+            const newCount = data.course.new_assignment_count || 0;
+            const found = (synced.gradescope?.found || 0) + (synced.website?.found || 0);
+            const syncSentence = syncedNames.length
+              ? ` Synced ${syncedNames.join(' and ')}: ${newCount} new` +
+                (found > newCount ? ` (${found - newCount} already in this course).` : '.')
+              : '';
+            const statusMessage = `Updated ${data.course.course_name}.${syncSentence}` +
+              (newCount ? ' Review the newly found assignments.' : '');
+            showMessage(statusMessage, 'Course Updated');
+          } catch (error) {
+            courseImportProgress.stop();
+            courseImportStatus.textContent = error.message || 'Course import failed. Please try again.';
+            courseImportStatus.style.color = '#c0392b';
+          } finally {
+            submitCourseImportButton.disabled = false;
+            submitCourseImportButton.textContent = editingCourseId ? 'Save Changes' : 'Create New Course';
+            const courseImportCancelButton = document.getElementById('course-import-cancel-btn');
+            if (courseImportCancelButton) courseImportCancelButton.disabled = false;
+          }
+        });
+
+        document.getElementById('logout-btn').onclick = async () => {
+          await auth.signOut();
+          window.location.href = '/';
+        };
+      });
+    })();
+  </script>
+</body>
+
+</html>

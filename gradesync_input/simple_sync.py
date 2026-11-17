@@ -4,6 +4,8 @@ Pull every assignment's grade CSV from a Gradescope course and write each one
 as a tab in a Google Sheet. Re-runs overwrite cleanly.
 """
 
+from __future__ import annotations
+
 import argparse
 import csv
 import io
@@ -14,11 +16,9 @@ from pathlib import Path
 
 import os
 
-import gspread
 import requests
-import google.auth
-from google.oauth2.service_account import Credentials
 from html import unescape
+from urllib.parse import urlparse
 
 GRADESCOPE_BASE = "https://www.gradescope.com"
 SHEETS_SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
@@ -26,7 +26,7 @@ SHEETS_SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
 
 def gs_login(email: str, password: str) -> requests.Session:
     session = requests.Session()
-    session.headers.update({"User-Agent": "Mozilla/5.0"})
+    session.headers.update({"User-Agent": "Mozilla/5.0 SimpleSync"})
 
     r = session.get(f"{GRADESCOPE_BASE}/login")
     r.raise_for_status()
@@ -36,7 +36,7 @@ def gs_login(email: str, password: str) -> requests.Session:
         raise RuntimeError("Could not find CSRF token on Gradescope login page")
     csrf = match.group(1)
 
-    r = session.post(
+    response = session.post(
         f"{GRADESCOPE_BASE}/login",
         data={
             "utf8": "✓",
@@ -45,22 +45,28 @@ def gs_login(email: str, password: str) -> requests.Session:
             "session[password]": password,
             "session[remember_me]": "0",
             "commit": "Log In",
+            "session[remember_me_code]": "",
         },
         allow_redirects=True,
     )
-    r.raise_for_status()
-
-    if "/logout" not in r.text and "Log Out" not in r.text:
-        raise RuntimeError("Gradescope login failed — check credentials")
+    response.raise_for_status()
+    check = session.get(f"{GRADESCOPE_BASE}/account")
+    if check.status_code in (401, 403):
+        raise RuntimeError(
+            "GRADESCOPE_AUTH_ERROR: Gradescope rejected the shared account login "
+            f"(HTTP {check.status_code})."
+        )
+    check.raise_for_status()
+    if urlparse(check.url).path.rstrip("/") == "/login":
+        raise RuntimeError(
+            "GRADESCOPE_AUTH_ERROR: Gradescope redirected the shared account back to login."
+        )
 
     return session
 
 
-def get_assignments(session: requests.Session, course_id: str) -> list[dict]:
-    r = session.get(f"{GRADESCOPE_BASE}/courses/{course_id}/assignments")
-    r.raise_for_status()
-
-    m = re.search(r'data-react-props="([^"]+)"', r.text)
+def parse_assignments(html: str) -> list[dict]:
+    m = re.search(r'data-react-props="([^"]+)"', html)
     if not m:
         raise RuntimeError("Could not find assignment data on Gradescope page")
 
@@ -73,9 +79,35 @@ def get_assignments(session: requests.Session, course_id: str) -> list[dict]:
         id_match = re.search(r"(\d+)$", raw_id)
         if not id_match or not row.get("title"):
             continue
-        assignments.append({"id": id_match.group(1), "title": row["title"]})
+        due = find_due_value(row)
+        assignments.append({"id": id_match.group(1), "title": row["title"], "due": due})
 
     return assignments
+
+
+def find_due_value(value):
+    if isinstance(value, dict):
+        for key, item in value.items():
+            normalized_key = re.sub(r"[^a-z]", "", key.lower())
+            if normalized_key in {"due", "dueat", "duedate", "deadline", "deadlineat"} and isinstance(item, (str, int, float)):
+                if item:
+                    return item
+        for item in value.values():
+            due = find_due_value(item)
+            if due:
+                return due
+    elif isinstance(value, list):
+        for item in value:
+            due = find_due_value(item)
+            if due:
+                return due
+    return None
+
+
+def get_assignments(session: requests.Session, course_id: str) -> list[dict]:
+    r = session.get(f"{GRADESCOPE_BASE}/courses/{course_id}/assignments")
+    r.raise_for_status()
+    return parse_assignments(r.text)
 
 
 def fetch_csv(
@@ -91,6 +123,8 @@ def fetch_csv(
 
 def sync_roster_from_assignments(spreadsheet: gspread.Spreadsheet, first_assignment_rows: list[list[str]]):
     """Add any students missing from the Roster tab using names from an assignment CSV."""
+    import gspread
+
     if not first_assignment_rows or len(first_assignment_rows) < 2:
         return
 
@@ -159,6 +193,8 @@ def safe_tab_name(name: str) -> str:
 
 
 def get_or_create_worksheet(spreadsheet: gspread.Spreadsheet, title: str, rows_needed: int = 200, cols_needed: int = 20):
+    import gspread
+
     # Sized to the actual data plus headroom, not a flat 2000x50 (100,000 cells)
     # per tab regardless of content — that wastes ~97% of the cell allocation and
     # runs into Sheets' hard 10M-cell-per-spreadsheet ceiling once there are 100+ tabs.
@@ -178,6 +214,8 @@ def get_or_create_worksheet(spreadsheet: gspread.Spreadsheet, title: str, rows_n
 
 
 def write_tab(ws, rows: list[list[str]], sleep: float):
+    import gspread
+
     for attempt in range(6):
         try:
             ws.clear()
@@ -206,6 +244,10 @@ def write_tab(ws, rows: list[list[str]], sleep: float):
 
 
 def main():
+    import gspread
+    import google.auth
+    from google.oauth2.service_account import Credentials
+
     parser = argparse.ArgumentParser(description="Sync Gradescope grades to Google Sheets")
     parser.add_argument("--config", default="config/sync_config.json")
     parser.add_argument("--credentials", default="config/credentials.json")

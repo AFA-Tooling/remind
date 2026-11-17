@@ -9,10 +9,17 @@
         <a href="/#features" class="nav__link" id="nav-features-link" data-nav="features">Features</a>
         <a href="/#how-it-works" class="nav__link" id="nav-howitworks-link" data-nav="how-it-works">How it works</a>
         <a href="./about.html" class="nav__link" id="nav-about-link" data-nav="about">About</a>
-        <a href="./assignments.html" class="nav__link" id="nav-assignments-link" data-nav="assignments" style="display:none;">Assignments</a>
+        <a href="/my-courses" class="nav__link" id="nav-assignments-link" data-nav="my-courses" style="display:none;">My Courses</a>
         <a href="./login.html" id="nav-login-link" class="btn btn--outline" style="text-decoration:none; padding: 8px 16px; font-size: 14px;">Log in</a>
         <a href="mailto:autoremind@berkeley.edu" class="btn btn--primary" style="text-decoration:none;">Contact Us</a>
-        <span id="user-email" style="display:none; font-size:14px; color:var(--text);"></span>
+        <details class="account-menu">
+          <summary id="user-email" style="display:none; font-size:14px; color:var(--text);"></summary>
+          <div class="account-menu__dropdown">
+            <button type="button" class="account-menu__option" data-switch-role="student">Student</button>
+            <button type="button" class="account-menu__option" data-switch-role="instructor">Instructor</button>
+            <div class="account-menu__error" id="account-menu-error" role="alert"></div>
+          </div>
+        </details>
         <button id="logout-btn" class="btn btn--outline" style="display:none; padding: 8px 14px; font-size: 13px;">Sign Out</button>
       </div>
       <button class="nav__toggle" id="nav-toggle" aria-label="Toggle navigation">
@@ -26,6 +33,65 @@
     </div>
   </div>
 </nav>
+<style>
+  .account-menu { position: relative; }
+  .account-menu summary { cursor: pointer; list-style: none; }
+  .account-menu summary::-webkit-details-marker { display: none; }
+  .account-menu summary::after {
+    content: "";
+    display: inline-block;
+    margin-left: 0.45em;
+    border: 0.28em solid transparent;
+    border-top-color: currentColor;
+    transform: translateY(0.12em);
+  }
+  .account-menu__dropdown {
+    display: none;
+    position: absolute;
+    z-index: 110;
+    top: calc(100% + 4px);
+    right: 0;
+    min-width: 200px;
+    padding: 6px 8px 8px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: #fff;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, .12);
+  }
+  .account-menu__option {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    margin-top: 2px;
+    padding: 8px 10px;
+    border: 0;
+    border-radius: 6px;
+    background: #fff;
+    color: var(--text);
+    text-align: left;
+    font: inherit;
+    font-size: 14px;
+    cursor: pointer;
+    transition: background 120ms ease, color 120ms ease;
+  }
+  .account-menu__option:hover,
+  .account-menu__option:focus-visible { background: var(--pale); outline: none; }
+  .account-menu__option[aria-pressed="true"] { background: var(--pale); color: var(--olive-dark); font-weight: 600; }
+  .account-menu__option[aria-pressed="true"]::after {
+    content: "Current";
+    padding: 2px 6px;
+    border-radius: 999px;
+    background: #fff;
+    color: var(--olive-dark);
+    font-size: 10px;
+    font-weight: 600;
+  }
+  .account-menu__option:disabled { cursor: default; opacity: 1; }
+  .account-menu__error { padding: 6px 10px 4px; color: #b42318; font-size: 11px; }
+  .account-menu__error:empty { display: none; }
+  .account-menu[open] .account-menu__dropdown { display: block; }
+</style>
 <script>
   (function () {
     var toggle = document.getElementById('nav-toggle');
@@ -36,6 +102,80 @@
     }
 
     var page = (document.body && document.body.getAttribute('data-page')) || '';
+    var accountMenu = document.querySelector('.account-menu');
+    var accountEmail = document.getElementById('user-email');
+    var roleButtons = document.querySelectorAll('[data-switch-role]');
+    var roleError = document.getElementById('account-menu-error');
+
+    document.addEventListener('click', function (event) {
+      if (accountMenu && !accountMenu.contains(event.target)) accountMenu.open = false;
+    });
+    document.addEventListener('keydown', function (event) {
+      if (event.key === 'Escape' && accountMenu && accountMenu.open) {
+        accountMenu.open = false;
+        accountMenu.querySelector('summary').focus();
+      }
+    });
+
+    function waitForAuth(callback, attempts) {
+      if (window.auth && window.auth._auth) return callback(window.auth);
+      if (attempts > 0) setTimeout(function () { waitForAuth(callback, attempts - 1); }, 100);
+    }
+
+    if (accountMenu && accountEmail) {
+      waitForAuth(function (auth) {
+        auth.onAuthStateChange(async function (user, session, loading) {
+          if (loading || !user) return;
+          accountEmail.textContent = user.email || '';
+          accountEmail.style.display = 'inline-block';
+          try {
+            var role = await auth.getAccountRole();
+            var assignmentsLink = document.getElementById('nav-assignments-link');
+            if (assignmentsLink) {
+              if (role === 'instructor') {
+                assignmentsLink.textContent = 'My Courses';
+                assignmentsLink.href = '/my-courses';
+                assignmentsLink.dataset.nav = 'my-courses';
+                if (page === 'my-courses') {
+                  assignmentsLink.classList.add('nav__link--active');
+                } else {
+                  assignmentsLink.classList.remove('nav__link--active');
+                }
+              } else {
+                assignmentsLink.textContent = 'Assignments';
+                assignmentsLink.href = './assignments.html';
+                assignmentsLink.dataset.nav = 'assignments';
+                assignmentsLink.classList.toggle('nav__link--active', page === 'assignments');
+              }
+            }
+            roleButtons.forEach(function (button) {
+              var current = button.dataset.switchRole === role;
+              button.setAttribute('aria-pressed', String(current));
+              button.disabled = current;
+            });
+          } catch (error) {
+            console.error('Could not load account role for menu:', error);
+            roleError.textContent = 'Could not load role.';
+          }
+        });
+
+        roleButtons.forEach(function (button) {
+          button.addEventListener('click', async function () {
+            if (button.getAttribute('aria-pressed') === 'true') return;
+            roleButtons.forEach(function (option) { option.disabled = true; });
+            roleError.textContent = '';
+            try {
+              await auth.setAccountRole(button.dataset.switchRole);
+              window.location.assign('./index.html');
+            } catch (error) {
+              console.error('Could not switch account role:', error);
+              roleError.textContent = 'Could not switch role. Try again.';
+              roleButtons.forEach(function (option) { option.disabled = false; });
+            }
+          });
+        });
+      }, 50);
+    }
 
     // Highlight active link
     var activeLink = document.querySelector('.nav__link[data-nav="' + page + '"]');
@@ -44,7 +184,7 @@
     // Default visibility per page type. Per-page auth scripts continue to toggle these
     // when auth state changes; this only sets the initial render.
     var hide = function (id) { var el = document.getElementById(id); if (el) el.style.display = 'none'; };
-    if (page === 'index' || page === 'assignments') {
+    if (page === 'index' || page === 'assignments' || page === 'my-courses') {
       // Authed-only pages: marketing links and Log in are not relevant
       hide('nav-features-link');
       hide('nav-howitworks-link');
